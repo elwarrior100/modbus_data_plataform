@@ -260,7 +260,7 @@ Um merge bem-sucedido em `main` que altere gold gera uma **release imutável**:
 Cada fase tem **Definition of Done** verificável. Não avança sem DoD cumprido.
 Nunca duas fases abertas ao mesmo tempo.
 
-### Fase 0 — Fundações
+### Fase 0 — Fundações  ✅ concluída (2026-10-24)
 Repo git, estrutura de pastas, ADRs 001-004, VM Linux (Lima) dimensionada
 (8 vCPU / 24 GB RAM / 150 GB disco), k3s, `kubectl` a falar a partir do macOS, namespaces,
 ingress, storage class, SeaweedFS, PostgreSQL, **lakeFS** (KV backend em Postgres, storage em
