@@ -1,6 +1,6 @@
 # ADR-000 — Spike: leitura de Parquet num branch lakeFS com DuckDB
 
-**Data:** 2026-09-05 · **Estado:** em curso (pontos 4, 5, 6 fechados; 7-9 pendentes)
+**Data:** 2026-09-05 · **Estado:** concluído (2026-10-24)
 **Timebox:** 2 h · **Contexto:** [PLAN.md §13](../PLAN.md)
 
 ## Pergunta
@@ -85,23 +85,47 @@ local (`SUM` = `5005544.534905481` nos dois casos), pelo que o gateway não alte
 sobre o custo de **listagem** com milhares de objetos, nem sobre débito a dezenas de GB.
 Repetir a uma escala realista antes de fechar a Fase 4.
 
-### Ponto 5b — origem da coluna `dt` ⬜ pendente
+### Repetição no cluster (k3s + SeaweedFS + lakeFS em Postgres)
 
-Ler o mesmo ficheiro com `hive_partitioning` desligado: se o `dt` desaparecer, o valor vive
-no nome da pasta; se persistir, está duplicado dentro do ficheiro. Determina se há
-*partition pruning* e se se está a gastar espaço em duplicado.
+O spike inicial usou lakeFS em Docker com blockstore local. Foi repetido contra o
+cluster real da Fase 0, com o lakeFS 1.86.0 a escrever para SeaweedFS (S3), metadados em
+PostgreSQL e DuckDB 1.5.5 no Mac a ler pelo gateway S3 do lakeFS via port-forward.
 
-### Ponto 7 — leitura de `main` do lado do consumidor ⬜ pendente
+| Ponto | Resultado |
+|---|---|
+| Isolamento (branch invisível em `main` até ao merge) | ✅ repetido no cluster |
+| Commit, merge e tag `gold-v0.1.0` | ✅ |
+| Leitura por tag com glob | ✅ 100 000 linhas, soma `5005544.534905481` |
+| Igualdade com a leitura local | ✅ soma idêntica, bit a bit |
+| Compatibilidade lakeFS sobre SeaweedFS | ✅ escrita, commit, merge e leitura |
 
-Repetir a consulta apontando a `main` **antes do merge**: deve falhar por não encontrar
-ficheiros. O erro é o resultado positivo.
+### Ponto 5b — origem da coluna `dt` ✅
 
-### Pontos 7-8 — merge e tag ⬜ pendente
+Com `hive_partitioning` desligado, `dt` **desaparece** (restam `asset_id`, `tag_name`,
+`ts_utc`, `value`, `row_index`). O valor vive só no nome da pasta: não há duplicação em
+disco e é possível *partition pruning* por data.
 
-### Ponto 9 — duas refs na mesma consulta ⬜ pendente
+### Ponto 6 (repetido) — desempenho ✅
 
-Decide se o gate G3 (reconciliação silver↔gold entre branch e `main`) é implementável como
-está desenhado no plano.
+`SUM(value)`, 2.ª execução: lakeFS 0.007 s vs local 0.001 s. Diferença de ~6 ms para 3
+ficheiros (≈2 ms/ficheiro), o que confirma custo fixo por pedido. A 1.ª execução (0.031 s)
+inclui o aquecimento de ligações. A ressalva anterior mantém-se: 3 ficheiros em localhost
+não dizem nada sobre milhares de ficheiros ou concorrência.
+
+### Ponto 9 — duas refs na mesma consulta ✅
+
+Uma única consulta lê a tag `gold-v0.1.0` e o branch `etl-gap` (de onde se apagou a
+partição de 2026-03-02), agrega por `dt` e junta com `FULL OUTER JOIN`:
+
+| dt | linhas_tag | linhas_branch | diferença |
+|---|---|---|---|
+| 2026-03-01 | 33760 | 33760 | 0 |
+| 2026-03-02 | 33120 | NULL | 33120 |
+| 2026-03-03 | 33120 | 33120 | 0 |
+
+O dia em falta é detetado. **Armadilha confirmada:** o lado ausente vem `NULL`, não `0`;
+a coluna `diferença` só dispara porque a consulta aplica `coalesce`. Um gate escrito como
+`linhas_tag <> linhas_branch` sem tratar `NULL` deixaria passar o dia em falta.
 
 ## Aprendizagens laterais
 
@@ -115,4 +139,18 @@ está desenhado no plano.
 
 ## Decisão
 
-⬜ Pendente dos pontos 5b e 7-9. Até aqui, nada contradiz o desenho da §2 do plano.
+**Seguir com o desenho Write-Audit-Publish da §2 do plano.** Todos os pontos do spike
+foram respondidos com evidência e nenhum contradiz o desenho:
+
+- branches isolam dados por validar; só o merge promove;
+- o DuckDB lê qualquer ref (branch, tag) pelo gateway S3, com glob e partições Hive;
+- o custo do gateway é fixo por ficheiro e os dados chegam intactos;
+- a reconciliação entre duas refs (gate G3) é implementável numa única consulta.
+
+Regras que passam para o desenho dos gates:
+1. Qualquer comparação entre refs trata o lado ausente (`coalesce`), porque a ausência é
+   `NULL` e `NULL <> x` não é verdadeiro.
+2. O passo de commit é explícito no DAG: staging não é histórico.
+3. Repetir a medição de desempenho a escala realista antes de fechar a Fase 4.
+
+Alteração ao plano: o armazenamento passou de MinIO para SeaweedFS (ADR-002).
