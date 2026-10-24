@@ -15,11 +15,11 @@ A plataforma tem de correr on-prem e o desenvolvimento faz-se num MacBook (12 co
 | Cluster em Raspberry Pi | Máximo realismo | Hardware e rede extra, ARM e RAM limitadas |
 
 ## Decisão
-k3s numa VM Lima (Ubuntu, 8 vCPU / 24 GB / 150 GB), configuração versionada em
+k3s numa VM Lima (Ubuntu, 8 vCPU / 16 GB / 150 GB), configuração versionada em
 `platform/lima/`.
 
 ## Consequências
-- 24 dos 36 GB ficam reservados à VM; se o Mac sofrer, reduz-se para 16 GB e corre-se só
-  o perfil `core` do plano (§9).
+- 16 dos 36 GB ficam reservados à VM (reduzido de 24 GB por precaução em 2026-10-24); corre-se só
+  o perfil `core` do plano (§9) e sobe-se a RAM quando a Fase 5 (OpenMetadata) o exigir.
 - O simulador Modbus/RS-232 vive dentro da VM.
 - A VM tem de ser recriável com um comando (critério da Fase 9).
