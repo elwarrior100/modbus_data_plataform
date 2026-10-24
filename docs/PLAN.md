@@ -81,7 +81,7 @@ de um treino de ML é o hash do commit; e "quem estragou o quê, quando" é um `
 │                                                                            │
 │   ┌────────────────────────────────────────────────────────────────────┐   │
 │   │  lakeFS  (versionamento: branches · commits · tags · hooks)        │   │
-│   │      └── MinIO (S3 on-prem, storage físico)                        │   │
+│   │      └── SeaweedFS (S3 on-prem, storage físico)                        │   │
 │   │            bronze/  raw imutável, particionado por dia/hora        │   │
 │   │            silver/  parquet canónico, tipado, deduplicado          │   │
 │   │            gold/    agregados de negócio + features ML             │   │
@@ -90,7 +90,7 @@ de um treino de ML é o hash do commit; e "quem estragou o quê, quando" é um `
 │  Airflow (KubernetesExecutor) orquestra: branch → ETL → gates → merge → tag│
 │  OpenMetadata: catálogo · linhagem · glossário · testes de qualidade       │
 │  Postgres: metadata Airflow + lakeFS KV + OpenMetadata + serving layer     │
-│  MLflow: tracking + registry (artefactos no MinIO, dados por tag lakeFS)   │
+│  MLflow: tracking + registry (artefactos no SeaweedFS, dados por tag lakeFS)   │
 │                                                                            │
 │  Grafana (live, <5 s)   ·   Superset (BI sobre gold)                       │
 │  Prometheus + Loki (observabilidade)   ·   Argo CD (GitOps)                │
@@ -111,7 +111,7 @@ Cada linha vira um ADR curto em `docs/adr/`.
 | # | Decisão | Escolha | Alternativas | Porquê |
 |---|---|---|---|---|
 | 001 | Runtime k8s | **k3s numa VM Linux (Lima)** | k3d em Docker, Pi cluster | k3s a sério, storage e rede realistas, reprodutível |
-| 002 | Object storage | **MinIO** | SeaweedFS, Ceph | API S3 fiel, leve, versioning |
+| 002 | Object storage | **SeaweedFS** (MinIO deixou de publicar imagens; ver ADR-002) | MinIO, Ceph | API S3, Apache-2.0, leve |
 | 003 | Versionamento de dados | **lakeFS** *(requisito)* | Iceberg, Delta, nada | Branches, tags imutáveis e hooks pré-merge — é o motor dos gates e das releases |
 | 004 | Formato de tabela | **Parquet + partições Hive** | Iceberg, Delta | O lakeFS já dá atomicidade, time travel e histórico. Somar Iceberg duplicaria conceitos e triplicaria a fricção de integração |
 | 005 | Catálogo e governança | **OpenMetadata** *(requisito)* | DataHub, Amundsen | Catálogo, linhagem, glossário, testes de qualidade e profiler num só sítio |
@@ -123,7 +123,7 @@ Cada linha vira um ADR curto em `docs/adr/`.
 | 011 | Orquestração | **Airflow 3, KubernetesExecutor** *(requisito)* | Dagster, Prefect | Confirmado na stack de referência; integra com lakeFS (hooks/operadores) e alimenta a linhagem do OpenMetadata |
 | 012 | Dashboard live | **Grafana** (fonte: Timescale) | app própria | Refresh curto, alerting incluído |
 | 013 | BI | **Superset** | Metabase, só Grafana | Camada semântica, exploração ad-hoc sobre gold |
-| 014 | ML tracking | **MLflow** | W&B (cloud → viola on-prem) | On-prem, registry, artefactos no MinIO |
+| 014 | ML tracking | **MLflow** | W&B (cloud → viola on-prem) | On-prem, registry, artefactos no SeaweedFS |
 | 015 | GitOps | **Argo CD** | Flux, kubectl à mão | Estado declarativo, drift detection |
 
 > **Regra:** antes de escrever o ADR, o Stéphane defende a escolha em duas frases. Se não
@@ -263,9 +263,9 @@ Nunca duas fases abertas ao mesmo tempo.
 ### Fase 0 — Fundações
 Repo git, estrutura de pastas, ADRs 001-004, VM Linux (Lima) dimensionada
 (8 vCPU / 24 GB RAM / 150 GB disco), k3s, `kubectl` a falar a partir do macOS, namespaces,
-ingress, storage class, MinIO, PostgreSQL, **lakeFS** (KV backend em Postgres, storage em
-MinIO), repositório lakeFS `industrial-lake` inicializado com `main`, registry local.
-**DoD:** `kubectl get nodes` do macOS mostra Ready; MinIO e a UI do lakeFS abrem no browser;
+ingress, storage class, SeaweedFS, PostgreSQL, **lakeFS** (KV backend em Postgres, storage em
+SeaweedFS), repositório lakeFS `industrial-lake` inicializado com `main`, registry local.
+**DoD:** `kubectl get nodes` do macOS mostra Ready; SeaweedFS e a UI do lakeFS abrem no browser;
 um ficheiro escrito num branch lakeFS **não** aparece em `main` antes do merge, e aparece
 depois; tudo sobrevive a reboot da VM.
 
@@ -301,7 +301,7 @@ reprocessar a mesma partição duas vezes não altera contagens; uma falha a mei
 `main` intacto (o trabalho por acabar fica no branch) — este é o teste que prova o WAP.
 
 ### Fase 5 — Governança e gates
-OpenMetadata no cluster, conectores (PostgreSQL, datalake sobre MinIO/lakeFS, linhagem do
+OpenMetadata no cluster, conectores (PostgreSQL, datalake sobre SeaweedFS/lakeFS, linhagem do
 Airflow), glossário de negócio, *owners* por dataset, test suites de G2/G3, e os *pre-merge
 hooks* do lakeFS a impor o resultado.
 **DoD:** injetar `comms_gap` faz G2 falhar por completude e **o merge é rejeitado**;
@@ -337,7 +337,7 @@ retrain a partir da tag registada reproduz as métricas.
 
 ### Fase 9 — Hardening e produto final
 Prometheus/Loki, alerting, CI (lint, testes, build de imagens), Argo CD, secrets (SOPS ou
-sealed-secrets), backups (versioning MinIO + dump Postgres + garbage collection do lakeFS),
+sealed-secrets), backups (versioning SeaweedFS + dump Postgres + garbage collection do lakeFS),
 README com arquitetura e demo, bootstrap de raiz. Broker (ADR-009) se o gatilho se verificar.
 **DoD:** destruir a VM e reconstruir tudo a partir do repo em <30 min, sem passos manuais
 não documentados.
@@ -351,12 +351,12 @@ O OpenMetadata pesa (servidor + índice de pesquisa). Por isso a plataforma corr
 
 | Perfil | Componentes | RAM aprox. |
 |---|---|---|
-| `core` (F0-F4) | k3s, MinIO, lakeFS, Postgres, Airflow, OT sim | ~11 GB |
+| `core` (F0-F4) | k3s, SeaweedFS, lakeFS, Postgres, Airflow, OT sim | ~11 GB |
 | `core+gov` (F5-F6) | + OpenMetadata + índice de pesquisa | ~16 GB |
 | `core+bi` (F7) | + Grafana, Prometheus, Loki, Superset | ~17 GB |
 | `full` (F8-F9) | + MLflow (OpenMetadata pode ficar parado) | ~19 GB |
 
-Componente a componente: k3s 2 · MinIO 2 · Postgres 2 · lakeFS 1 · Airflow 4 ·
+Componente a componente: k3s 2 · SeaweedFS 2 · Postgres 2 · lakeFS 1 · Airflow 4 ·
 OpenMetadata 2 · índice de pesquisa 2 (heap reduzido) · Grafana+Prom+Loki 2 ·
 Superset 2 · MLflow 1 · folga para jobs 2-3.
 
@@ -406,7 +406,7 @@ modbus_data_plataform/
 │   ├── data-contracts.md     contratos bronze/silver/gold
 │   └── runbook.md            operação e troubleshooting
 ├── ot/                       simulador + gateway OPC UA
-├── platform/                 k3s bootstrap, MinIO, lakeFS, Postgres, OpenMetadata, Argo CD
+├── platform/                 k3s bootstrap, SeaweedFS, lakeFS, Postgres, OpenMetadata, Argo CD
 ├── pipelines/                DAGs Airflow + transformações
 ├── quality/                  test suites + hooks lakeFS
 ├── governance/               config de conectores e glossário OpenMetadata
@@ -434,14 +434,14 @@ duas horas, não construir infraestrutura.
 
 Passos e perguntas a responder:
 
-1. lakeFS + MinIO a correr localmente (quickstart oficial do lakeFS); repositório `spike`.
+1. lakeFS + SeaweedFS a correr localmente (quickstart oficial do lakeFS); repositório `spike`.
 2. Criar branch `test` a partir de `main`.
 3. Escrever ~100k linhas de Parquet particionado por dia para `test`, sob `bronze/dt=…/`.
 4. **Isolamento:** o ficheiro aparece em `test` e **não** aparece em `main`? (Se falhar aqui,
    pára tudo — não percebeste o modelo do lakeFS.)
 5. **Leitura:** o DuckDB lê via gateway S3, com o branch no caminho? Faz *glob* de partições
-   (`**/*.parquet`)? Precisa de credenciais próprias do lakeFS ou reutiliza as do MinIO?
-6. **Performance:** ler as 100k linhas demora quanto, comparado com ler direto do MinIO?
+   (`**/*.parquet`)? Precisa de credenciais próprias do lakeFS ou reutiliza as do SeaweedFS?
+6. **Performance:** ler as 100k linhas demora quanto, comparado com ler direto do SeaweedFS?
    Ordem de grandeza chega — só interessa se for 10× pior.
 7. Commit no branch, merge para `main`, confirmar que agora aparece em `main`.
 8. Criar uma tag e ler a partir dela (é assim que o ML e o BI vão consumir).
