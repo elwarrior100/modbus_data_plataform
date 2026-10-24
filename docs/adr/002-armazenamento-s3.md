@@ -22,12 +22,10 @@ SeaweedFS (`weed server` com master, volume, filer e gateway S3 num só pod).
 ## Consequências
 - A compatibilidade com o lakeFS é validada no spike da Fase 0 (escrita, leitura e
   glob a partir do DuckDB). Se falhar, reabre-se este ADR.
-- Três buckets, um por camada: `bronze`, `silver`, `gold` (decisão do Stéphane,
-  2026-10-24). Cada um serve de *storage namespace* de um repositório lakeFS próprio,
-  logo há **três repositórios lakeFS**, não um.
-- Custo desta escolha: um merge no lakeFS é atómico dentro de **um** repositório, não
-  entre três. A promoção bronze→silver→gold deixa de ser uma única operação atómica e
-  passa a ser uma sequência de merges, cada um com o seu gate. A reprodutibilidade
-  cross-camada fica a cargo do manifest da release (§7 do plano), que regista o commit
-  de cada repositório. Rever o §2 do plano quando se implementar o pipeline (Fase 4).
+- Um único bucket, `lake`, que é o *storage namespace* de **um** repositório lakeFS
+  (`industrial-lake`). Bronze, silver e gold são pastas dentro dele.
+- Alternativa avaliada e rejeitada (2026-10-24): três buckets, três repositórios. Ganhava
+  retenção por camada e isolamento, mas perdia a atomicidade do merge entre camadas, que é
+  o que sustenta o Write-Audit-Publish do plano §2. Com o volume do projeto, os ganhos não
+  compensam. Reabrir se o volume do bronze tornar a retenção por camada necessária.
 - Nome do serviço no cluster: `seaweedfs:8333` (S3).
