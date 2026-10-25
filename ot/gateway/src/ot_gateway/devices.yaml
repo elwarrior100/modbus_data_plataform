@@ -1,0 +1,38 @@
+# Espelho de docs/register-map.md. Um teste compara as duas fontes.
+poll_interval_s: 1.0
+devices:
+  - name: PUMP-01
+    unit: 1
+    word_order: ABCD
+    alarm_coil: 0
+    signals:
+      - {name: outlet_pressure, addr: 0, type: uint16, scale: 0.01, unit: bar, eu: [0, 16]}
+      - {name: flow_rate, addr: 1, type: uint16, scale: 0.1, unit: m3/h, eu: [0, 500]}
+      - {name: motor_current, addr: 2, type: uint16, scale: 0.1, unit: A, eu: [0, 100]}
+      - {name: bearing_temp, addr: 3, type: int16, scale: 0.1, unit: degC, eu: [-20, 150]}
+      - {name: vibration_rms, addr: 4, type: uint16, scale: 0.01, unit: mm/s, eu: [0, 50]}
+      - {name: run_hours, addr: 5, type: uint32, unit: h, kind: counter}
+      - {name: state, addr: 7, type: uint16, kind: state, enum: [STOPPED, STARTING, RUNNING, FAULT, MAINTENANCE]}
+      - {name: device_clock, addr: 20, type: uint32, unit: s, kind: clock}
+  - name: MOTOR-01
+    unit: 2
+    word_order: CDAB
+    alarm_coil: 0
+    signals:
+      - {name: speed_rpm, addr: 0, type: uint32, unit: rpm, eu: [0, 3600]}
+      - {name: torque, addr: 2, type: int16, scale: 0.1, unit: N.m, eu: [-500, 1000]}
+      - {name: current, addr: 3, type: uint16, scale: 0.1, unit: A, eu: [0, 200]}
+      - {name: winding_temp, addr: 4, type: int16, scale: 0.1, unit: degC, eu: [-20, 200]}
+      - {name: vibration_rms, addr: 5, type: uint16, scale: 0.01, unit: mm/s, eu: [0, 50]}
+      - {name: state, addr: 6, type: uint16, kind: state, enum: [STOPPED, STARTING, RUNNING, FAULT, MAINTENANCE]}
+      - {name: device_clock, addr: 20, type: uint32, unit: s, kind: clock}
+  - name: CHILLER-01
+    unit: 3
+    word_order: ABCD
+    signals:
+      - {name: inlet_temp, addr: 0, type: int16, scale: 0.1, unit: degC, eu: [0, 40]}
+      - {name: outlet_temp, addr: 1, type: int16, scale: 0.1, unit: degC, eu: [0, 30]}
+      - {name: power_kw, addr: 2, type: float32, unit: kW, eu: [0, 500]}
+      # 'OFF' tem de levar aspas: em YAML 1.1, OFF sem aspas é o booleano False
+      - {name: state, addr: 4, type: uint16, kind: state, enum: ['OFF', STANDBY, COOLING, FAULT]}
+      - {name: device_clock, addr: 20, type: uint32, unit: s, kind: clock}

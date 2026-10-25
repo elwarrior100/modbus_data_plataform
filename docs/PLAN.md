@@ -277,7 +277,7 @@ sobre série + TCP, cenários injetáveis por configuração.
 palavras correta; ativar `sensor_stuck` produz efeito observável; o mapa de registos está
 completo e correto.
 
-### Fase 2 — Gateway OPC UA
+### Fase 2 — Gateway OPC UA  ✅ concluída (2026-10-25)
 Cliente Modbus → servidor OPC UA com address space modelado por ativo, `EngineeringUnits`,
 `EURange`, e mapeamento de falhas Modbus para *status codes* (timeout → `BAD_...`, **não**
 `GOOD` com o valor antigo — é o erro clássico e é uma fonte silenciosa de dados falsos).
