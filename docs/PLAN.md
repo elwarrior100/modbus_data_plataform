@@ -269,7 +269,7 @@ SeaweedFS), repositório lakeFS `industrial-lake` inicializado com `main`, regis
 um ficheiro escrito num branch lakeFS **não** aparece em `main` antes do merge, e aparece
 depois; tudo sobrevive a reboot da VM.
 
-### Fase 1 — OT: Modbus + RS-232
+### Fase 1 — OT: Modbus + RS-232  ✅ concluída (2026-10-25)
 Simulador dos três ativos, **mapa de registos documentado em markdown** (entregável por
 direito próprio: endereço, tipo, escala, unidade, word order), par série virtual, Modbus RTU
 sobre série + TCP, cenários injetáveis por configuração.
