@@ -154,6 +154,45 @@ vê-se na interface do Argo se o cluster está "em dia" (*Synced*).
 
 ---
 
+### Como o Argo funciona por dentro
+
+👉 **Imagem 6.**
+
+O Argo CD é um **comparador que nunca descansa**. Em cada ciclo faz três coisas:
+
+1. **Lê o que devia estar** (o `repo-server` vai ao GitHub e prepara os manifestos).
+2. **Vê o que está** (o `application-controller` pergunta ao cluster).
+3. **Compara.** Se são iguais, o estado é `Synced` e não faz nada. Se são diferentes, é
+   `OutOfSync`, e, como as nossas aplicações são automáticas, **aplica a diferença**.
+
+O que ele vigia está escrito numa "Application", que é um objeto do próprio cluster. A nossa
+aplicação `data` diz, em resumo:
+
+    repositório : git@github.com:elwarrior100/modbus_data_plataform.git
+    ramo        : main
+    pasta       : platform/k8s            (só os ficheiros do Postgres, SeaweedFS e lakeFS)
+    destino     : o nosso cluster, namespace data
+    automático  : selfHeal=true (desfaz alterações à mão)   prune=false (nunca apaga)
+
+Repara no `prune=false`: se apagares um ficheiro do git, o Argo **não** apaga o serviço
+correspondente. É de propósito, para uma base de dados não desaparecer por engano.
+
+Temos quatro aplicações, organizadas em **"app-of-apps"**: a `root` vigia a pasta
+`platform/argocd/apps/`, e cada ficheiro lá dentro (`namespaces`, `data`, `ot`) é outra
+aplicação. Assim, para o Argo gerir uma coisa nova, basta acrescentar um ficheiro.
+
+Duas palavras que vês na interface:
+
+| Estado | Pergunta a que responde | Valores |
+|---|---|---|
+| **Sync** | o cluster é igual ao git? | `Synced` ou `OutOfSync` |
+| **Health** | o que corre está vivo e saudável? | `Healthy`, `Progressing`, `Degraded` |
+
+Podes estar `Synced` (igual ao git) mas `Degraded` (o git descreve algo que não funciona).
+O Argo garante que o cluster **é igual ao git**, não que o git **esteja certo**.
+
+---
+
 ## 6. Como ver tudo (as interfaces)
 
 ```
@@ -171,10 +210,76 @@ k9s                               # o cluster no terminal (precisa do KUBECONFIG
 | Simulador | http://localhost:8083/state | os valores atuais das 3 máquinas |
 | OPC UA | `opc.tcp://localhost:4840/ot-gateway` | abrir com o UaExpert |
 
-**`k9s` em 5 teclas:** `:pods` + Enter (lista pods) · `l` (logs do pod selecionado) · `d`
-(descrição) · `/` (filtrar) · `Esc` (voltar) · `Ctrl-C` (sair).
+## 6b. Como usar o k9s (o cluster no terminal)
 
----
+O `k9s` é uma "janela" dentro do terminal que mostra o cluster em tempo real. Ao contrário
+do `kubectl`, não tens de decorar comandos: navegas com o teclado.
+
+### Como ligar (tens de o fazer em cada terminal novo)
+
+O `k9s` precisa de saber **onde está o cluster**. Tens duas formas:
+
+```
+# Forma 1: dizer ao terminal onde está o cluster (e depois usas k9s e kubectl à vontade)
+export KUBECONFIG=~/.lima/industrial/copied-from-guest/kubeconfig.yaml
+k9s
+
+# Forma 2: dizer só ao k9s, nesse comando
+k9s --kubeconfig ~/.lima/industrial/copied-from-guest/kubeconfig.yaml
+```
+
+Antes, confirma que a VM está ligada: `limactl list` deve mostrar `Running`. Se estiver
+`Stopped`, corre `limactl start industrial`.
+
+**Recomendo abrir sempre em modo só de leitura enquanto estás a aprender**, para nunca
+apagares nada por engano:
+
+```
+k9s --readonly
+```
+
+### O que vês no ecrã
+
+    ┌ topo ─────────────────────────────────────────────────────────┐
+    │ cluster, versão, uso de CPU e RAM + as teclas disponíveis     │
+    ├ meio ─────────────────────────────────────────────────────────┤
+    │ a lista (por omissão, os pods), com estado, restarts e idade  │
+    ├ fundo ────────────────────────────────────────────────────────┤
+    │ o caminho onde estás (ex.: pods > ot) para saberes voltar     │
+    └───────────────────────────────────────────────────────────────┘
+
+### As teclas que precisas
+
+| Tecla | O que faz |
+|---|---|
+| `:` e depois o nome | muda de vista: `:pods`, `:deploy`, `:svc`, `:ns` (namespaces), `:events` |
+| `0` | mostra tudo, de todos os namespaces |
+| `↑` `↓` (ou `j` `k`) | mover na lista |
+| `Enter` | entrar no item selecionado (de um pod, vai aos contentores) |
+| `l` | **ver os logs** do pod selecionado |
+| `d` | descrever: eventos e configuração (o que o `kubectl describe` mostra) |
+| `y` | ver o YAML do objeto |
+| `/` | filtrar a lista por texto |
+| `Esc` | voltar atrás |
+| `?` | ajuda com todas as teclas |
+| `:q` ou `Ctrl-C` | sair |
+
+**Cuidado** (só fora do modo `--readonly`): `Ctrl-D` **apaga** o item selecionado. Num pod
+gerido por um Deployment é inofensivo (é recriado), mas apagar outras coisas não.
+
+### Três exercícios para treinares
+
+**1. Ver o simulador a funcionar.** `k9s --readonly` → escreve `:ns` + Enter → seleciona `ot`
+→ Enter → seleciona o pod `ot-edge-…` → prime `l`. Vês os logs: "Modbus TCP a escutar",
+"Modbus RTU a escutar", "OPC UA a escutar". É o que o pod disse ao arrancar.
+
+**2. Ver o Argo.** Escreve `:applications` + Enter. Aparecem as quatro aplicações, com
+`Synced` e `Healthy`. Seleciona `data`, prime `d` e vês o que o Argo vigia.
+
+**3. Ver o self-heal com os teus olhos** (este exercício precisa de **sair do modo de
+leitura**: abre só `k9s`). Vai a `:deploy` no namespace `ot`, seleciona `ot-edge`, e prime `s`
+(*scale*) para o pôr a 3 réplicas. Em cerca de 4 segundos o Argo volta a pô-lo a 1. Estás a
+ver, em direto, o cluster a ser puxado para o git.
 
 ## 7. Se alguma coisa não funcionar
 

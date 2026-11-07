@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" width="800" height="520" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>Como o Argo CD funciona: compara o git com o cluster, e iguala</title>
+<rect width="800" height="520" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">Como o Argo CD funciona: compara o git com o cluster, e iguala</text>
+<rect x="20" y="60" width="200" height="100" rx="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="34" y="83" font-weight="bold" fill="#3c3489">GIT (no GitHub)</text>
+<text x="34" y="104" font-size="12.5"  fill="#3c3489">o que DEVIA estar</text>
+<text x="34" y="122" font-size="12.5"  fill="#3c3489">pasta platform/k8s</text>
+<text x="34" y="140" font-size="12.5"  fill="#3c3489">ramo main</text>
+<rect x="20" y="210" width="200" height="86" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="233" font-weight="bold" fill="#0c447c">repo-server</text>
+<text x="34" y="254" font-size="12.5"  fill="#0c447c">lê o git e prepara</text>
+<text x="34" y="272" font-size="12.5"  fill="#0c447c">os manifestos</text>
+<rect x="300" y="210" width="200" height="100" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="314" y="233" font-weight="bold" fill="#633806">application-controller</text>
+<text x="314" y="254" font-size="12.5"  fill="#633806">COMPARA os dois</text>
+<text x="314" y="272" font-size="12.5"  fill="#633806">é o 'cérebro' do Argo</text>
+<rect x="580" y="60" width="190" height="100" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="594" y="83" font-weight="bold" fill="#27500a">CLUSTER (k3s)</text>
+<text x="594" y="104" font-size="12.5"  fill="#27500a">o que ESTÁ a correr</text>
+<text x="594" y="122" font-size="12.5"  fill="#27500a">pods, serviços, ...</text>
+<path d="M120 160 V208" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M222 252 H298" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="260" y="240" font-size="11" fill="#444" text-anchor="middle">o que</text>
+<text x="260" y="275" font-size="11" fill="#444" text-anchor="middle">devia estar</text>
+<path d="M675 162 V262 H502" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="588" y="252" font-size="11.5" fill="#444" text-anchor="middle">o que está</text>
+<path d="M400 208 V112 H578" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="488" y="104" font-size="11.5" fill="#444" text-anchor="middle">aplica a diferença</text>
+<text x="20" y="340" font-size="12.5" fill="#2c2c2a" text-anchor="start" font-weight="bold">O ciclo repete-se de 3 em 3 minutos, e também logo que alguém mexe no cluster.</text>
+<rect x="20" y="360" width="360" height="70" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="34" y="383" font-weight="bold" fill="#27500a">Synced  =  iguais</text>
+<text x="34" y="404" font-size="12.5"  fill="#27500a">o Argo não faz nada</text>
+<rect x="400" y="360" width="370" height="70" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="414" y="383" font-weight="bold" fill="#633806">OutOfSync  =  diferentes</text>
+<text x="414" y="404" font-size="12.5"  fill="#633806">se for automático, aplica a diferença</text>
+<rect x="20" y="445" width="360" height="56" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="34" y="468" font-weight="bold" fill="#2c2c2a">Healthy / Progressing / Degraded</text>
+<text x="34" y="489" font-size="12.5"  fill="#2c2c2a">é a saúde: os pods estão mesmo vivos?</text>
+<rect x="400" y="445" width="370" height="56" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="414" y="468" font-weight="bold" fill="#2c2c2a">argocd-server e redis</text>
+<text x="414" y="489" font-size="12.5"  fill="#2c2c2a">a interface web e a memória rápida</text>
+</svg>
