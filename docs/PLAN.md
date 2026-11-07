@@ -284,7 +284,7 @@ Cliente Modbus → servidor OPC UA com address space modelado por ativo, `Engine
 **DoD:** UaExpert navega a árvore de ativos; subscription com deadband entrega alterações;
 desligar o simulador faz as variáveis passarem a `BAD` em segundos.
 
-### Fase 3 — Ingestão e bronze (Write)
+### Fase 3 — Ingestão e bronze (Write)  🟡 implementada, DoD parcial (2026-11-08)
 Collector OPC UA (subscriptions, reconnect com backoff, spool local durável), writer que
 abre branch lakeFS, escreve bronze particionado e faz commit. Gate G1. Caminho live para
 Timescale em paralelo.
@@ -292,13 +292,32 @@ Timescale em paralelo.
 (verificado por contagem de `event_id` distintos); G1 rejeita um payload malformado injetado
 de propósito e o branch correspondente **não** chega a `main`.
 
-### Fase 4 — Silver + Airflow
+> **Estado real (2026-11-08).** Feito e verificado: collector OPC UA, spool, writer idempotente,
+> gate G1 (8 regras) e reconciliação spool↔lakeFS sem faltas nem duplicados no cluster
+> (27 116 amostras), incluindo mortes do writer e um reinício do Postgres. **Desvios:** o spool é
+> PostgreSQL e não um ficheiro (ADR-006); o lote tem 3 estados. **Em falta para fechar o DoD:**
+> as 24 h contínuas, o G1 provado no cluster com uma amostra inválida (só o está contra o lakeFS
+> real, num destino descartável), e o caminho *live* para o Timescale. **Adiado:** comandos
+> para listar e reprocessar lotes rejeitados, e G1 por linha em vez de por lote.
+
+### Fase 4 — Silver + Airflow  🔵 em curso
 Airflow no k3s (KubernetesExecutor, Postgres), DAG que abre branch → bronze→silver →
 commit → merge. Desescalamento, conversão de unidades, dedup, normalização de quality,
 backfill e late-arriving.
 **DoD:** backfill de 7 dias produz resultado idêntico ao incremental (idempotência);
 reprocessar a mesma partição duas vezes não altera contagens; uma falha a meio do DAG deixa
 `main` intacto (o trabalho por acabar fica no branch) — este é o teste que prova o WAP.
+
+> **Desvios decididos (ADR-007, 2026-11-08).** A silver é particionada pela hora de **receção**
+> (1 para 1 com o bronze), não pela hora do evento: dispensa reprocessar partições antigas com
+> dados atrasados. As unidades **não** se convertem para SI: mantêm-se as do gateway, com código
+> UNECE e um catálogo de conversão (hoje identidade). Contrato: `docs/silver-contract.md`.
+>
+> **Estado (2026-11-07):** feitos o transform (DuckDB), `run_hour` (branch → verificar → merge), 24 testes
+> (incl. semana de 7 dias: backfill == incremental, byte a byte, 169 ficheiros; crash em cada passo deixa
+> `main` intacto) e o DAG `silver_hourly` a correr no cluster (horas 16 e 17 de 07-11 reconciliadas).
+> Falta: teste de integração contra um lakeFS real com branches descartáveis, backfill pelo Airflow,
+> política de retenção dos branches `etl-*`/`silver-*`.
 
 ### Fase 5 — Governança e gates
 OpenMetadata no cluster, conectores (PostgreSQL, datalake sobre SeaweedFS/lakeFS, linhagem do
@@ -407,7 +426,8 @@ modbus_data_plataform/
 │   └── runbook.md            operação e troubleshooting
 ├── ot/                       simulador + gateway OPC UA
 ├── platform/                 k3s bootstrap, SeaweedFS, lakeFS, Postgres, OpenMetadata, Argo CD
-├── pipelines/                DAGs Airflow + transformações
+├── ingest/                   collector, spool e writer do bronze (Fase 3)
+├── pipelines/                DAGs Airflow + transformações (Fase 4)
 ├── quality/                  test suites + hooks lakeFS
 ├── governance/               config de conectores e glossário OpenMetadata
 ├── ml/                       features, treino, backtest
