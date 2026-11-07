@@ -316,7 +316,8 @@ reprocessar a mesma partição duas vezes não altera contagens; uma falha a mei
 > **Estado (2026-11-07):** feitos o transform (DuckDB), `run_hour` (branch → verificar → merge), 24 testes
 > (incl. semana de 7 dias: backfill == incremental, byte a byte, 169 ficheiros; crash em cada passo deixa
 > `main` intacto) e o DAG `silver_hourly` a correr no cluster (horas 16 e 17 de 07-11 reconciliadas).
-> Falta: teste de integração contra um lakeFS real com branches descartáveis, backfill pelo Airflow,
+> Teste contra o lakeFS real (8 casos: ordem, idempotência, crash em 5 passos, main intacto) a passar
+> (`pipelines/tests/run_lakefs_tests.sh`). Falta: backfill pelo Airflow,
 > política de retenção dos branches `etl-*`/`silver-*`.
 
 ### Fase 5 — Governança e gates
