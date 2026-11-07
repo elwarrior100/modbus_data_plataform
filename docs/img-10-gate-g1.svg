@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" width="800" height="560" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>O gate G1: 8 regras, e uma falha bloqueia o lote todo</title>
+<rect width="800" height="560" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">O gate G1: 8 regras, e uma falha bloqueia o lote todo</text>
+<rect x="20" y="50" width="760" height="56" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="73" font-weight="bold" fill="#0c447c">Entrada: o Parquet que acabou de ser lido do branch  +  quantas linhas o spool diz que tem</text>
+<rect x="20" y="130" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="34" y="153" font-weight="bold" fill="#633806">G1-01</text>
+<text x="34" y="174" font-size="12.5"  fill="#633806">o esquema é o do contrato</text>
+<rect x="404" y="130" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="418" y="153" font-weight="bold" fill="#633806">G1-02</text>
+<text x="418" y="174" font-size="12.5"  fill="#633806">event_id únicos e recalculáveis</text>
+<rect x="20" y="192" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="34" y="215" font-weight="bold" fill="#633806">G1-03</text>
+<text x="34" y="236" font-size="12.5"  fill="#633806">o nó OPC UA é conhecido</text>
+<rect x="404" y="192" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="418" y="215" font-weight="bold" fill="#633806">G1-04</text>
+<text x="418" y="236" font-size="12.5"  fill="#633806">o valor tem o tipo certo</text>
+<rect x="20" y="254" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="34" y="277" font-weight="bold" fill="#633806">G1-05</text>
+<text x="34" y="298" font-size="12.5"  fill="#633806">Bad ⇒ sem valor; Good ⇒ com valor</text>
+<rect x="404" y="254" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="418" y="277" font-weight="bold" fill="#633806">G1-06</text>
+<text x="418" y="298" font-size="12.5"  fill="#633806">source_ts não é lixo (±1 ano / 1 dia)</text>
+<rect x="20" y="316" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="34" y="339" font-weight="bold" fill="#633806">G1-07</text>
+<text x="34" y="360" font-size="12.5"  fill="#633806">ingest_ts não está no futuro</text>
+<rect x="404" y="316" width="376" height="50" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="418" y="339" font-weight="bold" fill="#633806">G1-08</text>
+<text x="418" y="360" font-size="12.5"  fill="#633806">nº de linhas = nº do spool</text>
+<path d="M400 380 V404" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="410" width="370" height="100" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="34" y="433" font-weight="bold" fill="#27500a">0 violações</text>
+<text x="34" y="454" font-size="12.5"  fill="#27500a">validated → merge no main</text>
+<text x="34" y="472" font-size="12.5"  fill="#27500a">o lote entra no bronze</text>
+<rect x="410" y="410" width="370" height="100" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="424" y="433" font-weight="bold" fill="#791f1f">1 ou mais violações</text>
+<text x="424" y="454" font-size="12.5"  fill="#791f1f">rejected: o branch fica por juntar,</text>
+<text x="424" y="472" font-size="12.5"  fill="#791f1f">com g1_report.json; o main não muda</text>
+<text x="20" y="540" font-size="12" fill="#444" text-anchor="start">Importante: o G1 só rejeita lixo. Um relógio 10 minutos adiantado passa de propósito (é o G2 que o deteta).</text>
+</svg>

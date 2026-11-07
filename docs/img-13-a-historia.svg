@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" width="800" height="470" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>A Fase 3 numa história: o carteiro, o caderno, o arquivista e o porteiro</title>
+<rect width="800" height="470" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">A Fase 3 numa história: o carteiro, o caderno, o arquivista e o porteiro</text>
+<rect x="20" y="50" width="176" height="170" rx="12" fill="#faeeda" stroke="#854f0b" stroke-width="1.5"/>
+<circle cx="42" cy="72" r="14" fill="#854f0b"/><text x="42" y="77" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">1</text>
+<text x="108.0" y="114" text-anchor="middle" font-size="15" font-weight="bold" fill="#633806">O sensor diz</text>
+<text x="108.0" y="136" text-anchor="middle" font-size="15" font-weight="bold" fill="#633806">"5,07 bar"</text>
+<text x="108.0" y="190" text-anchor="middle" font-size="12" fill="#633806">(o gateway)</text>
+<path d="M197 135 H210" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="212" y="50" width="176" height="170" rx="12" fill="#e6f1fb" stroke="#185fa5" stroke-width="1.5"/>
+<circle cx="234" cy="72" r="14" fill="#185fa5"/><text x="234" y="77" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">2</text>
+<text x="300.0" y="114" text-anchor="middle" font-size="15" font-weight="bold" fill="#0c447c">O carteiro ouve</text>
+<text x="300.0" y="136" text-anchor="middle" font-size="15" font-weight="bold" fill="#0c447c">e escreve</text>
+<text x="300.0" y="190" text-anchor="middle" font-size="12" fill="#0c447c">(o collector)</text>
+<path d="M389 135 H402" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="404" y="50" width="176" height="170" rx="12" fill="#eaf3de" stroke="#3b6d11" stroke-width="1.5"/>
+<circle cx="426" cy="72" r="14" fill="#3b6d11"/><text x="426" y="77" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">3</text>
+<text x="492.0" y="114" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">O caderno</text>
+<text x="492.0" y="136" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">guarda tudo</text>
+<text x="492.0" y="190" text-anchor="middle" font-size="12" fill="#27500a">(o spool, no disco)</text>
+<path d="M581 135 H594" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="596" y="50" width="176" height="170" rx="12" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/>
+<circle cx="618" cy="72" r="14" fill="#534ab7"/><text x="618" y="77" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">4</text>
+<text x="684.0" y="114" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">De minuto a minuto,</text>
+<text x="684.0" y="136" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">o arquivista arranca</text>
+<text x="684.0" y="158" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">uma página</text>
+<text x="684.0" y="190" text-anchor="middle" font-size="12" fill="#3c3489">(o writer faz um lote)</text>
+<rect x="116" y="270" width="176" height="170" rx="12" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/>
+<circle cx="138" cy="292" r="14" fill="#534ab7"/><text x="138" y="297" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">5</text>
+<text x="204.0" y="334" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">Faz uma cópia</text>
+<text x="204.0" y="356" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">numa gaveta</text>
+<text x="204.0" y="378" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">de rascunho</text>
+<text x="204.0" y="410" text-anchor="middle" font-size="12" fill="#3c3489">(um branch no lakeFS)</text>
+<path d="M293 355 H306" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="308" y="270" width="176" height="170" rx="12" fill="#fcebeb" stroke="#a32d2d" stroke-width="1.5"/>
+<circle cx="330" cy="292" r="14" fill="#a32d2d"/><text x="330" y="297" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">6</text>
+<text x="396.0" y="334" text-anchor="middle" font-size="15" font-weight="bold" fill="#791f1f">O porteiro</text>
+<text x="396.0" y="356" text-anchor="middle" font-size="15" font-weight="bold" fill="#791f1f">confere a página</text>
+<text x="396.0" y="410" text-anchor="middle" font-size="12" fill="#791f1f">(o gate G1)</text>
+<path d="M485 355 H498" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="500" y="270" width="176" height="170" rx="12" fill="#eaf3de" stroke="#3b6d11" stroke-width="1.5"/>
+<circle cx="522" cy="292" r="14" fill="#3b6d11"/><text x="522" y="297" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">7</text>
+<text x="588.0" y="334" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">Se está bem,</text>
+<text x="588.0" y="356" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">vai para o</text>
+<text x="588.0" y="378" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">arquivo oficial</text>
+<text x="588.0" y="410" text-anchor="middle" font-size="12" fill="#27500a">(o main do lakeFS)</text>
+<path d="M692 222 V246 H204 V268" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+</svg>

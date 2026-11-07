@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" width="800" height="560" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>O spool: uma amostra desde que chega até ficar num lote</title>
+<rect width="800" height="560" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">O spool: uma amostra desde que chega até ficar num lote</text>
+<rect x="20" y="56" width="400" height="62" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="79" font-weight="bold" fill="#0c447c">1. Chega uma notificação OPC UA</text>
+<text x="34" y="100" font-size="12.5"  fill="#0c447c">valor + estado + 2 timestamps</text>
+<path d="M220 118 V146" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="148" width="400" height="62" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="171" font-weight="bold" fill="#0c447c">2. Event.build  (envelope.py)</text>
+<text x="34" y="192" font-size="12.5"  fill="#0c447c">calcula o event_id (UUID v5 do conteúdo)</text>
+<path d="M220 210 V238" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="240" width="400" height="62" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="34" y="263" font-weight="bold" fill="#27500a">3. INSERT OR IGNORE  (spool.add)</text>
+<text x="34" y="284" font-size="12.5"  fill="#27500a">se o event_id já existe, é ignorado</text>
+<path d="M220 302 V330" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="332" width="400" height="62" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="34" y="355" font-weight="bold" fill="#633806">4. Espera por atribuir  (batch_id vazio)</text>
+<text x="34" y="376" font-size="12.5"  fill="#633806">fica no disco, em segurança</text>
+<path d="M220 394 V422" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="424" width="400" height="62" rx="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="34" y="447" font-weight="bold" fill="#3c3489">5. assign_batch congela um lote</text>
+<text x="34" y="468" font-size="12.5"  fill="#3c3489">põe o batch_id nas linhas e cria o lote</text>
+<rect x="450" y="56" width="330" height="236" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="464" y="79" font-weight="bold" fill="#2c2c2a">tabela  events</text>
+<text x="466" y="102" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">seq            (ordem de chegada)</text>
+<text x="466" y="124" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">event_id       ÚNICO  ← dedup</text>
+<text x="466" y="146" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">source, opcua_node_id</text>
+<text x="466" y="168" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">raw_value      (JSON ou nulo)</text>
+<text x="466" y="190" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">opcua_status_code</text>
+<text x="466" y="212" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">source_ts, server_ts</text>
+<text x="466" y="234" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">ingest_ts</text>
+<text x="466" y="256" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">batch_id       (nulo = por atribuir)</text>
+<rect x="450" y="312" width="330" height="150" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="464" y="335" font-weight="bold" fill="#2c2c2a">tabela  batches</text>
+<text x="466" y="358" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">batch_id       (hash dos event_id)</text>
+<text x="466" y="380" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">state          pending → exported</text>
+<text x="466" y="402" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">rows, created_us, updated_us</text>
+<text x="466" y="424" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">detail         (relatório se rejeitado)</text>
+<text x="20" y="540" font-size="12.5" fill="#27500a" text-anchor="start" font-weight="bold">Um lote, depois de congelado, nunca mais é reagrupado: é isso que torna a escrita repetível.</text>
+</svg>

@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" width="800" height="700" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>Os passos de um lote, e o que acontece se o writer morrer em cada um</title>
+<rect width="800" height="700" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">Os passos de um lote, e o que acontece se o writer morrer em cada um</text>
+<text x="20" y="56" font-size="12" fill="#444" text-anchor="start" font-weight="bold">PASSO</text>
+<text x="190" y="56" font-size="12" fill="#444" text-anchor="start" font-weight="bold">O QUE O WRITER FAZ  (writer.process)</text>
+<text x="530" y="56" font-size="12" fill="#444" text-anchor="start" font-weight="bold">SE MORRER AQUI, AO REINICIAR</text>
+<rect x="20" y="66" width="150" height="52" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="89" font-weight="bold" fill="#0c447c">1  branch</text>
+<rect x="186" y="66" width="330" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="200" y="89" font-weight="bold" fill="#2c2c2a"></text>
+<text x="200" y="110" font-size="12.5"  fill="#2c2c2a">cria o branch etl-&lt;id&gt; (se já existe, segue)</text>
+<rect x="530" y="66" width="250" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="544" y="89" font-weight="bold" fill="#2c2c2a"></text>
+<text x="544" y="110" font-size="12.5"  fill="#2c2c2a">create(exist_ok): igual</text>
+<path d="M95 118 V140" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="142" width="150" height="52" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="165" font-weight="bold" fill="#0c447c">2  upload</text>
+<rect x="186" y="142" width="330" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="200" y="165" font-weight="bold" fill="#2c2c2a"></text>
+<text x="200" y="186" font-size="12.5"  fill="#2c2c2a">carrega o Parquet de cada partição</text>
+<rect x="530" y="142" width="250" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="544" y="165" font-weight="bold" fill="#2c2c2a"></text>
+<text x="544" y="186" font-size="12.5"  fill="#2c2c2a">sobrescreve o mesmo ficheiro: igual</text>
+<path d="M95 194 V216" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="218" width="150" height="52" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="241" font-weight="bold" fill="#0c447c">3  commit</text>
+<rect x="186" y="218" width="330" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="200" y="241" font-weight="bold" fill="#2c2c2a"></text>
+<text x="200" y="262" font-size="12.5"  fill="#2c2c2a">commit no branch, com metadados do lote</text>
+<rect x="530" y="218" width="250" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="544" y="241" font-weight="bold" fill="#2c2c2a"></text>
+<text x="544" y="262" font-size="12.5"  fill="#2c2c2a">'no changes' conta como feito</text>
+<path d="M95 270 V292" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="294" width="150" height="52" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="34" y="317" font-weight="bold" fill="#27500a">4  validar</text>
+<rect x="186" y="294" width="330" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="200" y="317" font-weight="bold" fill="#2c2c2a"></text>
+<text x="200" y="338" font-size="12.5"  fill="#2c2c2a">lê os ficheiros de volta e corre o G1</text>
+<rect x="530" y="294" width="250" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="544" y="317" font-weight="bold" fill="#2c2c2a"></text>
+<text x="544" y="338" font-size="12.5"  fill="#2c2c2a">só leitura: repete-se à vontade</text>
+<path d="M95 346 V368" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="370" width="150" height="52" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="34" y="393" font-weight="bold" fill="#27500a">5  merge</text>
+<rect x="186" y="370" width="330" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="200" y="393" font-weight="bold" fill="#2c2c2a"></text>
+<text x="200" y="414" font-size="12.5"  fill="#2c2c2a">junta o branch ao main</text>
+<rect x="530" y="370" width="250" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="544" y="393" font-weight="bold" fill="#2c2c2a"></text>
+<text x="544" y="414" font-size="12.5"  fill="#2c2c2a">'nada a juntar' conta como feito</text>
+<path d="M95 422 V444" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="446" width="150" height="52" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="34" y="469" font-weight="bold" fill="#27500a">6  exportado</text>
+<rect x="186" y="446" width="330" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="200" y="469" font-weight="bold" fill="#2c2c2a"></text>
+<text x="200" y="490" font-size="12.5"  fill="#2c2c2a">marca o lote como exported no spool</text>
+<rect x="530" y="446" width="250" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="544" y="469" font-weight="bold" fill="#2c2c2a"></text>
+<text x="544" y="490" font-size="12.5"  fill="#2c2c2a">último passo: nada a repetir</text>
+<rect x="20" y="528" width="150" height="52" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="34" y="551" font-weight="bold" fill="#791f1f">4b  rejeitado</text>
+<rect x="186" y="528" width="330" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="200" y="551" font-weight="bold" fill="#2c2c2a"></text>
+<text x="200" y="572" font-size="12.5"  fill="#2c2c2a">G1 falhou: relatório no branch, main intacto</text>
+<rect x="530" y="528" width="250" height="52" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="544" y="551" font-weight="bold" fill="#2c2c2a"></text>
+<text x="544" y="572" font-size="12.5"  fill="#2c2c2a">estado final: nada se junta</text>
+<text x="20" y="610" font-size="12.5" fill="#27500a" text-anchor="start" font-weight="bold">No spool o lote só tem 3 estados: pending → exported  (ou rejected). Os passos não ficam gravados:</text>
+<text x="20" y="630" font-size="12.5" fill="#27500a" text-anchor="start" font-weight="bold">se morrer, o lote continua pending e recomeça-se do passo 1. Por isso 'retomar' = 'fazer outra vez'.</text>
+</svg>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 430" width="800" height="430" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>O porteiro (G1): uma linha estranha, e a página inteira fica de fora</title>
+<rect width="800" height="430" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">O porteiro (G1): uma linha estranha, e a página inteira fica de fora</text>
+<rect x="20" y="56" width="250" height="210" rx="12" fill="#ffffff" stroke="#8a8a85" stroke-width="1.5"/>
+<text x="145.0" y="94" text-anchor="middle" font-size="15" font-weight="bold" fill="#2c2c2a">Página (lote)</text>
+<text x="40" y="118" font-size="13.5" font-family="Menlo, Consolas, monospace" fill="#27500a">pressão 5,07 bar   ✓</text>
+<text x="40" y="148" font-size="13.5" font-family="Menlo, Consolas, monospace" fill="#27500a">caudal 222,5 m³/h  ✓</text>
+<text x="40" y="178" font-size="13.5" font-family="Menlo, Consolas, monospace" fill="#a32d2d">sensor INVENTADO   ✗</text>
+<text x="40" y="208" font-size="13.5" font-family="Menlo, Consolas, monospace" fill="#27500a">corrente 41 A      ✓</text>
+<path d="M272 160 H318" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="320" y="56" width="200" height="210" rx="12" fill="#fcebeb" stroke="#a32d2d" stroke-width="1.5"/>
+<text x="420.0" y="94" text-anchor="middle" font-size="15" font-weight="bold" fill="#791f1f">O porteiro</text>
+<text x="420.0" y="116" text-anchor="middle" font-size="15" font-weight="bold" fill="#791f1f">vê a linha ✗</text>
+<text x="420.0" y="138" text-anchor="middle" font-size="15" font-weight="bold" fill="#791f1f">e recusa</text>
+<text x="420.0" y="160" text-anchor="middle" font-size="15" font-weight="bold" fill="#791f1f">a página</text>
+<text x="420.0" y="236" text-anchor="middle" font-size="12" fill="#791f1f">8 regras: g1.py, linha 42</text>
+<path d="M522 110 H568" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M522 210 H568" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="570" y="56" width="210" height="100" rx="12" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/>
+<text x="675.0" y="94" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">Fica na gaveta</text>
+<text x="675.0" y="116" text-anchor="middle" font-size="15" font-weight="bold" fill="#3c3489">de rascunho</text>
+<text x="675.0" y="126" text-anchor="middle" font-size="12" fill="#3c3489">com um relatório do porquê</text>
+<rect x="570" y="166" width="210" height="100" rx="12" fill="#eaf3de" stroke="#3b6d11" stroke-width="1.5"/>
+<text x="675.0" y="204" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">O arquivo oficial</text>
+<text x="675.0" y="226" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">não muda</text>
+<text x="675.0" y="236" text-anchor="middle" font-size="12" fill="#27500a">o main fica limpo</text>
+<text x="20" y="310" font-size="13.5" fill="#27500a" text-anchor="start" font-weight="bold">Bom: nunca entra lixo no arquivo oficial, e o relatório explica o que estava mal.</text>
+<text x="20" y="340" font-size="13.5" fill="#791f1f" text-anchor="start" font-weight="bold">Mau: as 3 linhas boas ficam presas com a má. É o ponto fraco nº 2, e podemos melhorar:</text>
+<text x="20" y="364" font-size="13.5" fill="#791f1f" text-anchor="start">separar só as linhas más e deixar passar as boas.</text>
+<text x="20" y="400" font-size="12.5" fill="#0c447c" text-anchor="start">No código: writer.py, _reject (linha 62) guarda o relatório no branch e não faz o merge.</text>
+</svg>

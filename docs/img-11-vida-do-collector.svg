@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" width="800" height="560" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>A vida do collector: ligar, ouvir, vigiar, e voltar a ligar se cair</title>
+<rect width="800" height="560" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">A vida do collector: ligar, ouvir, vigiar, e voltar a ligar se cair</text>
+<rect x="20" y="50" width="430" height="62" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="73" font-weight="bold" fill="#0c447c">1. Ligar ao gateway</text>
+<text x="34" y="94" font-size="12.5"  fill="#0c447c">Client(opc.tcp://ot-edge...:4840)</text>
+<path d="M235 112 V140" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="142" width="430" height="62" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="165" font-weight="bold" fill="#0c447c">2. Descobrir as variáveis</text>
+<text x="34" y="186" font-size="12.5"  fill="#0c447c">Plant → 3 ativos → 25 variáveis</text>
+<path d="M235 204 V232" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="234" width="430" height="62" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="34" y="257" font-weight="bold" fill="#0c447c">3. Subscrever</text>
+<text x="34" y="278" font-size="12.5"  fill="#0c447c">fila no servidor: 50 · fila local: 100 000</text>
+<path d="M235 296 V324" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="326" width="430" height="62" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="34" y="349" font-weight="bold" fill="#27500a">4. Receber e guardar</text>
+<text x="34" y="370" font-size="12.5"  fill="#27500a">handler → lista → flush: 1 transação</text>
+<path d="M235 388 V416" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="418" width="430" height="62" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="34" y="441" font-weight="bold" fill="#633806">5. Batimento de 2 em 2 s</text>
+<text x="34" y="462" font-size="12.5"  fill="#633806">lê o estado do servidor; se falhar, sai</text>
+<rect x="500" y="190" width="280" height="130" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="514" y="213" font-weight="bold" fill="#791f1f">A ligação caiu</text>
+<text x="514" y="234" font-size="12.5"  fill="#791f1f">espera 1 s, 2 s, 4 s, 8 s, 16 s,</text>
+<text x="514" y="252" font-size="12.5"  fill="#791f1f">30 s (máximo) e volta ao passo 1</text>
+<text x="514" y="270" font-size="12.5"  fill="#791f1f">para sempre</text>
+<path d="M452 389 H476 V300 H498" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="458" y="410" font-size="11.5" fill="#444" text-anchor="start">falhou</text>
+<path d="M640 188 V81 H452" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="560" y="74" font-size="11.5" fill="#444" text-anchor="middle">volta a ligar</text>
+<text x="500" y="350" font-size="11.5" fill="#444" text-anchor="start">Se sobre-encher a fila local, desliga-se</text>
+<text x="500" y="366" font-size="11.5" fill="#444" text-anchor="start">e reconecta (falha alto em vez de perder).</text>
+<text x="500" y="394" font-size="11.5" fill="#444" text-anchor="start">O mesmo valor reentregue ao reconectar</text>
+<text x="500" y="410" font-size="11.5" fill="#444" text-anchor="start">tem o mesmo event_id e é ignorado.</text>
+</svg>

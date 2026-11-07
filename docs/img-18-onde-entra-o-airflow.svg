@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" width="800" height="560" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>Onde entra o Airflow: serviços sempre ligados contra tarefas agendadas</title>
+<rect width="800" height="560" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">Onde entra o Airflow: serviços sempre ligados contra tarefas agendadas</text>
+<rect x="20" y="50" width="760" height="190" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1" stroke-dasharray="6 5"/>
+<text x="34" y="73" font-weight="bold" fill="#2c2c2a">SERVIÇOS SEMPRE LIGADOS  (Fase 3, já existem)</text>
+<rect x="36" y="100" width="124" height="100" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="50" y="123" font-weight="bold" fill="#633806">Gateway</text>
+<text x="50" y="144" font-size="12.5"  fill="#633806">OPC UA</text>
+<rect x="188" y="100" width="124" height="100" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="202" y="123" font-weight="bold" fill="#0c447c">Collector</text>
+<text x="202" y="144" font-size="12.5"  fill="#0c447c">ouve sem parar</text>
+<rect x="340" y="100" width="124" height="100" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="354" y="123" font-weight="bold" fill="#27500a">Spool</text>
+<text x="354" y="144" font-size="12.5"  fill="#27500a">caderno no disco</text>
+<rect x="492" y="100" width="124" height="100" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="506" y="123" font-weight="bold" fill="#0c447c">Writer</text>
+<text x="506" y="144" font-size="12.5"  fill="#0c447c">de minuto a minuto</text>
+<rect x="644" y="100" width="124" height="100" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="658" y="123" font-weight="bold" fill="#2c2c2a">Bronze</text>
+<text x="658" y="144" font-size="12.5"  fill="#2c2c2a">no lakeFS</text>
+<path d="M161 150 H186" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M313 150 H338" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M465 150 H490" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M617 150 H642" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="20" y="290" width="760" height="210" rx="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1" stroke-dasharray="6 5"/>
+<text x="34" y="313" font-weight="bold" fill="#3c3489">TAREFAS AGENDADAS  (Airflow, da Fase 4 em diante)</text>
+<rect x="36" y="340" width="160" height="70" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="50" y="363" font-weight="bold" fill="#2c2c2a">1  abre um branch</text>
+<text x="50" y="384" font-size="12.5"  fill="#2c2c2a">uma vez por hora</text>
+<rect x="220" y="340" width="160" height="70" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="234" y="363" font-weight="bold" fill="#2c2c2a">2  bronze → silver</text>
+<rect x="404" y="340" width="160" height="70" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="418" y="363" font-weight="bold" fill="#2c2c2a">3  gate G2</text>
+<rect x="588" y="340" width="160" height="70" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="602" y="363" font-weight="bold" fill="#2c2c2a">4  merge no main</text>
+<path d="M197 375 H218" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M381 375 H402" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M565 375 H586" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M706 202 V268 H116 V338" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="412" y="262" font-size="12" fill="#444" text-anchor="middle">o Airflow lê daqui, de hora a hora</text>
+<rect x="36" y="430" width="340" height="56" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1"/>
+<text x="50" y="453" font-weight="bold" fill="#2c2c2a">Fase 6: gold e versões</text>
+<text x="50" y="474" font-size="12.5"  fill="#2c2c2a">também em Airflow</text>
+<rect x="400" y="430" width="360" height="56" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1"/>
+<text x="414" y="453" font-weight="bold" fill="#2c2c2a">Fase 8: treino do modelo</text>
+<text x="414" y="474" font-size="12.5"  fill="#2c2c2a">também em Airflow</text>
+<text x="20" y="535" font-size="12" fill="#444" text-anchor="start">O Airflow não substitui o writer: serve para tarefas que acabam e voltam a correr, não para ficar sempre ligado.</text>
+</svg>

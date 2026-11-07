@@ -23,3 +23,8 @@ Escrever o ADR é planeamento, não código — podes escrevê-lo.
 
 ## Regra #4: língua
 Responde sempre em português de Portugal.
+
+## Regra #5: nada de commits sem o Stéphane pedir
+O Stéphane quer **rever e perceber o código antes de ficar registado no git**. Não fazer
+`git commit`, nem `git push`, a não ser que ele o peça. Deixar as alterações no disco, por
+rever, e dizer o que mudou. Isto aplica-se mesmo a documentação e a código já testado.
