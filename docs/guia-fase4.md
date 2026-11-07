@@ -65,6 +65,8 @@ o estado tem nome (`GOOD`/`UNCERTAIN`/`BAD`) e cada linha leva *flags* se algo f
 Pensa num rascunho: só se publica depois de revisto. Está testado: o teste "mata" o processo
 em cada passo e confirma que o `main` fica intacto.
 
+👉 **Imagem 19** (`docs/img-19-bronze-para-silver.svg`): o fluxo de uma hora.
+
 ### Idempotência (palavra que vais ouvir muito)
 
 Correr a mesma hora 1 vez ou 10 vezes dá **exatamente o mesmo resultado**, até ao byte.
@@ -91,7 +93,7 @@ e "já está feito" conta como sucesso (branch já existe, commit sem alteraçõ
    que tem de dar ficheiros **idênticos**.
 6. **Airflow**: instalado com Helm. Descobri duas coisas: o volume de logs pedia um tipo de disco que o
    k3s não tem (criámos o nosso), e o código tem de estar *dentro da imagem* porque o repositório é privado.
-7. **O DAG**: ao minuto 10 de cada hora, trata a hora que **acabou de fechar**.
+7. **O DAG**: ao minuto 10 de cada hora, trata a hora que **acabou de fechar** (👉 **imagem 20**, `docs/img-20-hora-fechada.svg`).
 8. **Credenciais**: o script copia o Secret do lakeFS para o namespace do Airflow, sem o mostrar.
 
 Para o explicares a alguém: *"o Airflow acorda de hora a hora, lança um pod, o pod copia os dados da

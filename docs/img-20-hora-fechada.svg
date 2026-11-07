@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 330" width="800" height="330" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>O DAG processa a hora que já fechou (corre ao minuto 10)</title>
+<rect width="800" height="330" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">O DAG processa a hora que já fechou (corre ao minuto 10)</text>
+<line x1="40" y1="170" x2="760" y2="170" stroke="#8a8a85" stroke-width="2"/>
+<line x1="60" y1="160" x2="60" y2="180" stroke="#444" stroke-width="2"/>
+<text x="42" y="200" font-size="12.5" fill="#2c2c2a">16:00</text>
+<line x1="280" y1="160" x2="280" y2="180" stroke="#444" stroke-width="2"/>
+<text x="262" y="200" font-size="12.5" fill="#2c2c2a">17:00</text>
+<line x1="500" y1="160" x2="500" y2="180" stroke="#444" stroke-width="2"/>
+<text x="482" y="200" font-size="12.5" fill="#2c2c2a">18:00</text>
+<line x1="720" y1="160" x2="720" y2="180" stroke="#444" stroke-width="2"/>
+<text x="702" y="200" font-size="12.5" fill="#2c2c2a">19:00</text>
+<rect x="60" y="120" width="220" height="40" rx="6" fill="#eaf3de" stroke="#3b6d11"/>
+<text x="90" y="145" fill="#27500a" font-size="12.5">hora 16: fechada</text>
+<rect x="280" y="120" width="220" height="40" rx="6" fill="#faeeda" stroke="#854f0b"/>
+<text x="305" y="145" fill="#633806" font-size="12.5">hora 17: a receber dados</text>
+<rect x="240" y="230" width="230" height="80" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="252" y="253" font-weight="bold" fill="#0c447c">17:10 → processa a hora 16</text>
+<text x="252" y="274" font-size="12.5" fill="#0c447c">já não entra nada novo</text>
+<text x="252" y="292" font-size="12.5" fill="#0c447c">e o último lote já chegou</text>
+<rect x="500" y="230" width="260" height="80" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="512" y="253" font-weight="bold" fill="#0c447c">18:10 → processa a hora 17</text>
+<text x="512" y="274" font-size="12.5" fill="#0c447c">margem de 10 min para o writer</text>
+<text x="512" y="292" font-size="12.5" fill="#0c447c">(1.ª versão: 42 132 vs 42 887 linhas)</text>
+<line x1="380" y1="230" x2="170" y2="163" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="520" y1="230" x2="400" y2="163" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="40" y="70" font-size="13" fill="#2c2c2a">hora = logical_date - 1 h. Processar a hora ainda aberta dava uma silver parcial.</text>
+</svg>
