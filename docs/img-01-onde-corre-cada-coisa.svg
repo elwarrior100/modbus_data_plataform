@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" width="800" height="700" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>Onde corre cada coisa: três 'casas' uma dentro da outra</title>
+<rect width="800" height="700" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">Onde corre cada coisa: três 'casas' uma dentro da outra</text>
+<rect x="20" y="44" width="760" height="640" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1" stroke-dasharray="6 5"/>
+<text x="34" y="67" font-weight="bold" fill="#2c2c2a">O TEU MAC</text>
+<text x="150" y="68" font-size="12" fill="#444" text-anchor="start">onde tu e eu trabalhamos</text>
+<rect x="40" y="90" width="215" height="92" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="54" y="113" font-weight="bold" fill="#2c2c2a">Pasta do projeto</text>
+<text x="54" y="134" font-size="12.5"  fill="#2c2c2a">modbus_data_plataform</text>
+<text x="54" y="152" font-size="12.5"  fill="#2c2c2a">código, manifestos, docs</text>
+<text x="54" y="170" font-size="12.5"  fill="#2c2c2a">(o git vive aqui)</text>
+<rect x="40" y="200" width="215" height="92" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="54" y="223" font-weight="bold" fill="#2c2c2a">Ferramentas</text>
+<text x="54" y="244" font-size="12.5"  fill="#2c2c2a">kubectl · k9s · ui.sh</text>
+<text x="54" y="262" font-size="12.5"  fill="#2c2c2a">browser · terminal</text>
+<text x="54" y="280" font-size="12.5"  fill="#2c2c2a">(para ver e mexer)</text>
+<rect x="40" y="310" width="215" height="92" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="54" y="333" font-weight="bold" fill="#2c2c2a">Claude Code (eu)</text>
+<text x="54" y="354" font-size="12.5"  fill="#2c2c2a">escrevo ficheiros</text>
+<text x="54" y="372" font-size="12.5"  fill="#2c2c2a">e corro comandos</text>
+<text x="54" y="390" font-size="12.5"  fill="#2c2c2a">a pedido teu</text>
+<rect x="290" y="90" width="470" height="575" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1" stroke-dasharray="6 5"/>
+<text x="304" y="113" font-weight="bold" fill="#0c447c">VM LIMA: um Linux dentro do Mac</text>
+<text x="304" y="134" font-size="12.5"  fill="#0c447c">8 CPUs · 16 GB de RAM · 150 GB de disco</text>
+<rect x="310" y="150" width="430" height="500" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1" stroke-dasharray="6 5"/>
+<text x="324" y="173" font-weight="bold" fill="#2c2c2a">k3s: o Kubernetes (o 'gestor' que mantém tudo vivo)</text>
+<rect x="330" y="190" width="390" height="130" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="344" y="213" font-weight="bold" fill="#27500a">namespace data   (armazenamento)</text>
+<rect x="344" y="226" width="114" height="76" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="358" y="249" font-weight="bold" fill="#2c2c2a">PostgreSQL</text>
+<text x="358" y="270" font-size="12.5"  fill="#2c2c2a">metadados</text>
+<rect x="468" y="226" width="114" height="76" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="482" y="249" font-weight="bold" fill="#2c2c2a">SeaweedFS</text>
+<text x="482" y="270" font-size="12.5"  fill="#2c2c2a">bytes (S3)</text>
+<rect x="592" y="226" width="114" height="76" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="606" y="249" font-weight="bold" fill="#2c2c2a">lakeFS</text>
+<text x="606" y="270" font-size="12.5"  fill="#2c2c2a">versões</text>
+<rect x="330" y="334" width="390" height="140" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="344" y="357" font-weight="bold" fill="#633806">namespace ot   (a fábrica simulada)</text>
+<rect x="344" y="370" width="362" height="92" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="358" y="393" font-weight="bold" fill="#2c2c2a">um só contentor: ot-edge</text>
+<text x="358" y="414" font-size="12.5"  fill="#2c2c2a">socat = o fio RS-232 virtual</text>
+<text x="358" y="432" font-size="12.5"  fill="#2c2c2a">simulador Modbus  +  gateway OPC UA</text>
+<rect x="330" y="488" width="390" height="144" rx="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="344" y="511" font-weight="bold" fill="#3c3489">namespace argocd   (GitOps)</text>
+<rect x="344" y="524" width="362" height="92" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="358" y="547" font-weight="bold" fill="#2c2c2a">Argo CD</text>
+<text x="358" y="568" font-size="12.5"  fill="#2c2c2a">lê o git no GitHub e mantém</text>
+<text x="358" y="586" font-size="12.5"  fill="#2c2c2a">o cluster igual ao que lá está</text>
+<path d="M255 246 H308" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="262" y="236" font-size="11" fill="#444" text-anchor="start">fala com</text>
+<text x="20" y="698" font-size="12" fill="#444" text-anchor="start">Um 'namespace' é só uma pasta dentro do cluster, para arrumar serviços por assunto.</text>
+</svg>

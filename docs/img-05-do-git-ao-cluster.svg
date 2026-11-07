@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 590" width="800" height="590" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>Como uma alteração chega ao cluster (GitOps)</title>
+<rect width="800" height="590" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">Como uma alteração chega ao cluster (GitOps)</text>
+<rect x="30" y="50" width="430" height="66" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="44" y="73" font-weight="bold" fill="#2c2c2a">1. Alteras um ficheiro no Mac</text>
+<text x="44" y="94" font-size="12.5"  fill="#2c2c2a">ex.: mudar a imagem do ot-edge em ot-edge.yaml</text>
+<path d="M245 116 V144" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="30" y="146" width="430" height="66" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="44" y="169" font-weight="bold" fill="#0c447c">2. git commit</text>
+<text x="44" y="190" font-size="12.5"  fill="#0c447c">guarda a alteração no historial local, com uma mensagem</text>
+<path d="M245 212 V240" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="30" y="242" width="430" height="66" rx="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="44" y="265" font-weight="bold" fill="#3c3489">3. git push  →  GitHub</text>
+<text x="44" y="286" font-size="12.5"  fill="#3c3489">envia o commit para a cópia na internet (ramo main)</text>
+<path d="M245 308 V336" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="30" y="338" width="430" height="66" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="44" y="361" font-weight="bold" fill="#633806">4. O Argo CD repara</text>
+<text x="44" y="382" font-size="12.5"  fill="#633806">consulta o GitHub de 3 em 3 minutos e vê o commit novo</text>
+<path d="M245 404 V432" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<rect x="30" y="434" width="430" height="66" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="44" y="457" font-weight="bold" fill="#27500a">5. O cluster fica igual ao git</text>
+<text x="44" y="478" font-size="12.5"  fill="#27500a">o Argo aplica a diferença; se alguém mexer à mão, desfaz</text>
+<rect x="500" y="250" width="270" height="100" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1" stroke-dasharray="6 5"/>
+<text x="514" y="273" font-weight="bold" fill="#791f1f">FORA do git (à mão)</text>
+<text x="514" y="294" font-size="12.5"  fill="#791f1f">porque não pode ou não deve</text>
+<text x="514" y="312" font-size="12.5"  fill="#791f1f">ir para o GitHub</text>
+<rect x="500" y="372" width="270" height="70" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="514" y="395" font-weight="bold" fill="#2c2c2a">Palavras-passe</text>
+<text x="514" y="416" font-size="12.5"  fill="#2c2c2a">bootstrap-secrets.sh → Secret</text>
+<rect x="500" y="460" width="270" height="70" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="514" y="483" font-weight="bold" fill="#2c2c2a">Imagens (o código empacotado)</text>
+<text x="514" y="504" font-size="12.5"  fill="#2c2c2a">build-image.sh → importar no k3s</text>
+<path d="M500 407 H480 V455 H462" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<path d="M500 495 H480 V478 H462" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="500" y="560" font-size="11.5" fill="#444" text-anchor="start">Segredos nunca vão para o git. As imagens ainda não têm CI (Fase 9).</text>
+</svg>
