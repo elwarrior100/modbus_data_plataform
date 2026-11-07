@@ -222,11 +222,16 @@ O `k9s` precisa de saber **onde está o cluster**. Tens duas formas:
 ```
 # Forma 1: dizer ao terminal onde está o cluster (e depois usas k9s e kubectl à vontade)
 export KUBECONFIG=~/.lima/industrial/copied-from-guest/kubeconfig.yaml
-k9s
+k9s -A
 
 # Forma 2: dizer só ao k9s, nesse comando
-k9s --kubeconfig ~/.lima/industrial/copied-from-guest/kubeconfig.yaml
+k9s -A --kubeconfig ~/.lima/industrial/copied-from-guest/kubeconfig.yaml
 ```
+
+**O `-A` é essencial.** O `k9s` abre por omissão no namespace `default`, que no nosso cluster
+está **vazio**, e por isso mostra "No resources found". Os nossos pods estão em `data`, `ot`
+e `argocd`. O `-A` mostra todos; dentro do `k9s`, a tecla `0` faz o mesmo. O `kubectl` tem a
+mesma armadilha: `kubectl get pods` sem `-n` ou `-A` olha para o `default`.
 
 Antes, confirma que a VM está ligada: `limactl list` deve mostrar `Running`. Se estiver
 `Stopped`, corre `limactl start industrial`.
@@ -235,7 +240,7 @@ Antes, confirma que a VM está ligada: `limactl list` deve mostrar `Running`. Se
 apagares nada por engano:
 
 ```
-k9s --readonly
+k9s --readonly -A
 ```
 
 ### O que vês no ecrã
@@ -269,7 +274,7 @@ gerido por um Deployment é inofensivo (é recriado), mas apagar outras coisas n
 
 ### Três exercícios para treinares
 
-**1. Ver o simulador a funcionar.** `k9s --readonly` → escreve `:ns` + Enter → seleciona `ot`
+**1. Ver o simulador a funcionar.** `k9s --readonly -A` → escreve `:ns` + Enter → seleciona `ot`
 → Enter → seleciona o pod `ot-edge-…` → prime `l`. Vês os logs: "Modbus TCP a escutar",
 "Modbus RTU a escutar", "OPC UA a escutar". É o que o pod disse ao arrancar.
 
@@ -277,9 +282,26 @@ gerido por um Deployment é inofensivo (é recriado), mas apagar outras coisas n
 `Synced` e `Healthy`. Seleciona `data`, prime `d` e vês o que o Argo vigia.
 
 **3. Ver o self-heal com os teus olhos** (este exercício precisa de **sair do modo de
-leitura**: abre só `k9s`). Vai a `:deploy` no namespace `ot`, seleciona `ot-edge`, e prime `s`
+leitura**: abre só `k9s -A`). Vai a `:deploy` no namespace `ot`, seleciona `ot-edge`, e prime `s`
 (*scale*) para o pôr a 3 réplicas. Em cerca de 4 segundos o Argo volta a pô-lo a 1. Estás a
 ver, em direto, o cluster a ser puxado para o git.
+
+## 6c. Entrar na VM (o "ssh" para o Lima)
+
+Podes abrir uma shell **dentro** da VM, que é um Linux normal:
+
+```
+limactl shell industrial                      # entrar (exit para sair)
+limactl shell industrial -- k3s kubectl get pods -A     # correr um comando sem entrar
+ssh -F ~/.lima/industrial/ssh.config lima-industrial    # o ssh "a sério", equivalente
+```
+
+Dentro da VM o `kubectl` já sabe onde está o cluster (não precisas de `KUBECONFIG`). Comandos
+úteis lá dentro: `sudo k3s kubectl get pods -A` (pods), `sudo k3s crictl ps` (os contentores,
+um nível abaixo dos pods), `ls /var/lib/rancher/k3s/server/db/` (o `state.db`, onde o
+Kubernetes guarda o que deve estar a correr), `free -m` e `df -h` (RAM e disco).
+
+---
 
 ## 7. Se alguma coisa não funcionar
 
