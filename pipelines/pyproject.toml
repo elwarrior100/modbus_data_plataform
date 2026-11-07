@@ -1,0 +1,37 @@
+[project]
+name = "silver"
+version = "0.1.0"
+description = "Transformação bronze → silver (DuckDB) e DAG horário do Airflow"
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=1.4",
+    "lakefs>=0.16.0",
+    "pyarrow>=24.0.0",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "ingest",
+    "ot-simulator",
+    "pytest>=9.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/silver"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+markers = [
+    "lakefs: precisa do lakeFS real (LAKEFS_ENDPOINT)",
+    "slow: demora vários minutos",
+]
+
+[tool.uv.sources]
+ot-simulator = { path = "../ot/simulator" }
+ingest = { path = "../ingest" }
