@@ -8,7 +8,7 @@ Imagens `docs/img-13` a `img-17`. Para o detalhe técnico, ver `docs/guia-fase3.
 |---|---|---|
 | o sensor que diz um número | o gateway OPC UA | (Fase 2) |
 | o **carteiro** que ouve e escreve | o **collector** | `collector.py` |
-| o **caderno** escrito à caneta | o **spool** (ficheiro SQLite no disco) | `spool.py` |
+| o **caderno** escrito à caneta | o **spool** (duas tabelas no PostgreSQL) | `spool.py` |
 | a **impressão digital** de cada leitura | o **`event_id`** | `envelope.py` |
 | uma **página** do caderno | um **lote** | `spool.py` |
 | o **arquivista** | o **writer** | `writer.py` |
@@ -33,17 +33,19 @@ entrar lixo no arquivo oficial.
 
 **Não perder (imagem 14).** O carteiro só segue depois de a tinta secar: a leitura só conta
 quando está no disco.
-→ Ver `spool.py`, linha 27: `PRAGMA synchronous=FULL`. É **uma** linha, mas é ela que obriga
-o disco a gravar a sério a cada vez.
+→ Ver `spool.py`, linha 52 (`add`): o `INSERT` só acaba depois de o Postgres confirmar o `COMMIT`, e
+ele só o confirma depois de gravar no disco.
+E se o Postgres falhar? → Ver `collector.py`, linha 45 (`_Queue`): a leitura fica **em memória** e
+tenta-se outra vez a cada segundo; só sai da fila depois de gravada.
 
 **Não duplicar (imagem 15).** Cada leitura tem uma impressão digital feita do que ela *diz*.
 Se chegar duas vezes, o caderno recusa a segunda.
 → Ver `envelope.py`, linha 24 (`make_event_id`): repara nos campos que entram e nos que
-**não** entram. E `spool.py`: a palavra `UNIQUE` na tabela e o `INSERT OR IGNORE` no `add`.
+**não** entram. E `spool.py`: a palavra `UNIQUE` no `SCHEMA` (linha 12) e o `ON CONFLICT DO NOTHING` no `add` (linha 52).
 
 **Não entrar lixo (imagem 17).** O porteiro tem 8 regras; uma linha estranha e a página fica
 na gaveta, com um relatório.
-→ Ver `g1.py`, linha 42 (`validate`): cada `found.append(Violation(...))` é uma regra a falhar.
+→ Ver `g1.py`, linha 41 (`validate`): cada `found.append(Violation(...))` é uma regra a falhar.
 
 ## A ideia mais importante: e se o arquivista desmaiar? (imagem 16)
 
@@ -65,10 +67,10 @@ juntar" são tratados como **sucesso** e não como erro.
 | # | Onde | O que procurar | Pergunta para ti |
 |---|---|---|---|
 | 1 | `envelope.py` linha 24 | que campos entram na impressão digital | porque é que a hora de chegada não entra? |
-| 2 | `spool.py` linhas 27 e 42 | `synchronous=FULL` e `INSERT OR IGNORE` | o que acontecia sem cada uma? |
+| 2 | `spool.py` linhas 12 e 52 | `UNIQUE` e `ON CONFLICT DO NOTHING` | o que acontecia sem cada uma? |
 | 3 | `writer.py` linha 23 | os passos, por ordem, e os `self.hook(...)` | onde é que o writer pode morrer? |
 | 4 | `lake.py` linhas 29 e 39 | o `return False` em "no changes" | porque é que um erro passa a sucesso? |
-| 5 | `g1.py` linha 42 | as 8 regras | porque é que um relógio 10 min adiantado passa? |
+| 5 | `g1.py` linha 41 | as 8 regras | porque é que um relógio 10 min adiantado passa? |
 
 ## Os pontos fracos que vale a pena discutir
 

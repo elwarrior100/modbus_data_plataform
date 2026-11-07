@@ -19,7 +19,7 @@
 <circle cx="426" cy="72" r="14" fill="#3b6d11"/><text x="426" y="77" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">3</text>
 <text x="492.0" y="114" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">O caderno</text>
 <text x="492.0" y="136" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">guarda tudo</text>
-<text x="492.0" y="190" text-anchor="middle" font-size="12" fill="#27500a">(o spool, no disco)</text>
+<text x="492.0" y="190" text-anchor="middle" font-size="12" fill="#27500a">(o spool, no Postgres)</text>
 <path d="M581 135 H594" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
 <rect x="596" y="50" width="176" height="170" rx="12" fill="#eeedfe" stroke="#534ab7" stroke-width="1.5"/>
 <circle cx="618" cy="72" r="14" fill="#534ab7"/><text x="618" y="77" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">4</text>

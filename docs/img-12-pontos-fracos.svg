@@ -19,10 +19,10 @@
 <text x="560" y="156" font-size="12" fill="#633806">isolar só as linhas más</text>
 <text x="560" y="174" font-size="12" fill="#633806"></text>
 <rect x="20" y="198" width="760" height="56" rx="8" fill="#faeeda" stroke="#854f0b"/>
-<text x="32" y="231" font-size="12.5" font-weight="bold" fill="#633806">Um pod, um ficheiro SQLite</text>
-<text x="250" y="222" font-size="12" fill="#633806">se o disco ou o pod falharem,</text>
-<text x="250" y="240" font-size="12" fill="#633806">perde-se o spool</text>
-<text x="560" y="222" font-size="12" fill="#633806">backup do volume, ou broker</text>
+<text x="32" y="231" font-size="12.5" font-weight="bold" fill="#633806">O spool depende do Postgres</text>
+<text x="250" y="222" font-size="12" fill="#633806">se cair, o collector retém em</text>
+<text x="250" y="240" font-size="12" fill="#633806">memória; se o collector morrer, perde</text>
+<text x="560" y="222" font-size="12" fill="#633806">persistir a fila, ou broker</text>
 <text x="560" y="240" font-size="12" fill="#633806">(Fase 9)</text>
 <rect x="20" y="264" width="760" height="56" rx="8" fill="#faeeda" stroke="#854f0b"/>
 <text x="32" y="297" font-size="12.5" font-weight="bold" fill="#633806">Conta de administrador</text>

@@ -17,8 +17,8 @@
 <text x="595.0" y="138" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">escrever à caneta,</text>
 <text x="595.0" y="160" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">esperar que seque,</text>
 <text x="595.0" y="182" text-anchor="middle" font-size="15" font-weight="bold" fill="#27500a">só então seguir</text>
-<text x="595.0" y="276" text-anchor="middle" font-size="12" fill="#27500a">no código: o SQLite faz fsync a</text>
-<text x="595.0" y="292" text-anchor="middle" font-size="12" fill="#27500a">cada gravação (synchronous=FULL)</text>
-<text x="400" y="345" font-size="13.5" fill="#2c2c2a" text-anchor="middle" font-weight="bold">O caderno é um ficheiro no disco do pod. Se o pod reiniciar, o caderno continua lá.</text>
+<text x="595.0" y="276" text-anchor="middle" font-size="12" fill="#27500a">no código: o Postgres só confirma o</text>
+<text x="595.0" y="292" text-anchor="middle" font-size="12" fill="#27500a">COMMIT depois de gravar no disco</text>
+<text x="400" y="345" font-size="13.5" fill="#2c2c2a" text-anchor="middle" font-weight="bold">O caderno é uma base de dados (Postgres). Se um pod reiniciar, o caderno continua lá.</text>
 <text x="400" y="372" font-size="12.5" fill="#791f1f" text-anchor="middle">O que fica por escrever num caderno desligado (collector parado) perde-se: é o ponto fraco nº 1.</text>
 </svg>

@@ -12,7 +12,7 @@
 <text x="34" y="192" font-size="12.5"  fill="#0c447c">calcula o event_id (UUID v5 do conteúdo)</text>
 <path d="M220 210 V238" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
 <rect x="20" y="240" width="400" height="62" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
-<text x="34" y="263" font-weight="bold" fill="#27500a">3. INSERT OR IGNORE  (spool.add)</text>
+<text x="34" y="263" font-weight="bold" fill="#27500a">3. INSERT ... ON CONFLICT DO NOTHING</text>
 <text x="34" y="284" font-size="12.5"  fill="#27500a">se o event_id já existe, é ignorado</text>
 <path d="M220 302 V330" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
 <rect x="20" y="332" width="400" height="62" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
@@ -36,7 +36,7 @@
 <text x="464" y="335" font-weight="bold" fill="#2c2c2a">tabela  batches</text>
 <text x="466" y="358" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">batch_id       (hash dos event_id)</text>
 <text x="466" y="380" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">state          pending → exported</text>
-<text x="466" y="402" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">rows, created_us, updated_us</text>
+<text x="466" y="402" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">rows           (nº de amostras)</text>
 <text x="466" y="424" font-size="12.5" font-family="Menlo, Consolas, monospace" fill="#2c2c2a">detail         (relatório se rejeitado)</text>
 <text x="20" y="540" font-size="12.5" fill="#27500a" text-anchor="start" font-weight="bold">Um lote, depois de congelado, nunca mais é reagrupado: é isso que torna a escrita repetível.</text>
 </svg>

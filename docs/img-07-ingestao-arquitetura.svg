@@ -8,41 +8,38 @@
 <text x="34" y="154" font-size="12.5"  fill="#633806">o gateway OPC UA</text>
 <text x="34" y="172" font-size="12.5"  fill="#633806">porto 4840</text>
 <text x="34" y="190" font-size="12.5"  fill="#633806">(namespace ot)</text>
-<rect x="230" y="56" width="350" height="470" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1" stroke-dasharray="6 5"/>
-<text x="244" y="79" font-weight="bold" fill="#2c2c2a">POD ingest  (namespace ingest)</text>
-<rect x="250" y="100" width="310" height="100" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
-<text x="264" y="123" font-weight="bold" fill="#0c447c">contentor collector</text>
-<text x="264" y="144" font-size="12.5"  fill="#0c447c">subscreve as 25 variáveis</text>
-<text x="264" y="162" font-size="12.5"  fill="#0c447c">e põe cada alteração</text>
-<text x="264" y="180" font-size="12.5"  fill="#0c447c">no spool</text>
-<rect x="250" y="240" width="310" height="110" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
-<text x="264" y="263" font-weight="bold" fill="#27500a">volume: spool.db (SQLite)</text>
-<text x="264" y="284" font-size="12.5"  fill="#27500a">o 'caderno' durável</text>
-<text x="264" y="302" font-size="12.5"  fill="#27500a">tabelas: events e batches</text>
-<text x="264" y="320" font-size="12.5"  fill="#27500a">sobrevive a reinícios</text>
-<rect x="250" y="390" width="310" height="110" rx="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
-<text x="264" y="413" font-weight="bold" fill="#3c3489">contentor writer</text>
-<text x="264" y="434" font-size="12.5"  fill="#3c3489">forma lotes, escreve Parquet</text>
-<text x="264" y="452" font-size="12.5"  fill="#3c3489">num branch do lakeFS, valida</text>
-<text x="264" y="470" font-size="12.5"  fill="#3c3489">(G1) e junta ao main</text>
-<path d="M192 160 H248" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
-<text x="220" y="148" font-size="11" fill="#444" text-anchor="middle">OPC UA</text>
-<path d="M405 200 V238" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
-<text x="412" y="224" font-size="11.5" fill="#444" text-anchor="start">escreve</text>
-<path d="M405 350 V388" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
-<text x="412" y="374" font-size="11.5" fill="#444" text-anchor="start">lê lotes</text>
-<rect x="620" y="300" width="160" height="130" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
-<text x="634" y="323" font-weight="bold" fill="#2c2c2a">lakeFS</text>
-<text x="634" y="344" font-size="12.5"  fill="#2c2c2a">branches, commits</text>
-<text x="634" y="362" font-size="12.5"  fill="#2c2c2a">e merge sobre os</text>
-<text x="634" y="380" font-size="12.5"  fill="#2c2c2a">ficheiros</text>
-<text x="634" y="398" font-size="12.5"  fill="#2c2c2a">(namespace data)</text>
-<rect x="620" y="460" width="160" height="66" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1"/>
-<text x="634" y="483" font-weight="bold" fill="#2c2c2a">SeaweedFS + Postgres</text>
-<text x="634" y="504" font-size="12.5"  fill="#2c2c2a">bytes  +  historial</text>
-<path d="M562 445 H592 V365 H618" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
-<text x="572" y="470" font-size="11" fill="#444" text-anchor="start">branch, upload,</text>
-<text x="572" y="484" font-size="11" fill="#444" text-anchor="start">commit, merge</text>
-<path d="M700 432 V458" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
-<text x="20" y="545" font-size="12" fill="#444" text-anchor="start">Collector e writer estão no mesmo pod porque o SQLite é um ficheiro: um volume só se partilha dentro de um pod.</text>
+<rect x="230" y="56" width="250" height="110" rx="9" fill="#e6f1fb" stroke="#185fa5" stroke-width="1"/>
+<text x="244" y="79" font-weight="bold" fill="#0c447c">Deployment collector</text>
+<text x="244" y="100" font-size="12.5"  fill="#0c447c">subscreve as 25 variáveis</text>
+<text x="244" y="118" font-size="12.5"  fill="#0c447c">e grava cada alteração</text>
+<text x="244" y="136" font-size="12.5"  fill="#0c447c">no spool</text>
+<rect x="230" y="216" width="250" height="130" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="244" y="239" font-weight="bold" fill="#27500a">PostgreSQL: base ingest</text>
+<text x="244" y="260" font-size="12.5"  fill="#27500a">o 'caderno' durável</text>
+<text x="244" y="278" font-size="12.5"  fill="#27500a">tabelas: events e batches</text>
+<text x="244" y="296" font-size="12.5"  fill="#27500a">(o Postgres que já existia)</text>
+<rect x="230" y="396" width="250" height="110" rx="9" fill="#eeedfe" stroke="#534ab7" stroke-width="1"/>
+<text x="244" y="419" font-weight="bold" fill="#3c3489">Deployment writer</text>
+<text x="244" y="440" font-size="12.5"  fill="#3c3489">forma lotes, escreve Parquet</text>
+<text x="244" y="458" font-size="12.5"  fill="#3c3489">num branch, valida (G1)</text>
+<text x="244" y="476" font-size="12.5"  fill="#3c3489">e junta ao main</text>
+<path d="M192 120 H212 V110 H228" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="150" y="98" font-size="11" fill="#444" text-anchor="middle">OPC UA</text>
+<path d="M355 168 V214" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="364" y="196" font-size="11.5" fill="#444" text-anchor="start">grava</text>
+<path d="M355 348 V394" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="364" y="376" font-size="11.5" fill="#444" text-anchor="start">lê lotes</text>
+<rect x="560" y="300" width="220" height="130" rx="9" fill="#ffffff" stroke="#8a8a85" stroke-width="1"/>
+<text x="574" y="323" font-weight="bold" fill="#2c2c2a">lakeFS</text>
+<text x="574" y="344" font-size="12.5"  fill="#2c2c2a">branches, commits e merge</text>
+<text x="574" y="362" font-size="12.5"  fill="#2c2c2a">sobre os ficheiros</text>
+<text x="574" y="380" font-size="12.5"  fill="#2c2c2a">(namespace data)</text>
+<rect x="560" y="460" width="220" height="66" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1"/>
+<text x="574" y="483" font-weight="bold" fill="#2c2c2a">SeaweedFS + Postgres</text>
+<text x="574" y="504" font-size="12.5"  fill="#2c2c2a">bytes  +  historial</text>
+<path d="M482 450 H520 V365 H558" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="488" y="474" font-size="11" fill="#444" text-anchor="start">branch, upload,</text>
+<text x="488" y="488" font-size="11" fill="#444" text-anchor="start">commit, merge</text>
+<path d="M670 432 V458" stroke="#444" stroke-width="1.7" fill="none" marker-end="url(#a)"/>
+<text x="20" y="545" font-size="11.5" fill="#444" text-anchor="start">Collector e writer são pods independentes: só partilham o Postgres. Se ele cair, o collector retém as amostras em memória.</text>
 </svg>

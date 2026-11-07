@@ -27,12 +27,12 @@ Do mais simples (sem rede) ao mais complexo. Cada ficheiro é pequeno.
 | # | Ficheiro | Linhas | O que é | Imagem |
 |---|---|---|---|---|
 | 1 | `envelope.py` | 49 | o que é uma "amostra" e como se calcula a identidade | — |
-| 2 | `spool.py` | 108 | o caderno durável (SQLite) | 8 |
+| 2 | `spool.py` | 102 | o caderno durável (PostgreSQL) | 8 |
 | 3 | `bronze.py` | 59 | o formato do Parquet e os caminhos | — |
-| 4 | `g1.py` | 82 | as 8 regras do gate | 10 |
+| 4 | `g1.py` | 81 | as 8 regras do gate | 10 |
 | 5 | `lake.py` | 53 | as operações no lakeFS | — |
-| 6 | `writer.py` | 86 | **o coração**: o ciclo do lote | 9 |
-| 7 | `collector.py` | 104 | a ligação ao gateway | 11 |
+| 6 | `writer.py` | 79 | **o coração**: o ciclo do lote | 9 |
+| 7 | `collector.py` | 124 | a ligação ao gateway | 11 |
 | 8 | `main.py` | 63 | os comandos (`collect`, `write`, `status`…) | — |
 
 O contrato que estas peças cumprem está em `docs/bronze-contract.md`. Lê-o **antes** do código.
@@ -59,21 +59,22 @@ mesma: ficam fundidas. Ver o ponto fraco 8 na imagem 12.)
 
 ### 3.2 `spool.py`: o caderno que não esquece
 
-👉 **Imagem 8.** É um ficheiro SQLite com duas tabelas: `events` (as amostras) e `batches`
-(os lotes). Os pontos a ler com atenção:
+👉 **Imagem 8.** São duas tabelas no PostgreSQL (base `ingest`): `events` (as amostras) e
+`batches` (os lotes). Os pontos a ler com atenção:
 
-- **`__init__`, linhas 22 a 40**: `journal_mode=WAL` e `synchronous=FULL`. O segundo faz um
-  *fsync* a cada commit: a amostra só conta como guardada quando está **mesmo no disco**.
-  É lento, mas é o preço da durabilidade.
-- **`add`, linha 42**: `INSERT OR IGNORE`. A coluna `event_id` é `UNIQUE`, por isso uma
-  amostra repetida é ignorada pelo próprio SQLite. Devolve quantas eram realmente novas.
-- **`assign_batch`, linha 57**: o método mais subtil. Dentro de **uma transação**
-  (`BEGIN IMMEDIATE`), escolhe amostras sem lote, calcula o `batch_id` (hash dos seus ids),
-  marca as linhas e cria a linha do lote. Se interromperes a meio, a transação desfaz-se.
-  Um lote **congelado** nunca mais é reagrupado.
+- **`SCHEMA`, linha 12**: o desenho das duas tabelas. Repara em `event_id TEXT NOT NULL UNIQUE`:
+  é isto que impede duplicados, para sempre.
+- **`_tx`, linha 41**: uma transação, numa ligação que **se refaz sozinha** se a anterior caiu
+  (por exemplo, o Postgres reiniciou). Quase todos os métodos passam por aqui.
+- **`add`, linha 52**: `ON CONFLICT (event_id) DO NOTHING`. Uma amostra repetida é ignorada pela
+  própria base de dados. Devolve quantas eram realmente novas.
+- **`assign_batch`, linha 59**: o método mais subtil. Dentro de **uma transação**, escolhe amostras
+  sem lote (`FOR UPDATE`), calcula o `batch_id` (hash dos seus ids), marca as linhas e cria a
+  linha do lote. Se interromperes a meio, a transação desfaz-se. Um lote **congelado** nunca
+  mais é reagrupado.
 
-❓ *Porque é que o `BEGIN IMMEDIATE` importa se há dois processos (collector e writer) no
-mesmo ficheiro?* (Evita que os dois mexam na mesma amostra ao mesmo tempo.)
+❓ *A durabilidade antes vinha de `synchronous=FULL`. De onde vem agora?* (De o Postgres só
+confirmar o `COMMIT` depois de gravar no disco o seu registo de transações.)
 
 ### 3.3 `bronze.py`: o formato
 
@@ -84,7 +85,7 @@ mesmo ficheiro?* (Evita que os dois mexam na mesma amostra ao mesmo tempo.)
 
 ### 3.4 `g1.py`: o gate
 
-👉 **Imagem 10.** `validate` (**linha 42**) percorre o lote e junta as violações das 8 regras.
+👉 **Imagem 10.** `validate` (**linha 41**) percorre o lote e junta as violações das 8 regras.
 O que reparar:
 
 - Rejeita lote **inteiro**, não linhas soltas (decisão do ADR-006; ver ponto fraco 2).
@@ -116,10 +117,10 @@ Duas coisas a notar:
 - **`self.hook(...)`** aparece depois de cada passo. Em produção não faz nada. Nos testes
   serve para **simular um crash** em qualquer ponto: é assim que o teste mata o writer em 24
   sítios diferentes.
-- **`_reject`, linha 62**: se o G1 falhar, grava o relatório **no branch**, deixa-o por
+- **`_reject`, linha 55**: se o G1 falhar, grava o relatório **no branch**, deixa-o por
   juntar e marca o lote como `rejected`. O `main` nunca é tocado.
 
-`run_once` (linha 73) retoma os lotes por acabar e só depois forma novos.
+`run_once` (linha 66) retoma os lotes por acabar e só depois forma novos.
 
 ❓ *O que acontece se o writer morrer depois do merge mas antes de marcar `exported`?*
 (Ao reiniciar repete o lote: o merge devolve "nada a juntar", que conta como feito.)
@@ -128,12 +129,15 @@ Duas coisas a notar:
 
 👉 **Imagem 11.** Divide-se em duas classes:
 
-- **`_Handler`, linha 35**: chamado pelo `asyncua` a cada alteração. Não escreve logo no
-  spool: põe numa lista e agenda um `flush` (**linha 53**) com `call_soon`, para que as
-  alterações do mesmo pacote entrem **numa só transação** (e num só *fsync*).
-- **`Collector.run`, linha 70**: o ciclo de reconexão, com espera crescente (1 s, 2 s,
+- **`_Handler`, linha 35**: chamado pelo `asyncua` a cada alteração. Não escreve nada: só põe a
+  amostra na fila.
+- **`_Queue`, linha 45** (e `flush_forever`, **linha 62**): a fila das amostras ainda não gravadas.
+  Grava-as no spool e **só as tira da fila depois de gravadas**. Se o Postgres falhar, ficam em
+  memória e tenta-se outra vez a cada segundo. É a peça que compensa o spool ter passado a
+  depender da rede.
+- **`Collector.run`, linha 87**: o ciclo de reconexão ao gateway, com espera crescente (1 s, 2 s,
   4 s… até 30 s).
-- **`_session`, linha 86**: liga, descobre as variáveis, subscreve e fica num batimento de
+- **`_session`, linha 107**: liga, descobre as variáveis, subscreve e fica num batimento de
   2 em 2 s. Repara em `OverflowPolicy.DISCONNECT`: se a fila local encher, **desliga-se** e
   reconecta, em vez de deitar amostras fora em silêncio (o comportamento por omissão).
 
@@ -180,4 +184,4 @@ nada e encaixam melhor nas Fases 7 e 9.
 3. Se o writer morrer a meio do `upload`, o que fica no lakeFS e o que faz o reinício?
 4. Porque é que o lote rejeitado deixa o branch por juntar, em vez de o apagar?
 5. O que acontece às amostras enquanto o collector está desligado? (Este é o ponto fraco 1.)
-6. Porque é que o collector e o writer têm de estar no mesmo pod?
+6. O que acontece às amostras se o Postgres cair com o collector a correr? (Ficam em memória, na `_Queue`, e repetem-se.)
