@@ -1,0 +1,28 @@
+# Nós OPC UA conhecidos e o tipo esperado do valor (regras G1-03 e G1-04).
+# Espelha ot/gateway/src/ot_gateway/devices.yaml; um teste compara as duas fontes.
+nodes:
+  "ns=2;s=PUMP-01.Connected": boolean
+  "ns=2;s=PUMP-01.outlet_pressure": double
+  "ns=2;s=PUMP-01.flow_rate": double
+  "ns=2;s=PUMP-01.motor_current": double
+  "ns=2;s=PUMP-01.bearing_temp": double
+  "ns=2;s=PUMP-01.vibration_rms": double
+  "ns=2;s=PUMP-01.run_hours": uint32
+  "ns=2;s=PUMP-01.state": uint16
+  "ns=2;s=PUMP-01.device_clock": datetime
+  "ns=2;s=PUMP-01.alarm": boolean
+  "ns=2;s=MOTOR-01.Connected": boolean
+  "ns=2;s=MOTOR-01.speed_rpm": double
+  "ns=2;s=MOTOR-01.torque": double
+  "ns=2;s=MOTOR-01.current": double
+  "ns=2;s=MOTOR-01.winding_temp": double
+  "ns=2;s=MOTOR-01.vibration_rms": double
+  "ns=2;s=MOTOR-01.state": uint16
+  "ns=2;s=MOTOR-01.device_clock": datetime
+  "ns=2;s=MOTOR-01.alarm": boolean
+  "ns=2;s=CHILLER-01.Connected": boolean
+  "ns=2;s=CHILLER-01.inlet_temp": double
+  "ns=2;s=CHILLER-01.outlet_temp": double
+  "ns=2;s=CHILLER-01.power_kw": double
+  "ns=2;s=CHILLER-01.state": uint16
+  "ns=2;s=CHILLER-01.device_clock": datetime
