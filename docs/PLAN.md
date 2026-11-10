@@ -300,7 +300,7 @@ de propósito e o branch correspondente **não** chega a `main`.
 > real, num destino descartável), e o caminho *live* para o Timescale. **Adiado:** comandos
 > para listar e reprocessar lotes rejeitados, e G1 por linha em vez de por lote.
 
-### Fase 4 — Silver + Airflow  🔵 em curso
+### Fase 4 — Silver + Airflow  ✅ concluída (2026-11-09)
 Airflow no k3s (KubernetesExecutor, Postgres), DAG que abre branch → bronze→silver →
 commit → merge. Desescalamento, conversão de unidades, dedup, normalização de quality,
 backfill e late-arriving.
@@ -313,12 +313,12 @@ reprocessar a mesma partição duas vezes não altera contagens; uma falha a mei
 > dados atrasados. As unidades **não** se convertem para SI: mantêm-se as do gateway, com código
 > UNECE e um catálogo de conversão (hoje identidade). Contrato: `docs/silver-contract.md`.
 >
-> **Estado (2026-11-07):** feitos o transform (DuckDB), `run_hour` (branch → verificar → merge), 24 testes
-> (incl. semana de 7 dias: backfill == incremental, byte a byte, 169 ficheiros; crash em cada passo deixa
-> `main` intacto) e o DAG `silver_hourly` a correr no cluster (horas 16 e 17 de 07-11 reconciliadas).
-> Teste contra o lakeFS real (8 casos: ordem, idempotência, crash em 5 passos, main intacto) a passar
-> (`pipelines/tests/run_lakefs_tests.sh`). Falta: backfill pelo Airflow,
-> política de retenção dos branches `etl-*`/`silver-*`.
+> **Estado (2026-11-09):** DoD verificado: backfill de 7 dias == incremental, byte a byte (169 ficheiros,
+> `test_week.py`); reprocessar uma hora não altera nada (testes locais e contra o lakeFS real, 8 casos);
+> falha em cada um dos 5 passos antes do merge deixa o `main` intacto (WAP). DAG `silver_hourly` no cluster,
+> horas 16-18 de 07-11 reconciliadas, catchup de 41 execuções sem erros. Retenção de branches: DAG
+> `lake_housekeeping` (diário, em simulação até rever o primeiro relatório; ver ADR-007).
+> Por fazer, fora do DoD: GC de objetos órfãos do lakeFS (precisa de Spark; só se o armazenamento o justificar).
 
 ### Fase 5 — Governança e gates
 OpenMetadata no cluster, conectores (PostgreSQL, datalake sobre SeaweedFS/lakeFS, linhagem do

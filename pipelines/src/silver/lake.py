@@ -57,3 +57,15 @@ class Lake:
 
     def delete_branch(self, name: str) -> None:
         self.repo.branch(name).delete()
+
+    def branch_infos(self) -> "list[tuple[str, str, float]]":
+        """(nome, commit da ponta, data do commit em segundos) de cada branch."""
+        out = []
+        for b in self.repo.branches():
+            commit = b.get_commit()
+            out.append((b.id, commit.id, float(commit.creation_date)))
+        return out
+
+    def history_ids(self, ref: str = "main", limit: int = 20000) -> set[str]:
+        """Os commits que fazem parte da história de `ref` (inclui os dos branches já juntados)."""
+        return {c.id for c in self.repo.ref(ref).log(max_amount=limit)}

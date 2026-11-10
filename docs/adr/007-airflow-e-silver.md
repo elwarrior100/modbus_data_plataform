@@ -51,3 +51,23 @@ está em `docs/silver-contract.md`. O Airflow é requisito do projeto (ADR-011 d
 - **Fixture de teste**: o gerador de 7 dias deduplica por `event_id`, como o spool. Quando o relógio do
   dispositivo volta atrás (fim do `clock_skew`), repete `source_ts` e valor, e o spool descartaria a
   segunda amostra (ponto fraco 8 da Fase 3: a identidade depende de `source_ts` ao segundo).
+
+## Notas de 2026-11-09 (VM parada e catchup)
+- A VM Lima esteve parada de 07-11 (≈20h) a 09-11: o bronze tem um **buraco** das 19h de 07-11 às 06h de
+  09-11 (o collector não recebe nada com a VM parada; ponto fraco 1 da Fase 3). Ao arrancar, o Airflow
+  recuperou sozinho as horas em atraso: 41 execuções, todas com sucesso, a maioria "sem bronze, saltada".
+- Reconciliação de todas as horas fechadas no `main`: 16h (39 247), 17h (43 848), 18h (33 828), silver == bronze.
+- O SeaweedFS ficou em `ImagePullBackOff` ao arrancar a VM (etiqueta `latest` consulta o registo sem rede).
+  Corrigido com `imagePullPolicy: IfNotPresent` em `platform/k8s/seaweedfs/seaweedfs.yaml`.
+- `airflow backfill create --reprocess-behavior completed` **não** reprocessa runs já concluídos; para
+  forçar o reprocessamento usa-se `failed`/`all` ou *clear* na interface. A idempotência do reprocessamento
+  está provada pelo teste contra o lakeFS real, não por este backfill.
+
+## Retenção de branches (2026-11-09)
+Política em `pipelines/src/silver/retention.py`, executada pelo DAG `lake_housekeeping` (03:30 diário) e
+manualmente com `python -m silver.retention [--apply]`:
+- branch do pipeline (`etl-<hex>`, `silver-<data>-<hora>`) **juntado** ao main há mais de **7 dias**: apaga-se;
+- **por juntar** (rejeitado pelo G1 ou silver falhada) há mais de **30 dias**: apaga-se; até lá fica para autópsia;
+- nunca se tocam o `main` nem branches manuais (`etl-gap`).
+"Juntado" = o commit da ponta está na história do main. O DAG arranca com `APPLY = False` (só regista);
+muda-se para `True` depois de rever o primeiro relatório. Primeira simulação: 0 a apagar (168 branches, todos recentes).
