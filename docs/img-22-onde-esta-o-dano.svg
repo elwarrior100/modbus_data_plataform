@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 430" width="800" height="430" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>Onde está o dano: um único ficheiro, na ponta do main</title>
+<rect width="800" height="430" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">Onde está o dano: um único ficheiro, na ponta do main</text>
+<text x="20" y="58" font-size="13" fill="#444">Histórico do main no lakeFS (do mais antigo para o mais recente)</text>
+<rect x="40" y="75" width="110" height="70" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="52" y="98" font-weight="bold" fill="#27500a">22:53</text>
+<text x="52" y="119" font-size="12.5" fill="#27500a">legível</text>
+<rect x="170" y="75" width="110" height="70" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="182" y="98" font-weight="bold" fill="#27500a">22:55</text>
+<text x="182" y="119" font-size="12.5" fill="#27500a">legível</text>
+<rect x="300" y="75" width="110" height="70" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="312" y="98" font-weight="bold" fill="#27500a">22:57</text>
+<text x="312" y="119" font-size="12.5" fill="#27500a">legível</text>
+<rect x="430" y="75" width="110" height="70" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="442" y="98" font-weight="bold" fill="#27500a">22:58</text>
+<text x="442" y="119" font-size="12.5" fill="#27500a">legível</text>
+<rect x="560" y="75" width="110" height="70" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="572" y="98" font-weight="bold" fill="#791f1f">22:59</text>
+<text x="572" y="119" font-size="12.5" fill="#791f1f">ILEGÍVEL</text>
+<line x1="150" y1="110" x2="170" y2="110" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="280" y1="110" x2="300" y2="110" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="410" y1="110" x2="430" y2="110" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="540" y1="110" x2="560" y2="110" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="40" y="172" font-size="12.5" fill="#444">cada commit aponta para uma "metarange" (a lista do que ele contém)</text>
+<line x1="615" y1="145" x2="615" y2="215" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="500" y="215" width="280" height="90" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="512" y="238" font-weight="bold" fill="#791f1f">metarange fc3b2e46…</text>
+<text x="512" y="259" font-size="12.5" fill="#791f1f">está no ficheiro de volume 20</text>
+<text x="512" y="277" font-size="12.5" fill="#791f1f">do SeaweedFS, cortado no fim</text>
+<text x="512" y="295" font-size="12.5" fill="#791f1f">(o único objeto ilegível)</text>
+<rect x="30" y="215" width="430" height="90" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="42" y="238" font-weight="bold" fill="#27500a">O que está intacto</text>
+<text x="42" y="259" font-size="12.5" fill="#27500a">commits até 22:58 (447 ficheiros bronze e 18 silver legíveis)</text>
+<text x="42" y="277" font-size="12.5" fill="#27500a">spool no PostgreSQL com TODOS os eventos</text>
+<text x="42" y="295" font-size="12.5" fill="#27500a">o código e os testes dos gates</text>
+<text x="30" y="345" font-size="13" fill="#27500a" font-weight="bold">O lote perdido (392969388b01ac59) não se perdeu de facto: os eventos continuam no spool.</text>
+<text x="30" y="368" font-size="13" fill="#2c2c2a">Falta só reescrevê-lo no lakeFS. O writer sabe fazê-lo sozinho (cada passo é repetível).</text>
+</svg>

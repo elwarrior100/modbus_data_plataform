@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#444" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<title>O que aconteceu: a VM foi morta a meio de uma escrita</title>
+<rect width="800" height="400" fill="#ffffff"/>
+<text x="20" y="28" font-weight="bold" font-size="16" fill="#2c2c2a">O que aconteceu: a VM foi morta a meio de uma escrita</text>
+<rect x="20" y="60" width="170" height="100" rx="9" fill="#eaf3de" stroke="#3b6d11" stroke-width="1"/>
+<text x="32" y="83" font-weight="bold" fill="#27500a">09-11 · 22:59:20</text>
+<text x="32" y="104" font-size="12.5" fill="#27500a">O writer junta o lote</text>
+<text x="32" y="122" font-size="12.5" fill="#27500a">392969388b01ac59 ao main</text>
+<text x="32" y="140" font-size="12.5" fill="#27500a">(o último commit)</text>
+<line x1="190" y1="110" x2="230" y2="110" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="230" y="60" width="170" height="100" rx="9" fill="#faeeda" stroke="#854f0b" stroke-width="1"/>
+<text x="242" y="83" font-weight="bold" fill="#633806">22:59:44</text>
+<text x="242" y="104" font-size="12.5" fill="#633806">A VM pára SEM</text>
+<text x="242" y="122" font-size="12.5" fill="#633806">sequência de encerramento</text>
+<text x="242" y="140" font-size="12.5" fill="#633806">(o diário acaba a meio)</text>
+<line x1="400" y1="110" x2="440" y2="110" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="440" y="60" width="170" height="100" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="452" y="83" font-weight="bold" fill="#791f1f">Perdem-se bytes</text>
+<text x="452" y="104" font-size="12.5" fill="#791f1f">O disco só tinha gravado</text>
+<text x="452" y="122" font-size="12.5" fill="#791f1f">parte do ficheiro de volume</text>
+<text x="452" y="140" font-size="12.5" fill="#791f1f">do SeaweedFS (cache)</text>
+<line x1="610" y1="110" x2="650" y2="110" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="650" y="60" width="130" height="100" rx="9" fill="#f1f1ee" stroke="#8a8a85" stroke-width="1"/>
+<text x="662" y="83" font-weight="bold" fill="#2c2c2a">10-11 · 08:04</text>
+<text x="662" y="104" font-size="12.5" fill="#2c2c2a">VM arranca</text>
+<text x="662" y="122" font-size="12.5" fill="#2c2c2a">e parece normal</text>
+<line x1="715" y1="160" x2="715" y2="215" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="440" y="215" width="340" height="90" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="452" y="238" font-weight="bold" fill="#791f1f">O lakeFS tenta ler esse commit</text>
+<text x="452" y="259" font-size="12.5" fill="#791f1f">falta um bloco: erro 500 do SeaweedFS</text>
+<text x="452" y="277" font-size="12.5" fill="#791f1f">por isso não cria branches nem faz commits</text>
+<line x1="440" y1="260" x2="380" y2="260" stroke="#444" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="30" y="215" width="350" height="90" rx="9" fill="#fcebeb" stroke="#a32d2d" stroke-width="1"/>
+<text x="42" y="238" font-weight="bold" fill="#791f1f">Resultado: o pipeline pára</text>
+<text x="42" y="259" font-size="12.5" fill="#791f1f">writer parado (9 185 eventos à espera no spool)</text>
+<text x="42" y="277" font-size="12.5" fill="#791f1f">hooks do G2 não se conseguem instalar</text>
+<text x="30" y="345" font-size="13" fill="#791f1f">A mesma coisa já tinha acontecido a 07-11 (18:45): a VM é morta, não desligada.</text>
+<text x="30" y="368" font-size="13" fill="#2c2c2a" font-weight="bold">Causa: parar o Mac / fechar a app mata a VM sem ela gravar o que tem em memória.</text>
+</svg>

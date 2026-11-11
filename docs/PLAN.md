@@ -320,7 +320,12 @@ reprocessar a mesma partição duas vezes não altera contagens; uma falha a mei
 > `lake_housekeeping` (diário, em simulação até rever o primeiro relatório; ver ADR-007).
 > Por fazer, fora do DoD: GC de objetos órfãos do lakeFS (precisa de Spark; só se o armazenamento o justificar).
 
-### Fase 5 — Governança e gates
+### Fase 5 — Governança e gates  🔵 em curso (2026-11-11)
+> **Estado:** contrato (`docs/gates-contract.md`) e ADR-008 feitos; G2 (7 regras) implementado e calibrado; hook Lua
+> `pre-merge` + proteção `pre-commit` instalados no `industrial-lake`; 4 testes contra o lakeFS real e 34 locais a passar;
+> primeira corrida real: o G2 recusou as horas com buracos de recolha. **Falta:** `comms_gap` injetado de propósito no
+> simulador, OpenMetadata (catálogo, linhagem, owners, histórico dos gates), G3 (depende do gold, Fase 6).
+
 OpenMetadata no cluster, conectores (PostgreSQL, datalake sobre SeaweedFS/lakeFS, linhagem do
 Airflow), glossário de negócio, *owners* por dataset, test suites de G2/G3, e os *pre-merge
 hooks* do lakeFS a impor o resultado.
@@ -390,6 +395,7 @@ Superset 2 · MLflow 1 · folga para jobs 2-3.
 |---|---|
 | Âmbito enorme → desistência a meio | Cada fase entrega algo demonstrável; nunca duas fases abertas |
 | OpenMetadata come a VM | Perfis (§9); heap do índice reduzido; parar governança durante trabalho de ML |
+| VM Lima morta (Mac a dormir/app fechada) corrompe o fim dos ficheiros do SeaweedFS | `limactl stop industrial` antes de fechar; a rever `fsync`; já aconteceu (2026-11-09, ver ADR-008) |
 | lakeFS: o padrão branch-por-batch acumula branches e lixo | Política de retenção e *garbage collection* definida logo na Fase 4, não na Fase 9 |
 | Ler Parquet **através** do lakeFS tem fricção (DuckDB, Superset, MLflow) | Validar a leitura ponta-a-ponta com um teste mínimo **na Fase 0**, antes de comprometer a Fase 4 |
 | Airflow em k8s consome tempo desproporcional | Se a Fase 4 passar de 2 semanas, correr Airflow fora do k8s temporariamente e voltar na Fase 9 |
