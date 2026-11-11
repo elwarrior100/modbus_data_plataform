@@ -9,7 +9,10 @@ import pyarrow.parquet as pq
 
 from fake_lake import FakeLake
 from fixture_bronze import START
-from silver.run import run_hour
+from silver.run import GateFailed, run_hour
+
+# as horas que o G2 tem de recusar: o comms_gap do chiller e a última "hora" da fixture (só tem 1 leitura)
+BLOCKED = {"2026-11-02T10", "2026-11-08T00"}
 
 
 def hours(week):
@@ -24,9 +27,13 @@ def hours(week):
 def process(week, order):
     lake = FakeLake()
     lake.load_bronze(week[1])
+    blocked = set()
     for hour in order:
-        run_hour(lake, hour)
-    return lake
+        try:
+            run_hour(lake, hour)
+        except GateFailed:
+            blocked.add(hour.strftime("%Y-%m-%dT%H"))
+    return lake, blocked
 
 
 def fingerprint(lake):
@@ -37,19 +44,20 @@ def test_a_week_of_backfill_equals_a_week_of_incremental_runs(week):
     chronological = hours(week)
     shuffled = chronological[:]
     random.Random(7).shuffle(shuffled)                        # um backfill não tem de respeitar a ordem
-    incremental = process(week, chronological)
-    backfill = process(week, shuffled)
-    assert len(incremental.silver()) == len(chronological) == 169
-    assert fingerprint(incremental) == fingerprint(backfill)  # os 169 ficheiros são byte a byte iguais
-    again = process(week, chronological + chronological[:24])             # repetir um dia inteiro por cima
+    (incremental, blocked_a), (backfill, blocked_b) = process(week, chronological), process(week, shuffled)
+    assert blocked_a == blocked_b == BLOCKED                  # o gate decide o mesmo, em qualquer ordem
+    assert len(chronological) == 169 and len(incremental.silver()) == 169 - len(BLOCKED)
+    assert fingerprint(incremental) == fingerprint(backfill)  # os 167 ficheiros são byte a byte iguais
+    (again, _) = process(week, chronological + chronological[:24])        # repetir um dia inteiro por cima
     assert fingerprint(again) == fingerprint(incremental)
 
 
 def test_the_silver_has_every_bronze_row_exactly_once(week):
-    lake = process(week, hours(week))
-    events = week[0]
+    lake, _ = process(week, hours(week))
+    events = [e for e in week[0]                                                # só as horas que o gate deixou entrar
+              if datetime.fromtimestamp(e.ingest_ts / 1e6, timezone.utc).strftime("%Y-%m-%dT%H") not in BLOCKED]
     silver_rows = sum(pq.ParquetFile(io.BytesIO(d)).metadata.num_rows for d in lake.silver().values())
-    assert silver_rows == len(events) == 301_940
+    assert silver_rows == len(events) and len(events) < len(week[0]) == 301_940
     ids = duckdb.sql("SELECT COUNT(*), COUNT(DISTINCT bronze_event_id) FROM read_parquet([" + ",".join(
         f"'{p}'" for p in _dump(lake)) + "])").fetchall()[0]
     assert ids == (len(events), len(events))
@@ -66,13 +74,13 @@ def _dump(lake):
 
 
 def test_every_incident_leaves_its_mark_in_the_silver(week):
-    lake = process(week, hours(week))
+    lake, _ = process(week, hours(week))
     paths = ",".join(f"'{p}'" for p in _dump(lake))
     q = lambda sql: duckdb.sql(sql.replace("SILVER", f"read_parquet([{paths}])")).fetchall()    # noqa: E731
 
     assert q("SELECT COUNT(*) FROM SILVER WHERE quality = 'BAD' AND (value_double IS NOT NULL OR value_bool IS NOT NULL OR value_str IS NOT NULL)")[0][0] == 0
     bad = q("SELECT asset_id, COUNT(*) FROM SILVER WHERE quality = 'BAD' GROUP BY 1")
-    assert {a for a, _ in bad} == {"CHILLER-01", "PUMP-01"}                                   # a avaria do chiller e o reinício da bomba
+    assert {a for a, _ in bad} == {"PUMP-01"}            # o reinício da bomba; a avaria do chiller foi recusada pelo G2 e não entra
     assert q("SELECT COUNT(*) FROM SILVER WHERE 'out_of_range' IN dq_flags AND asset_id = 'PUMP-01' AND tag_name = 'outlet_pressure'")[0][0] >= 1
     skew = q("SELECT DISTINCT asset_id FROM SILVER WHERE list_contains(dq_flags, 'clock_skew')")
     assert skew == [("MOTOR-01",)]                                                           # só o motor teve o relógio desalinhado

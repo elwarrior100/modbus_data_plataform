@@ -25,6 +25,10 @@ class FakeLake:
     def upload(self, branch, path, data):
         self.branches[branch]["staged"][path] = data
 
+    def checksum(self, branch, path):
+        import hashlib
+        return hashlib.md5(self._view(branch)[path]).hexdigest()
+
     def commit(self, branch, message, metadata):
         b = self.branches[branch]
         changed = {p: d for p, d in b["staged"].items() if b["committed"].get(p) != d}

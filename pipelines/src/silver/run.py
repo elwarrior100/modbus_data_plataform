@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
+from . import g2
 from .catalog import load_catalog
 from .transform import VERSION, SilverError, transform
 
@@ -17,6 +18,11 @@ class RunResult:
     skipped: bool = False
     bronze_rows: int = 0
     silver_rows: int = 0
+    g2_status: str = ""                         # "pass" | "warn" (o "fail" levanta GateFailed)
+
+
+class GateFailed(SilverError):
+    """O G2 encontrou um problema `blocker`: a silver ficou no branch, mas não se junta ao destino."""
 
 
 def partition(hour: datetime) -> tuple[str, str]:
@@ -42,10 +48,15 @@ def run_hour(lake, hour: datetime, *, target: str = "main", hook=None, keep_bran
             local.append(Path(tmp) / f"bronze{i}.parquet")
             local[-1].write_bytes(lake.read(branch, path))
         out = Path(tmp) / "silver.parquet"
-        result = transform(local, out, load_catalog())          # levanta SilverError se o bronze não cumprir o contrato
+        catalog = load_catalog()
+        result = transform(local, out, catalog)                 # levanta SilverError se o bronze não cumprir o contrato
         hook("transform")
         lake.upload(branch, silver_path, out.read_bytes())
-    hook("upload")
+        hook("upload")
+        report = g2.evaluate(out, hour, catalog)                # o gate lê o ficheiro que acabámos de gerar
+    attested = {silver_path: lake.checksum(branch, silver_path)}
+    lake.upload(branch, f"_gates/g2/dt={dt}/hour={hh}.json", report.attestation(attested))   # a prova que o hook do lakeFS confere
+    hook("g2")
 
     lake.commit(branch, f"silver: {dt} hora {hh}", {"bronze_files": str(len(bronze_files)), "bronze_rows": str(result.bronze_rows),
                                                   "silver_rows": str(result.silver_rows), "silver_version": VERSION})
@@ -55,8 +66,10 @@ def run_hour(lake, hour: datetime, *, target: str = "main", hook=None, keep_bran
         raise SilverError(f"no lakeFS há {stored} linhas de silver e o bronze tem {result.bronze_rows}")
     hook("verify")
 
+    if report.status == "fail":                                 # o hook do lakeFS recusaria de qualquer forma; aqui falha-se cedo e alto
+        raise GateFailed(f"G2 falhou para {dt}T{hh}: {report.summary}. O branch {branch} fica por juntar para autópsia.")
     lake.merge(branch, target, f"silver: {dt} hora {hh}")
     hook("merge")
     if not keep_branch:
         lake.delete_branch(branch)
-    return RunResult(f"{dt}T{hh}", False, result.bronze_rows, result.silver_rows)
+    return RunResult(f"{dt}T{hh}", False, result.bronze_rows, result.silver_rows, report.status)

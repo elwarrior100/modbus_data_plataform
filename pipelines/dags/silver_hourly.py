@@ -23,13 +23,18 @@ with DAG(
 
     @task
     def bronze_to_silver(logical_date=None) -> dict:
+        from airflow.sdk.exceptions import AirflowFailException
+
         from silver.lake import Lake
-        from silver.run import run_hour
+        from silver.run import GateFailed, run_hour
 
         closed_hour = logical_date.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
-        result = run_hour(Lake.from_env(), closed_hour)
+        try:
+            result = run_hour(Lake.from_env(), closed_hour)
+        except GateFailed as error:                  # o gate G2 recusou a hora: repetir não muda nada, por isso não há retries
+            raise AirflowFailException(str(error)) from error
         print(result)
-        return {"hour": result.hour, "skipped": result.skipped,
+        return {"hour": result.hour, "skipped": result.skipped, "g2": result.g2_status,
                 "bronze_rows": result.bronze_rows, "silver_rows": result.silver_rows}
 
     bronze_to_silver()

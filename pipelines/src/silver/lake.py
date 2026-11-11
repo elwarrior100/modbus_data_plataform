@@ -35,6 +35,10 @@ class Lake:
     def upload(self, branch: str, path: str, data: bytes) -> None:
         self.repo.branch(branch).object(path).upload(data=data, mode="wb")
 
+    def checksum(self, branch: str, path: str) -> str:
+        """O checksum que o lakeFS guarda para o objeto (é o que o hook do G2 compara)."""
+        return self.repo.branch(branch).object(path).stat().checksum
+
     def commit(self, branch: str, message: str, metadata: dict[str, str]) -> bool:
         """False se não havia nada para commitar (já estava feito)."""
         try:
