@@ -16,7 +16,7 @@ with DAG(
     start_date=datetime(2026, 11, 7, 16, tzinfo=timezone.utc),  # primeira hora com bronze real
     schedule="10 * * * *",
     catchup=True,
-    max_active_runs=2,
+    max_active_runs=1,                   # em série: com 2 CPUs na Oracle uma hora de cada vez (docs/PLAN.md §9)
     default_args={"retries": 2, "retry_delay": timedelta(minutes=2)},
     tags=["silver"],
 ):
