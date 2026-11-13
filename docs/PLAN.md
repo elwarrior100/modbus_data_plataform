@@ -369,21 +369,34 @@ não documentados.
 
 ---
 
-## 9. Orçamento de recursos (VM: 24 GB RAM)
+## 9. Orçamento de recursos (alvo: Oracle Always Free, 2 OCPU / 12 GB)
 
-O OpenMetadata pesa (servidor + índice de pesquisa). Por isso a plataforma corre por
-**perfis**, não toda de uma vez:
+Desde 2026 o Ampere A1 gratuito da Oracle baixou de 4 OCPU / 24 GB para **2 OCPU / 12 GB / 200 GB de disco no total
+da conta**. O desenvolvimento continua local (VM Lima, 8 CPU / 16 GB) e migra-se para a Oracle quando estabilizar
+(Terraform em `platform/terraform/oracle/`). Por isso o orçamento passa a ser o da Oracle.
 
-| Perfil | Componentes | RAM aprox. |
+**Medido em 2026-11-11** (VM local, núcleo + OpenMetadata a correr): ~6 GB de RAM usados, dos quais o OpenMetadata
+~2,6 GB (OpenSearch 1,6 + servidor 1,0); dados em disco pequenos (SeaweedFS 83 MB, Postgres 357 MB; as imagens dos
+contentores são o maior consumo, 16 GB). Uma hora de silver custa ~0,07 s de CPU e 183 MB de pico. Teste de carga
+(`tests/stress/silver_backfill.py`, 1 160 horas, 11,9 M linhas, pod limitado a 2 CPU): 70 s com 2 workers, 137 s com 1;
+pico do nó 1,9 de 8 CPU e 326 MB de RAM no processo.
+
+Por isso a plataforma corre por **perfis**, não toda de uma vez, e **o trabalho corre em série**:
+
+| Perfil | Componentes | RAM aprox. (medida/estimada) |
 |---|---|---|
-| `core` (F0-F4) | k3s, SeaweedFS, lakeFS, Postgres, Airflow, OT sim | ~11 GB |
-| `core+gov` (F5-F6) | + OpenMetadata + índice de pesquisa | ~16 GB |
-| `core+bi` (F7) | + Grafana, Prometheus, Loki, Superset | ~17 GB |
-| `full` (F8-F9) | + MLflow (OpenMetadata pode ficar parado) | ~19 GB |
+| `core` (F0-F4) | k3s, SeaweedFS, Postgres, lakeFS, Airflow, OT sim | ~4-5 GB (medido) |
+| `core+gov` (F5-F6) | + OpenMetadata + OpenSearch | ~8-9 GB (medido ~6 GB + folga) |
+| `core+bi` (F7) | + Grafana, Prometheus, Loki, Superset | a medir; ~+2-3 GB |
+| `full` (F8-F9) | + MLflow (OpenMetadata pode ficar parado) | a medir |
 
-Componente a componente: k3s 2 · SeaweedFS 2 · Postgres 2 · lakeFS 1 · Airflow 4 ·
-OpenMetadata 2 · índice de pesquisa 2 (heap reduzido) · Grafana+Prom+Loki 2 ·
-Superset 2 · MLflow 1 · folga para jobs 2-3.
+**Execução em série (decisão de 2026-11-11):** com 2 CPUs, nada de paralelismo por omissão. `max_active_runs=1` nos DAGs
+(a hora seguinte só começa quando a anterior acaba), um worker em backfills e ingestões, e as ingestões do
+OpenMetadata fora da hora ao minuto 10, quando corre a silver. O custo é pequeno: 137 s para 1 180 horas com um só
+worker, contra 70 s com dois, e uma hora normal demora ~1 s. A vantagem é um pico de CPU previsível e nenhum pod a
+competir com o Postgres ou o lakeFS.
+
+Folga recomendada na Oracle: swap de 4 GB e *heap* do OpenSearch reduzido (512 MB se for preciso).
 
 **Regra:** um perfil é um conjunto de recursos do Argo CD, não um `kubectl apply` manual.
 
@@ -394,7 +407,8 @@ Superset 2 · MLflow 1 · folga para jobs 2-3.
 | Risco | Mitigação |
 |---|---|
 | Âmbito enorme → desistência a meio | Cada fase entrega algo demonstrável; nunca duas fases abertas |
-| OpenMetadata come a VM | Perfis (§9); heap do índice reduzido; parar governança durante trabalho de ML |
+| OpenMetadata come a VM | Perfis (§9); heap do índice reduzido; parar governança durante trabalho de ML. Medido: ~2,6 GB, cabe em 12 GB |
+| Oracle Always Free baixou para 2 OCPU / 12 GB (2026) e a Oracle pode recuperar VMs inativas ou excedidas | Orçamento do §9 já nesse limite; execução em série; **alerta de custos na consola OCI e confirmar o limite antes do `apply` (tarefa do Stéphane, §12.1)**; manter a hipótese Pay As You Go como plano B |
 | VM Lima morta (Mac a dormir/app fechada) corrompe o fim dos ficheiros do SeaweedFS | `limactl stop industrial` antes de fechar; a rever `fsync`; já aconteceu (2026-11-09, ver ADR-008) |
 | lakeFS: o padrão branch-por-batch acumula branches e lixo | Política de retenção e *garbage collection* definida logo na Fase 4, não na Fase 9 |
 | Ler Parquet **através** do lakeFS tem fricção (DuckDB, Superset, MLflow) | Validar a leitura ponta-a-ponta com um teste mínimo **na Fase 0**, antes de comprometer a Fase 4 |
@@ -441,6 +455,29 @@ modbus_data_plataform/
 ├── serving/                  dashboards, camada semântica
 └── tests/
 ```
+
+### 12.1 Separação em plataforma + projetos (ADR-010, proposto em 2026-11-12)
+
+A estrutura acima é a de **hoje** (um repositório). O alvo é dividir em dois tipos (👉 `docs/img-26-plataforma-e-projetos.svg`):
+
+- **`gitops` (plataforma, genérico):** `terraform/oracle/`, `platform/` (Airflow, Postgres, lakeFS, OpenMetadata,
+  Argo CD, partilhados por todos), `projects/<nome>/` (um projeto = uma pasta, lida por um ApplicationSet do Argo CD)
+  e `envs/local` · `envs/oracle` (ajustes por ambiente).
+- **Um repositório por projeto** (este é o primeiro): código, DAGs, Dockerfiles, testes, docs, e CI que publica
+  imagens arm64 num registo (GHCR) com tag = SHA do commit.
+
+Fluxo: push no projeto → CI → imagem no registo → commit da tag no `gitops` → o Argo CD de cada cluster aplica.
+Os DAGs saem da imagem do Airflow (git-sync por projeto) e cada tarefa corre com a imagem do seu projeto. Na Oracle,
+cada projeto tem namespace com ResourceQuota e um pool do Airflow partilhado mantém tudo em série.
+
+**Ordem de trabalho:**
+1. ⚠️ **Stéphane: criar o orçamento/alerta de custos na consola OCI** e confirmar o teto Always Free
+   (2 OCPU / 12 GB / 200 GB, contando a `agente-01`). Pré-requisito de qualquer `terraform apply`.
+2. Stéphane revê e commita o trabalho pendente (Fases 4-5) neste repositório.
+3. Registo de imagens + CI arm64 neste repositório.
+4. Criar o `gitops`, mover `platform/` e o Terraform (preservando a história), converter os scripts `install-*.sh`
+   em manifests do Argo CD, segredos cifrados (SOPS ou Sealed Secrets, ADR próprio).
+5. DAGs por git-sync e imagem por tarefa; validar no cluster local; só depois a Oracle.
 
 ---
 
