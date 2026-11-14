@@ -560,7 +560,7 @@ quality/  docs/  tests/
     <li><b>Como funciona:</b> o Traefik (que vem com o k3s) recebe na porta 80 e encaminha pelo nome do site. O <code>sslip.io</code> é um DNS público que responde a <code>qualquer-coisa.100.108.9.15.sslip.io</code> com <code>100.108.9.15</code>, o IP da VM no Tailscale: só os teus dispositivos na tailnet lá chegam. Pelo IP público não há resposta (a firewall da Oracle fecha a 80).</li>
     <li><b>Porque HTTP e não HTTPS:</b> o tráfego já vai cifrado pelo Tailscale (WireGuard) de ponta a ponta. HTTPS com certificado (<code>tailscale serve</code>) fica como opção futura.</li>
     <li><b>Palavras-passe:</b> <code>./scripts/vault-get.sh &lt;segredo&gt; password | pbcopy</code> (por exemplo <code>platform-argocd-admin-oracle</code>, <code>monitoring-grafana-admin-oracle</code>, <code>openmetadata-admin-oracle</code>).</li>
-    <li><b>O SeaweedFS não é publicado</b> (não tem login): continua acessível pelo <code>ui.sh</code>, que abre túneis, e serve de alternativa se o Ingress falhar.</li>
+    <li><b>O SeaweedFS não aparece no browser nem no <code>ui.sh</code>, de propósito:</b> o filer não tem login e deixa apagar objetos do lake nas costas do lakeFS (sem gates, sem commit, sem história). Para ver os objetos usa o lakeFS, que os mostra com os nomes verdadeiros. Só para emergências de armazenamento: <code>kubectl -n data exec -it seaweedfs-0 -- weed shell</code> e comandos de leitura (<code>s3.bucket.list</code>, <code>fs.du /buckets/lake</code>). O <code>kubectl exec</code> não passa pela rede dos pods, por isso a NetworkPolicy continua fechada. O <code>ui.sh</code> fica como alternativa se o Ingress falhar.</li>
   </ul>
 
   <div class="quiz">
