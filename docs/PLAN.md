@@ -497,6 +497,15 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
    encerramento gracioso, admissão, NetworkPolicies, monitorização (Grafana) e alarmes da OCI, Airflow 3.3.2 (ADR-013).
 7. ✅ (2026-11-14) Rede privada (Tailscale) entre o Mac e a VM da Oracle (`platform-oracle`); a porta 22 pública foi
    fechada por Terraform (`network.tf`): a VM não tem nenhuma porta aberta à internet, entra-se com `ssh ubuntu@platform-oracle`.
+10. ✅ (2026-11-14) 4.ª e 5.ª revisões (74 → 77,75): Ingress pelo Traefik (`http://<svc>.localhost` e
+   `http://<svc>.100.108.9.15.sslip.io`, só pela tailnet); depois chave do SeaweedFS só de leitura para a cópia do lake,
+   projeto `bootstrap` para a `root` e `default` vazio, saída do backup/ops só para as faixas OSN da Oracle, ensaio de
+   restauro do lake (`lake-restore-test.sh`: 374/374 objetos).
+11. ✅ (2026-11-14) 6.ª revisão crítica: 79,6/100. Corrigido logo o arranque de um cluster novo (o projeto `bootstrap`
+   tem de existir antes da `root`); ensaio de restauro com imagem fixa e prazo.
+12. ⬜ **A seguir à 6.ª revisão (não esquecer):** operador Kubernetes do Tailscale, para nomes com HTTPS grátis
+   (`https://airflow.<tailnet>.ts.net`, grafana, argocd, lakefs, openmetadata). Precisa de um OAuth client do Tailscale
+   criado pelo Stéphane (segredo no cofre); ~30–50 MB de RAM por serviço. O Ingress por `sslip.io` fica como alternativa.
 
 ---
 
