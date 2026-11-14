@@ -1,7 +1,7 @@
 # Imagem "ot-edge": par série virtual (socat) + simulador Modbus + gateway OPC UA.
 # O par pty só existe dentro do contentor que o cria; por isso os três correm juntos,
 # como uma caixa de campo com linha série e gateway lado a lado.
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends socat \
