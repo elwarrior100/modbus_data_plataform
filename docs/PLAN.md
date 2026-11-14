@@ -486,7 +486,8 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
    cofre com os mesmos valores (hash igual, nenhum pod reiniciado). Os scripts já não geram palavras-passe.
 5. Registo de imagens (GHCR) + CI arm64 no repositório do projeto; imagens com tag = SHA.
 6. DAGs por git-sync / DAG bundle e imagem por tarefa (ApplicationSet já existe); validar no cluster local; só depois a Oracle.
-7. Rede privada (Tailscale) entre o Mac e a VM da Oracle: acesso às interfaces sem nenhuma porta aberta à internet.
+7. ✅ (2026-11-14) Rede privada (Tailscale) entre o Mac e a VM da Oracle (`platform-oracle`); a porta 22 pública foi
+   fechada por Terraform (`network.tf`): a VM não tem nenhuma porta aberta à internet, entra-se com `ssh ubuntu@platform-oracle`.
 
 ---
 
