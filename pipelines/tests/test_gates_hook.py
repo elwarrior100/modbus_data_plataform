@@ -83,3 +83,22 @@ def test_nobody_can_delete_the_hook_with_a_normal_commit(scratch):
     repo.branch("fuga").create(source_reference="main")
     repo.branch("fuga").object("_lakefs_actions/g2.yaml").delete()
     assert "_lakefs_actions" in refused(lambda: repo.branch("fuga").commit("apagar o hook"))
+
+
+def test_a_protected_main_refuses_direct_commits_but_the_installer_still_works(scratch):
+    lake, repo = scratch
+    # proteção de branch no main (a mesma que scripts/lakefs-repo.sh do repositório platform aplica)
+    from lakefs_sdk import BranchProtectionRule
+    repo._BaseLakeFSObject__client.sdk_client.repositories_api.set_branch_protection_rules(repo.id, [BranchProtectionRule(pattern="main")])
+    # o lakeFS guarda as regras do repositório em cache: num repositório já usado, entram em vigor ao fim de algum tempo
+    deadline = time.time() + 120
+    while True:
+        try:
+            repo.branch("main").object("x.txt").upload(data=b"x")
+        except LakeFSException as error:
+            assert "protected branch" in str(error)
+            break
+        repo.branch("main").reset_changes(path_type="reset")
+        assert time.time() < deadline, "a proteção do main não entrou em vigor"
+        time.sleep(5)
+    assert install(repo) is False                                      # já estava instalado: nada a fazer, mesmo protegido

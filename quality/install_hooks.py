@@ -1,13 +1,15 @@
 """Instala os hooks dos gates num repositório lakeFS (docs/gates-contract.md, secção 4).
 
-Escreve `_lakefs_actions/g2.yaml` e `_lakefs_actions/protect.yaml` no `main`, a partir dos ficheiros Lua desta pasta,
-num commit marcado `gates_installer=true` (a exceção que o hook `protect_actions` admite).
-Idempotente: se já estiver igual, não faz commit.
+Escreve `_lakefs_actions/g2.yaml` e `_lakefs_actions/protect.yaml` a partir dos ficheiros Lua desta pasta, num commit
+marcado `gates_installer=true` (a exceção que o hook `protect_actions` admite). O commit é feito num branch temporário
+e entra no `main` por merge: o `main` tem proteção de branch (não aceita commits diretos, só merges).
+Idempotente: se já estiver igual, não faz commit nem merge.
 
     cd pipelines && uv run python ../quality/install_hooks.py            # LAKEFS_* no ambiente; repositório industrial-lake
 """
 import os
 import sys
+import time
 from pathlib import Path
 
 import lakefs
@@ -29,16 +31,20 @@ def render(header: str, lua_file: str) -> str:
 
 def install(repo: "lakefs.Repository", branch: str = "main") -> bool:
     """True se instalou ou atualizou algo."""
-    target = repo.branch(branch)
-    for name, (header, lua) in ACTIONS.items():
-        target.object(f"_lakefs_actions/{name}.yaml").upload(data=render(header, lua), mode="w")
+    work = repo.branch(f"gates-install-{int(time.time())}").create(source_reference=branch)
     try:
-        target.commit("gates: instalar hooks G2", metadata={"gates_installer": "true"})
+        for name, (header, lua) in ACTIONS.items():
+            work.object(f"_lakefs_actions/{name}.yaml").upload(data=render(header, lua), mode="w")
+        try:
+            work.commit("gates: instalar hooks G2", metadata={"gates_installer": "true"})
+        except lakefs.exceptions.LakeFSException as error:
+            if "no changes" in str(error).lower():
+                return False
+            raise
+        work.merge_into(repo.branch(branch), message="gates: instalar hooks G2")
         return True
-    except lakefs.exceptions.LakeFSException as error:
-        if "no changes" in str(error).lower():
-            return False
-        raise
+    finally:
+        work.delete()
 
 
 if __name__ == "__main__":
