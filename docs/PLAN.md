@@ -506,7 +506,11 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
 13. ✅ (2026-11-14) Pós-6.ª revisão (ADR-014): ensaio de restauro do lake **diário** (`ops/lake-restore-drill`, MD5 de
    cada objeto, alarme `lake_drill_success` em falta há 2 dias), pods recusados em namespaces sem
    `platform/network-reviewed`, `trivy config` no CI, lakeFS fixo por digest, cópias locais do estado do Terraform apagadas.
-14. ⬜ Silver local a falhar desde a hora 18 (G2: 65% dos minutos e 158 leituras em conflito); a Oracle está bem. Por investigar.
+14. ⬜ Silver local a falhar desde a hora 18 (G2: 65% dos minutos e 158 leituras em conflito); a Oracle está bem. Causa
+   provável (7.ª revisão): a VM do Lima em pausa quando o Mac dorme (buracos de 15–29 min no writer). Confirmar.
+15. ⬜ 7.ª revisão (81,6/100), a corrigir depois da revisão de código do Stéphane: o ensaio de restauro não escala
+   (um `stat` por objeto, duas cópias do lake no disco), multipart sem verificação, pods de backup/ops sem
+   `securityContext`, disco real (47 GB) diferente do Terraform (100 GB), o ensaio não deixa rasto.
 12. ⬜ **A seguir à 6.ª revisão (não esquecer):** operador Kubernetes do Tailscale, para nomes com HTTPS grátis
    (`https://airflow.<tailnet>.ts.net`, grafana, argocd, lakefs, openmetadata). Precisa de um OAuth client do Tailscale
    criado pelo Stéphane (segredo no cofre); ~30–50 MB de RAM por serviço. O Ingress por `sslip.io` fica como alternativa.
