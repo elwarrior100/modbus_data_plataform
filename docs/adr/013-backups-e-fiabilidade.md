@@ -32,6 +32,15 @@ perder o disco é perder a história do lake.
 - **Velero:** backup de volumes do Kubernetes; mais peças e um bucket S3 compatível (precisaria de chaves).
 - **Réplica do Postgres:** não cabe nos 12 GB, e uma réplica copia também os erros.
 
+11. **Cópia noturna dos objetos do lake** (`lake-sync`, rclone) para `platform-lake-backup`: `--immutable`, a VM não pode
+    sobrescrever nem apagar lá; sinal `lake_sync_success` e alarme. O pg_dump escreve `_COMPLETE` no fim e o teste de
+    restauro só usa execuções completas.
+12. **Frescura da silver** (namespace `ops`): sinal `silver_fresh` a cada 30 min enquanto o último merge tem < 3 h;
+    alarme quando falta. Alarmes de tamanho dos buckets (os 20 GB grátis).
+13. **Isolamento do namespace `backup`** (o que tem mais credenciais): saída só para o Postgres, o SeaweedFS, os
+    metadados e as APIs da OCI; Pod Security `baseline` em todos os namespaces.
+
 ## O que ainda falta
-- O SeaweedFS (os objetos do lake) só está coberto pelo backup do disco, não por um backup próprio.
+- Um ensaio completo de restauro do lake (base do lakeFS + objetos) num cluster de teste.
 - O cluster local não tem backups (é o ambiente de desenvolvimento).
+- Um só nó: se a VM se perder, a recuperação é a partir dos backups (RTO de horas, não de minutos).
