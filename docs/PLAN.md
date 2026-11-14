@@ -470,14 +470,23 @@ Fluxo: push no projeto → CI → imagem no registo → commit da tag no `gitops
 Os DAGs saem da imagem do Airflow (git-sync por projeto) e cada tarefa corre com a imagem do seu projeto. Na Oracle,
 cada projeto tem namespace com ResourceQuota e um pool do Airflow partilhado mantém tudo em série.
 
+**Decisões de 2026-11-14:** repositório `elwarrior100/platform` **público** (para o CV; o do projeto fica como está);
+segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde já (ADR-011), não em scripts nem no git.
+
 **Ordem de trabalho:**
-1. ⚠️ **Stéphane: criar o orçamento/alerta de custos na consola OCI** e confirmar o teto Always Free
-   (2 OCPU / 12 GB / 200 GB, contando a `agente-01`). Pré-requisito de qualquer `terraform apply`.
-2. Stéphane revê e commita o trabalho pendente (Fases 4-5) neste repositório.
-3. Registo de imagens + CI arm64 neste repositório.
-4. Criar o `gitops`, mover `platform/` e o Terraform (preservando a história), converter os scripts `install-*.sh`
-   em manifests do Argo CD, segredos cifrados (SOPS ou Sealed Secrets, ADR próprio).
-5. DAGs por git-sync e imagem por tarefa; validar no cluster local; só depois a Oracle.
+1. ✅ Alerta de custos na consola OCI (feito pelo Stéphane, 2026-11-13).
+2. ✅ Trabalho das Fases 4-5 commitado.
+3. ✅ (2026-11-14) `platform/` separado para [elwarrior100/platform](https://github.com/elwarrior100/platform)
+   (público), com a história, reorganizado em `platform/`, `projects/modbus/`, `envs/`, `terraform/`; `gitleaks` limpo.
+   O Argo CD passou a ler esse repositório (antes lia um `main` antigo deste, e o `ingest` não era gerido por ele);
+   `ot` e `ingest` vêm de um ApplicationSet. `platform/` foi apagado deste repositório; os scripts estão em
+   `../platform/scripts/` (o repositório `platform` clonado ao lado deste).
+4. ✅ (2026-11-14) Cofre: Terraform criou compartment, OCI Vault, chave e `eso-reader` (e importou a VM `agente-01`
+   sem a recriar); `vault-seed.sh` copiou 11 segredos; o ESO lê-os e os 13 Secrets do cluster passaram a vir do
+   cofre com os mesmos valores (hash igual, nenhum pod reiniciado). Os scripts já não geram palavras-passe.
+5. Registo de imagens (GHCR) + CI arm64 no repositório do projeto; imagens com tag = SHA.
+6. DAGs por git-sync / DAG bundle e imagem por tarefa (ApplicationSet já existe); validar no cluster local; só depois a Oracle.
+7. Rede privada (Tailscale) entre o Mac e a VM da Oracle: acesso às interfaces sem nenhuma porta aberta à internet.
 
 ---
 

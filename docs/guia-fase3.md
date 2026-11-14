@@ -151,7 +151,7 @@ malformada.
 ## 4. Como ver isto a funcionar
 
 ```
-./platform/scripts/ui.sh --open                                      # lakeFS em http://localhost:8082
+../platform/scripts/ui.sh --open                                      # lakeFS em http://localhost:8082
 kubectl -n ingest exec deploy/ingest -c collector -- ingest status   # estado do spool
 ./tests/phase3/run.sh                                                # reconcilia spool com lakeFS
 cd ingest && uv run pytest -v                                        # 27 testes (os do lakeFS real precisam de variáveis)

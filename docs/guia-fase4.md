@@ -8,7 +8,7 @@ Nada disto está commitado: é teu para rever.
 ## 0. Como ver o DAG que correu
 
 ```bash
-./platform/scripts/ui.sh --open
+../platform/scripts/ui.sh --open
 ```
 
 Abre o Airflow em **http://localhost:8084** (utilizador `admin`). A palavra-passe copia-se para a

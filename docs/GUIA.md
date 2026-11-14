@@ -196,9 +196,9 @@ O Argo garante que o cluster **é igual ao git**, não que o git **esteja certo*
 ## 6. Como ver tudo (as interfaces)
 
 ```
-./platform/scripts/ui.sh          # abre os túneis para todas as interfaces
-./platform/scripts/ui.sh --open   # e abre-as no browser
-./platform/scripts/ui.sh --check  # só testa se respondem
+../platform/scripts/ui.sh          # abre os túneis para todas as interfaces
+../platform/scripts/ui.sh --open   # e abre-as no browser
+../platform/scripts/ui.sh --check  # só testa se respondem
 k9s                               # o cluster no terminal (precisa do KUBECONFIG)
 ```
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Corre os testes que usam o lakeFS real do cluster. As chaves entram no ambiente DESTE processo
-# (nada é impresso nem gravado). Precisa do túnel aberto: ./platform/scripts/ui.sh (porto 8082).
+# (nada é impresso nem gravado). Precisa do túnel aberto: ../platform/scripts/ui.sh (porto 8082).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export KUBECONFIG="${KUBECONFIG:-$HOME/.lima/industrial/copied-from-guest/kubeconfig.yaml}"
