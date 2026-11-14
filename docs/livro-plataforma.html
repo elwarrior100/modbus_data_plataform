@@ -151,7 +151,7 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
     <li class="part">Parte V · Operação</li>
     <li><a href="#orcamento"><span class="n">11</span>Orçamento de recursos</a></li>
     <li><a href="#incidentes"><span class="n">12</span>Incidentes e lições</a></li>
-    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44 → 74</a></li>
+    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44 → 78</a></li>
     <li><a href="#melhorias"><span class="n">13b</span>O que mudou depois da crítica</a></li>
     <li><a href="#monitorizacao"><span class="n">13c</span>Monitorização e alarmes</a></li>
     <li><a href="#runbook"><span class="n">14</span>Runbook: cluster do zero</a></li>
@@ -547,6 +547,21 @@ quality/  docs/  tests/
     <li><strong>Ingress</strong> com o Traefik que o k3s já traz: regras "quem pedir <code>airflow.localhost</code> vai para o Airflow". Sempre disponível e declarado no git. No Mac já respondia na porta 80.</li>
     <li>Na Oracle, o Ingress só deve escutar na rede do Tailscale, nunca na pública.</li>
   </ul>
+  <h3>Como usar: abrir os serviços no browser</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Serviço</th><th>No Mac (VM local)</th><th>Na Oracle (com o Tailscale ligado)</th></tr>
+    <tr><td>Airflow</td><td><code>http://airflow.localhost</code></td><td><code>http://airflow.100.108.9.15.sslip.io</code></td></tr>
+    <tr><td>Grafana</td><td><code>http://grafana.localhost</code></td><td><code>http://grafana.100.108.9.15.sslip.io</code></td></tr>
+    <tr><td>Argo CD</td><td><code>http://argocd.localhost</code></td><td><code>http://argocd.100.108.9.15.sslip.io</code></td></tr>
+    <tr><td>lakeFS</td><td><code>http://lakefs.localhost</code></td><td><code>http://lakefs.100.108.9.15.sslip.io</code></td></tr>
+    <tr><td>OpenMetadata</td><td><code>http://openmetadata.localhost</code></td><td><code>http://openmetadata.100.108.9.15.sslip.io</code></td></tr>
+  </table></div>
+  <ul>
+    <li><b>Como funciona:</b> o Traefik (que vem com o k3s) recebe na porta 80 e encaminha pelo nome do site. O <code>sslip.io</code> é um DNS público que responde a <code>qualquer-coisa.100.108.9.15.sslip.io</code> com <code>100.108.9.15</code>, o IP da VM no Tailscale: só os teus dispositivos na tailnet lá chegam. Pelo IP público não há resposta (a firewall da Oracle fecha a 80).</li>
+    <li><b>Porque HTTP e não HTTPS:</b> o tráfego já vai cifrado pelo Tailscale (WireGuard) de ponta a ponta. HTTPS com certificado (<code>tailscale serve</code>) fica como opção futura.</li>
+    <li><b>Palavras-passe:</b> <code>./scripts/vault-get.sh &lt;segredo&gt; password | pbcopy</code> (por exemplo <code>platform-argocd-admin-oracle</code>, <code>monitoring-grafana-admin-oracle</code>, <code>openmetadata-admin-oracle</code>).</li>
+    <li><b>O SeaweedFS não é publicado</b> (não tem login): continua acessível pelo <code>ui.sh</code>, que abre túneis, e serve de alternativa se o Ingress falhar.</li>
+  </ul>
 
   <div class="quiz">
     <h3>Perguntas do capítulo 6</h3>
@@ -782,10 +797,10 @@ quality/  docs/  tests/
 <!-- ============================================================ 13 -->
 <section class="chapter" id="critica">
   <div class="chapnum">Capítulo 13 · Parte V</div>
-  <h2>Revisão crítica: de 44 para 74</h2>
-  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: quatro revisões: 44, 56, 66,75 e 74/100.</div>
+  <h2>Revisão crítica: de 44 para 77,75</h2>
+  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: cinco revisões: 44, 56, 66,75, 74 e 77,75/100.</div>
 
-  <p><span class="big">74</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (44 → 56 → 67 → 74)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
+  <p><span class="big">77,75</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (44 → 56 → 67 → 74 → 78)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
 
   <div class="score" id="scorecard"></div>
 
@@ -871,6 +886,11 @@ quality/  docs/  tests/
     <li><strong>Projeto <code>platform</code></strong> no Argo CD e <strong>CI no repositório platform</strong> (gitleaks, kubeconform, Terraform, shellcheck).</li>
   </ul>
   <p><strong>O que a quarta revisão ainda aponta:</strong> o namespace <code>backup</code> junta credenciais a mais e tem saída aberta; o <code>dataFrom.find</code> contorna a regra dos prefixos; a cópia do lake pode ser sobrescrita e não tem sinal de sucesso; o teste de restauro ainda escolhe o prefixo mais recente mesmo que incompleto.</p>
+  <h3>Quinta ronda (77,75) e o teto realista</h3>
+  <ul>
+    <li>Namespace <code>backup</code> fechado; verificação de frescura no namespace <code>ops</code>; Pod Security <code>baseline</code>; entrada no <code>data</code> só para quem usa; <code>dataFrom.find</code> recusado; cópia do lake imutável com sinal; <code>_COMPLETE</code>; alarmes de tamanho; projeto <code>platform</code> com 10 tipos; Airflow por digest.</li>
+    <li>O agente estima o teto realista de uma plataforma grátis para uma pessoa em <strong>81–83</strong>: com um só nó, um lakeFS de um só utilizador e um superutilizador do Postgres, a segurança e a fiabilidade ficam perto de 8. O resto sobe com ensaios (restauro do lake) e identidades mais estreitas (chave S3 só de leitura para a cópia, projeto <code>default</code> restringido).</li>
+  </ul>
   <h3>O que não deu para corrigir, e porquê</h3>
   <ul>
     <li><strong>Chaves do lakeFS por aplicação.</strong> O lakeFS Community só admite um utilizador (o admin); mais utilizadores são da versão Enterprise. O servidor ACL open source é só uma referência "not fit for production". Ficou a proteção do <code>main</code> (só merges) e o limite está escrito no ADR-008.</li>
@@ -1278,9 +1298,9 @@ nc -z -w 3 github.com 443                       && echo aberto || echo recusado 
 <script>
 (function () {
   var SCORES = [
-    ["Segurança", 7, 20, 5], ["Fiabilidade e backups", 7.5, 20, 2], ["Consistência GitOps", 8.5, 10, 5],
-    ["Terraform", 8.5, 10, 6], ["CI/CD e cadeia de fornecimento", 8, 10, 6], ["Observabilidade", 6.5, 10, 1],
-    ["Custo e recursos", 7, 10, 6], ["Documentação e ADRs", 6.5, 5, 6], ["Simplicidade para uma pessoa", 6.5, 5, 5]
+    ["Segurança", 7.5, 20, 5], ["Fiabilidade e backups", 8, 20, 2], ["Consistência GitOps", 8.5, 10, 5],
+    ["Terraform", 8.5, 10, 6], ["CI/CD e cadeia de fornecimento", 8, 10, 6], ["Observabilidade", 7.5, 10, 1],
+    ["Custo e recursos", 7.5, 10, 6], ["Documentação e ADRs", 7, 5, 6], ["Simplicidade para uma pessoa", 6.5, 5, 5]
   ];
   var sc = document.getElementById("scorecard");
   SCORES.forEach(function (s) {
