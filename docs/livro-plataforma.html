@@ -151,7 +151,9 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
     <li class="part">Parte V · Operação</li>
     <li><a href="#orcamento"><span class="n">11</span>Orçamento de recursos</a></li>
     <li><a href="#incidentes"><span class="n">12</span>Incidentes e lições</a></li>
-    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44/100</a></li>
+    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44 → 56</a></li>
+    <li><a href="#melhorias"><span class="n">13b</span>O que mudou depois da crítica</a></li>
+    <li><a href="#monitorizacao"><span class="n">13c</span>Monitorização e alarmes</a></li>
     <li><a href="#runbook"><span class="n">14</span>Runbook: cluster do zero</a></li>
     <li><a href="#exame"><span class="n">15</span>Exame final</a></li>
     <li><a href="#glossario"><span class="n">G</span>Glossário</a></li>
@@ -166,7 +168,7 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
 <div class="col">
 
 <header class="cover">
-  <div class="eyebrow">Livro de estudo · plataforma · 2026-11-14</div>
+  <div class="eyebrow">Livro de estudo · plataforma · atualizado 2026-11-14 (depois da crítica)</div>
   <h1>Livro da Plataforma de Dados</h1>
   <p>Como foi construída a plataforma que corre o projeto Modbus, explicada como se a fosses construir tu, do zero. Cada capítulo diz o objetivo, explica as peças, mostra um diagrama, conta como foi feito na realidade (incluindo o que correu mal) e termina com perguntas para verificares que percebeste.</p>
   <p>Repositórios: <a href="https://github.com/elwarrior100/platform">elwarrior100/platform</a> (a plataforma) e <a href="https://github.com/elwarrior100/modbus_data_plataform">elwarrior100/modbus_data_plataform</a> (o primeiro projeto).</p>
@@ -298,7 +300,7 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
   <h3>Parar uma VM com k3s: o problema do KillMode</h3>
   <p>O serviço do k3s corre com <code>KillMode=process</code>: quando o sistema desliga, o systemd para o processo do k3s mas <strong>não</strong> pede aos contentores que terminem com calma. O Postgres e o SeaweedFS são mortos a meio de escrever. Foi exatamente isso que corrompeu o último commit do lakeFS duas vezes no Mac.</p>
   <p>A solução no Mac foi o <code>scripts/vm-stop.sh</code>: primeiro um <code>kubectl drain</code> (pede a cada pod que termine, com SIGTERM e 60 s de tolerância), depois <code>sync</code>, e só então para a VM.</p>
-  <div class="pitfall"><b>Ainda em aberto na Oracle:</b> uma reinicialização da Oracle (manutenção, crash) não passa pelo <code>vm-stop.sh</code>. A correção é configurar o <em>graceful node shutdown</em> do kubelet (<code>shutdown-grace-period</code>). Está na lista do capítulo 13.</div>
+  <div class="pitfall"><b>Resolvido na Oracle (capítulo 13b):</b> o kubelet tem <em>graceful node shutdown</em> de 90 s (no ficheiro <code>kubelet.conf.d</code>, porque o Kubernetes 1.36 já não aceita a opção na linha de comando), provado com um reinício real.</div>
 
   <h3>O kernel que partia os sinais</h3>
   <p>No Mac, a VM atualizou-se sozinha para o kernel 7.0.0-42, em que o perfil AppArmor dos contentores recusava sinais entre processos do mesmo contentor. O Postgres não conseguia pedir um checkpoint, e o <code>gosu</code> ficava preso. A solução foi fixar o kernel 7.0.0-38. Na Oracle (kernel 7.0.0-1013-oracle) testou-se antes de avançar: um pod enviou SIGTERM a um processo filho e recebeu o código 143 (sinal entregue).</p>
@@ -409,7 +411,7 @@ quality/  docs/  tests/
   <p>Quando o Argo CD passou a ler o repositório novo, havia um risco: a raiz tinha <code>prune: true</code>, e as aplicações <code>ot</code> e <code>ingest</code> iam deixar de estar na pasta dela (passavam a vir do ApplicationSet). Fez-se em dois tempos: primeiro a raiz foi reapontada com o <code>prune</code> desligado; depois de confirmar que o ApplicationSet era o dono das duas, tirou-se a etiqueta de seguimento antiga e voltou a ligar-se o <code>prune</code>. Antes de tudo, <code>kubectl diff</code> mostrou que os manifests novos eram iguais ao que corria.</p>
   <div class="pitfall"><b>Descoberta pelo caminho:</b> o Argo CD estava a ler um <code>main</code> antigo do projeto (o trabalho estava no branch <code>test</code>) e o <code>ingest</code> nem sequer era gerido por ele. Lição: confirma sempre que repositório e que branch cada aplicação lê (<code>kubectl -n argocd get applications</code>).</div>
 
-  <div class="pitfall"><b>Ainda não é GitOps a 100 %:</b> o Argo CD, o Airflow e o OpenMetadata são instalados por scripts com <code>helm</code>. Mudar a imagem das tarefas do Airflow obriga a correr o <code>install-airflow.sh</code> em cada cluster. A crítica aponta isto (capítulo 13).</div>
+  <div class="pitfall"><b>Agora sim, GitOps:</b> o Airflow, o OpenMetadata e o próprio Argo CD passaram a aplicações Helm do Argo CD (valores no git). E a Oracle segue o branch <code>oracle</code>: uma mudança só lá chega quando promovida com <code>promote-oracle.sh</code> (ADR-012).</div>
 
   <div class="quiz">
     <h3>Perguntas do capítulo 4</h3>
@@ -480,8 +482,8 @@ quality/  docs/  tests/
     <li>Os 13 ExternalSecrets reais foram aplicados: o ESO <em>adotou</em> os Secrets existentes com os mesmos valores. Nenhum pod reiniciou.</li>
   </ol>
 
-  <div class="pitfall"><b>Erro a corrigir:</b> os ficheiros dizem que <code>deletionPolicy: Retain</code> mantém o Secret se o ExternalSecret for apagado. Não é verdade. Com <code>creationPolicy: Owner</code>, o Secret pertence ao ExternalSecret e o Kubernetes apaga-o com ele. A correção é <code>creationPolicy: Orphan</code> nos segredos de bases de dados.</div>
-  <div class="pitfall"><b>Risco aberto:</b> o instance principal autoriza a <em>VM inteira</em>. Qualquer pod que chegue ao serviço de metadados (169.254.169.254) pode ler o cofre. Falta uma NetworkPolicy que só deixe o ESO falar com esse endereço.</div>
+  <div class="pitfall"><b>Erro corrigido:</b> eu tinha escrito que <code>deletionPolicy: Retain</code> mantinha o Secret se o ExternalSecret fosse apagado. Não é verdade: isso depende do <code>creationPolicy</code>. Com <code>Owner</code>, o Secret seria apagado com ele; agora é <code>Orphan</code>, e nenhum Secret tem dono.</div>
+  <div class="pitfall"><b>Risco fechado:</b> o instance principal autoriza a <em>VM inteira</em>, por isso há uma NetworkPolicy que bloqueia 169.254.169.254 em todos os namespaces de trabalho. Só <code>external-secrets</code> e <code>backup</code> o alcançam, e a exceção é o namespace (não uma etiqueta que um pod pudesse pôr).</div>
 
   <div class="quiz">
     <h3>Perguntas do capítulo 5</h3>
@@ -666,7 +668,7 @@ quality/  docs/  tests/
   <h3>A prova, com output real</h3>
   <p>No Mac, um run manual da silver: o pod usou <code>ghcr.io/elwarrior100/modbus-pipelines:44008786…</code>, clonou o DAG desse commit ("Cloning repository… version 44008786…") e o G2 recusou a hora 12 com razão (34 de 60 minutos com dados, porque a VM só arrancou às 12:27).</p>
 
-  <div class="pitfall"><b>Deriva possível:</b> o bundle segue o <code>main</code> do projeto, mas a imagem está fixa num SHA. Um DAG novo que precise de código novo correria na imagem antiga. A correção é fixar <code>tracking_ref</code> ao mesmo SHA da imagem e mudar os dois no mesmo commit.</div>
+  <div class="pitfall"><b>Deriva fechada:</b> o <code>tracking_ref</code> do bundle é o mesmo SHA da imagem das tarefas, e os dois mudam no mesmo commit do repositório platform.</div>
 
   <div class="quiz">
     <h3>Perguntas do capítulo 9</h3>
@@ -731,7 +733,7 @@ quality/  docs/  tests/
     <tr><td>Imagens de contentores (Mac)</td><td class="num">16 GB, o maior consumo de disco</td></tr>
   </table></div>
   <p>Conclusão: com 2 CPU, executar em série custa pouco (o dobro do tempo num backfill, que é raro) e dá um pico previsível que não compete com o Postgres e o lakeFS.</p>
-  <div class="pitfall"><b>Ainda por resolver:</b> os limites de memória somam ~15 GB num nó de 12 GB, e o Postgres pode ser o primeiro a ser morto sob pressão. É preciso dar-lhe prioridade (PriorityClass ou QoS Guaranteed) e limitar a CPU do OpenSearch.</div>
+  <div class="pitfall"><b>Em parte resolvido:</b> o Postgres e o SeaweedFS têm a PriorityClass <code>platform-data</code> (são os últimos a ser despejados pelo kubelet) e o OpenSearch está limitado a 1 CPU. Os limites continuam a somar mais do que a RAM; com o monitoring, a Oracle está a ~69 % de memória.</div>
 
   <div class="quiz">
     <h3>Perguntas do capítulo 11</h3>
@@ -755,6 +757,9 @@ quality/  docs/  tests/
     <tr><td>Argo CD a aplicar código velho</td><td>Lia o <code>main</code> antigo; o trabalho estava no <code>test</code></td><td>Repositório e branch novos; <code>main</code> posto em dia</td><td>Verificar repo e branch de cada aplicação</td></tr>
     <tr><td>OpenMetadata sem ligar à base</td><td>Bug no <code>ensure_pg_role</code> (falta de quebra de linha)</td><td><code>read</code>/<code>printf</code> corrigidos; palavra-passe reposta</td><td>Testar como a aplicação liga, não por atalhos</td></tr>
     <tr><td>CI sem arrancar</td><td>Conta GitHub bloqueada por faturação</td><td>Resolvida na conta</td><td>Jobs com 0 passos: a causa está fora do código</td></tr>
+    <tr><td>k3s em ciclo de reinícios</td><td><code>--shutdown-grace-period</code> já não existe no Kubernetes 1.36</td><td>Opção movida para <code>kubelet.conf.d</code></td><td>Ler as notas de versão antes de mexer no kubelet</td></tr>
+    <tr><td>Scheduler do Airflow em ciclo após reinício</td><td>Bug do Airflow 3.2.2 ao adotar uma tarefa órfã</td><td>Tarefa marcada como falhada pela API</td><td>Documentar no runbook; atualizar o Airflow</td></tr>
+    <tr><td>Clusters com TimescaleDB diferentes</td><td>Tag <code>latest-pg17</code> resolvida em alturas diferentes</td><td>Imagem fixa por digest</td><td>Fixar sempre por digest o que guarda dados</td></tr>
     <tr><td>Secret do OpenMetadata sem sincronizar na Oracle</td><td>O namespace <code>openmetadata</code> não estava declarado</td><td>Declarado no <code>00-namespaces.yaml</code></td><td>Um cluster novo revela o que só existia por acaso no antigo</td></tr>
   </table></div>
 
@@ -770,14 +775,14 @@ quality/  docs/  tests/
 <!-- ============================================================ 13 -->
 <section class="chapter" id="critica">
   <div class="chapnum">Capítulo 13 · Parte V</div>
-  <h2>Revisão crítica: 44/100</h2>
-  <div class="goal"><b>Objetivo:</b> saber onde a plataforma está fraca, por ordem de risco, e qual é o caminho para a melhorar. Revisão feita por um agente independente, só de leitura, a 2026-11-14.</div>
+  <h2>Revisão crítica: de 44 para 56</h2>
+  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: a primeira deu 44/100; depois das correções, a segunda deu 56/100.</div>
 
-  <p><span class="big">44</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
+  <p><span class="big">56</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (era 44)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
 
   <div class="score" id="scorecard"></div>
 
-  <h3>Os cinco problemas graves</h3>
+  <h3>Os cinco problemas graves da primeira revisão (todos tratados, ver 13b)</h3>
   <ol>
     <li><span class="sev h">alto</span> <strong>Não há backups.</strong> Postgres (com a história do lakeFS e o spool) e SeaweedFS estão no disco único da VM. Correção grátis: política de backup do volume na Oracle (5 backups grátis) e <code>pg_dump</code> diário para o Object Storage, com um teste de restauro.</li>
     <li><span class="sev h">alto</span> <strong>Qualquer pod na Oracle pode ler o cofre</strong> (instance principal autoriza a VM). Correção: NetworkPolicy que bloqueia 169.254.169.254 exceto para o ESO.</li>
@@ -823,6 +828,71 @@ quality/  docs/  tests/
   </div>
 </section>
 
+<!-- ============================================================ 13b -->
+<section class="chapter" id="melhorias">
+  <div class="chapnum">Capítulo 13b · Parte V</div>
+  <h2>O que mudou depois da crítica</h2>
+  <div class="goal"><b>Objetivo:</b> conhecer cada correção, porquê, e como se provou que funciona. É a melhor lição deste livro: uma crítica externa, uma lista de correções, e uma prova para cada uma.</div>
+  <div class="tablewrap"><table>
+    <tr><th>Problema</th><th>Correção</th><th>Prova</th></tr>
+    <tr><td>Não havia backups</td><td>CronJob <code>pg-backup</code> (namespace <code>backup</code>): <code>pg_dump</code> de cada base para o Object Storage, com a identidade da VM; o bucket apaga dumps com mais de 14 dias; backup semanal do disco</td><td><code>pg-restore-test.sh</code>: 4 bases restauradas, linhas comparadas tabela a tabela; a VM não consegue apagar backups</td></tr>
+    <tr><td>Reinício sem encerramento gracioso</td><td>kubelet com <code>shutdownGracePeriod: 90s</code> no ficheiro de configuração; logind com 120 s (ficheiro <code>zz-</code> para vencer o do Ubuntu)</td><td>Reinício real: o Postgres voltou com "database system was shut down" (limpo)</td></tr>
+    <tr><td>Qualquer pod podia ler o cofre</td><td>NetworkPolicy bloqueia 169.254.169.254 em todos os namespaces de trabalho; só <code>external-secrets</code> e <code>backup</code> não estão na lista; a exceção é o namespace, não uma etiqueta</td><td>Pod em <code>data</code>, até com a etiqueta antiga: bloqueado; ESO e backup: funcionam</td></tr>
+    <tr><td>Pods com hostNetwork escapariam às políticas</td><td>ValidatingAdmissionPolicy: sem <code>hostNetwork</code> fora de <code>kube-system</code></td><td>Criar um pod assim: recusado</td></tr>
+    <tr><td>Comentário errado sobre <code>deletionPolicy</code></td><td><code>creationPolicy: Orphan</code></td><td>0 Secrets com dono ExternalSecret</td></tr>
+    <tr><td>Filer do SeaweedFS aberto</td><td>Saiu do Service e NetworkPolicy de entrada: só o lakeFS, só na 8333</td><td>SeaweedFS continua Ready, lakeFS continua a escrever</td></tr>
+    <tr><td>Imagens <code>latest</code></td><td>Postgres e SeaweedFS fixos por digest</td><td>Descobriu-se que os dois clusters corriam TimescaleDB diferentes</td></tr>
+    <tr><td>Airflow, OpenMetadata, Argo CD por scripts</td><td>Aplicações Helm do Argo CD (o Argo CD gere-se a si próprio)</td><td>Adoção sem reinícios; admin do Airflow com a palavra-passe do cofre</td></tr>
+    <tr><td>Tudo ia direto para a Oracle</td><td>A Oracle segue o branch <code>oracle</code>; promover = <code>promote-oracle.sh</code> (ADR-012)</td><td>Cada lote foi testado no Mac antes de promovido</td></tr>
+    <tr><td>DAG e imagem podiam divergir</td><td><code>tracking_ref</code> do DAG bundle = SHA da imagem</td><td>—</td></tr>
+    <tr><td>Sem fronteiras entre projetos</td><td>AppProject <code>modbus</code>; condições de namespace no cofre</td><td>Um ExternalSecret em <code>ot</code> não consegue ler a palavra-passe do Postgres</td></tr>
+    <tr><td>Credenciais de origem</td><td>Admin do Argo CD e do OpenMetadata com palavra-passe por ambiente no cofre</td><td><code>admin/admin</code> do OpenMetadata: 401</td></tr>
+    <tr><td>Estado do Terraform só no Mac</td><td>Backend <code>oci</code> no bucket versionado <code>platform-tfstate</code></td><td>plan: "No changes" depois da migração</td></tr>
+    <tr><td>CI frágil</td><td>Actions por SHA, Trivy antes do push, SBOM e proveniência, Dependabot</td><td>O Trivy travou a imagem de pipelines (ver abaixo)</td></tr>
+  </table></div>
+  <h3>O que não deu para corrigir, e porquê</h3>
+  <ul>
+    <li><strong>Chaves do lakeFS por aplicação.</strong> O lakeFS Community só admite um utilizador (o admin); mais utilizadores são da versão Enterprise. O servidor ACL open source é só uma referência "not fit for production". Ficou a proteção do <code>main</code> (só merges) e o limite está escrito no ADR-008.</li>
+    <li><strong>Um hook não sabe quem faz o commit.</strong> O objeto <code>action</code> de um pre-commit não tem utilizador (descoberto com um hook que devolvia o próprio objeto).</li>
+  </ul>
+  <h3>A descoberta do Trivy</h3>
+  <p>Quando o CI passou a analisar as imagens, a de pipelines foi travada: a imagem oficial do Airflow 3.2.2 tem vulnerabilidades CRÍTICAS com correção (pacotes Debian, bibliotecas Python incluídas e o próprio Airflow, corrigido na 3.3.0). A plataforma usa a mesma imagem, por isso o próximo passo de segurança é atualizar o Airflow.</p>
+  <h3>Incidentes provocados pelas próprias correções</h3>
+  <ul>
+    <li>O k3s esteve 2 minutos em ciclo: a opção <code>--shutdown-grace-period</code> já não existe no Kubernetes 1.36. Lição: ler as notas de versão antes de mexer no kubelet.</li>
+    <li>Depois do reinício de teste, o scheduler do Airflow 3.2.2 caiu ao adotar uma tarefa órfã (bug). Correção no runbook: marcar a tarefa como falhada pela API.</li>
+    <li>O <code>ensure_pg_role</code> gravou uma palavra-passe errada por falta de uma quebra de linha; o teste "provava" o contrário porque ligava por 127.0.0.1 (trust).</li>
+  </ul>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 13b</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-1"><label for="q13b-1">Porque é que uma exceção por etiqueta de pod era uma má ideia para o acesso aos metadados?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque qualquer um que possa criar um pod pode pôr-lhe a etiqueta, incluindo um DAG através do <code>pod_override</code>. A exceção tem de ser por algo que um projeto não controla, como o namespace, que a AppProject não deixa usar.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-2"><label for="q13b-2">Porque é que um backup sem teste de restauro "não conta"?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque só o restauro prova que o ficheiro está completo e utilizável. Um dump pode estar vazio, truncado ou incompatível; só se descobre no pior momento se nunca se testou.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-3"><label for="q13b-3">O Trivy travou a imagem de pipelines. Porque é que isso é uma boa notícia?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque o CI fez exatamente o que devia: impediu que uma imagem com vulnerabilidades críticas conhecidas fosse publicada, e revelou que a própria plataforma usa essa imagem. Sem a análise, ninguém saberia.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 13c -->
+<section class="chapter" id="monitorizacao">
+  <div class="chapnum">Capítulo 13c · Parte V</div>
+  <h2>Monitorização e alarmes</h2>
+  <div class="goal"><b>Objetivo:</b> perceber porque há duas camadas de alertas, uma dentro e outra fora da VM.</div>
+  <div class="two">
+    <div class="card"><h4>Dentro do cluster: Prometheus + Grafana</h4><p><code>kube-prometheus-stack</code> pelo Argo CD. Métricas de todos os pods, 24 dashboards de Kubernetes, regras de alerta visíveis no Grafana. ~930 Mi na Oracle. Abre-se em <code>localhost:3000</code> (<code>ui.sh</code>); palavra-passe no cofre.</p></div>
+    <div class="card"><h4>Fora da VM: alarmes da Oracle</h4><p>OCI Monitoring + Notifications (grátis), por email: VM sem métricas há 10 min, CPU &gt; 90 % durante 30 min, memória &gt; 92 % durante 15 min, e nenhum backup bem-sucedido em 26 h (o job publica <code>backup_success</code>).</p></div>
+  </div>
+  <p><strong>Porquê as duas:</strong> o Grafana dentro da VM morre com ela; não pode avisar que ela caiu. Os alarmes da Oracle estão fora, e o do backup é um "dead man's switch": avisa quando um sinal esperado deixa de chegar.</p>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 13c</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13c-1"><label for="q13c-1">O que é um "dead man's switch" e porque é que o alarme do backup é um?</label></div>
+      <details><summary>Ver resposta</summary><div>É um alarme que dispara quando um sinal periódico deixa de chegar. O backup publica <code>backup_success</code> quando corre bem; se nenhum chegar em 26 h, a Oracle avisa. Apanha tanto o backup que falha como o que nem chegou a correr.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13c-2"><label for="q13c-2">Porque é que o node-exporter corre sem hostNetwork?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque a regra de admissão recusa hostNetwork fora do kube-system (um pod na rede do nó escaparia às NetworkPolicies). As métricas do nó continuam a vir de /proc e /sys montados no pod.</div></details></div>
+  </div>
+</section>
+
 <!-- ============================================================ 14 -->
 <section class="chapter" id="runbook">
   <div class="chapnum">Capítulo 14 · Parte V</div>
@@ -839,6 +909,7 @@ quality/  docs/  tests/
     <li><strong>Serviços.</strong> <code>./scripts/install-airflow.sh</code> e <code>./scripts/install-openmetadata.sh</code>; ativar os DAGs (<code>airflow dags unpause</code>).</li>
     <li><strong>Verificar.</strong> <code>kubectl -n argocd get applications</code> (tudo Synced/Healthy), logs do writer a exportar lotes, e o teste de login pela rede para cada utilizador do Postgres.</li>
   </ol>
+  <p>Depois: <code>argocd-admin-password.sh &lt;env&gt;</code> e <code>openmetadata-admin-password.sh &lt;env&gt;</code> (palavras-passe de origem para o cofre), <code>lakefs-repo.sh</code> (também protege o <code>main</code>) e, na Oracle, <code>pg-restore-test.sh</code>. O guia "o que fazer quando" está em <code>platform/docs/runbook.md</code>.</p>
   <p>Todos os scripts são idempotentes: podes voltar a correr qualquer passo. E todos usam o cluster local por omissão: <strong>define sempre o <code>KUBECONFIG</code></strong> quando trabalhas na Oracle.</p>
 </section>
 
@@ -900,15 +971,15 @@ quality/  docs/  tests/
 <script>
 (function () {
   var SCORES = [
-    ["Segurança", 5, 20], ["Fiabilidade e backups", 2, 20], ["Consistência GitOps", 5, 10],
-    ["Terraform", 6, 10], ["CI/CD e cadeia de fornecimento", 6, 10], ["Observabilidade", 1, 10],
-    ["Custo e recursos", 6, 10], ["Documentação e ADRs", 6, 5], ["Simplicidade para uma pessoa", 5, 5]
+    ["Segurança", 5, 20, 5], ["Fiabilidade e backups", 5, 20, 2], ["Consistência GitOps", 7.5, 10, 5],
+    ["Terraform", 7.5, 10, 6], ["CI/CD e cadeia de fornecimento", 7, 10, 6], ["Observabilidade", 1, 10, 1],
+    ["Custo e recursos", 6.5, 10, 6], ["Documentação e ADRs", 7.5, 5, 6], ["Simplicidade para uma pessoa", 6, 5, 5]
   ];
   var sc = document.getElementById("scorecard");
   SCORES.forEach(function (s) {
     var color = s[1] >= 6 ? "var(--good)" : s[1] >= 4 ? "var(--warn)" : "var(--bad)";
     var a = document.createElement("div"); a.textContent = s[0] + " (peso " + s[2] + ")";
-    var b = document.createElement("div"); b.textContent = s[1] + "/10"; b.style.fontVariantNumeric = "tabular-nums";
+    var b = document.createElement("div"); b.textContent = s[3] + " → " + s[1] + "/10"; b.style.fontVariantNumeric = "tabular-nums";
     var m = document.createElement("div"); m.className = "meter";
     var f = document.createElement("span"); f.style.width = (s[1] * 10) + "%"; f.style.background = color; m.appendChild(f);
     sc.appendChild(a); sc.appendChild(b); sc.appendChild(m);
