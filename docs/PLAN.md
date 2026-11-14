@@ -508,6 +508,15 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
    `platform/network-reviewed`, `trivy config` no CI, lakeFS fixo por digest, cópias locais do estado do Terraform apagadas.
 14. ⬜ Silver local a falhar desde a hora 18 (G2: 65% dos minutos e 158 leituras em conflito); a Oracle está bem. Causa
    provável (7.ª revisão): a VM do Lima em pausa quando o Mac dorme (buracos de 15–29 min no writer). Confirmar.
+16. ⬜ **Crescimento do lake** (medido 2026-11-14: 33 MB em 9,5 h na Oracle, ~80 MB/dia, 30% metadados do lakeFS por
+   haver um commit por minuto). A este ritmo: alarme dos 12 GB em ~5 meses, 20 GB grátis em ~7–8. Plano (ADR-015):
+   commits da bronze menos frequentes, compactação horária, retenção da bronze crua, GC do lakeFS (Spark, semanal) e
+   poda da cópia imutável com uma identidade que não a da VM.
+   - ✅ (2026-11-14) **Retenção da bronze crua: 15 dias** (decisão do Stéphane), aplicada pelo `lake_housekeeping`
+     (03:30) nos dois clusters; provada (0 dias a sair, como devia). Primeira remoção real na Oracle a 2026-11-30.
+   - ⬜ **GC do lakeFS antes de 2026-11-30** (sem ela, apagar não liberta espaço); depois a poda mensal da cópia.
+   - ⬜ O estado de pausa dos DAGs vive na base do Airflow, não no git: no Mac o `lake_housekeeping` estava em pausa
+     (corrigido à mão). Tornar declarativo.
 15. ⬜ 7.ª revisão (81,6/100), a corrigir depois da revisão de código do Stéphane: o ensaio de restauro não escala
    (um `stat` por objeto, duas cópias do lake no disco), multipart sem verificação, pods de backup/ops sem
    `securityContext`, disco real (47 GB) diferente do Terraform (100 GB), o ensaio não deixa rasto.
