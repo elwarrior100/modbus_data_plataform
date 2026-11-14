@@ -1,7 +1,7 @@
 # Image for this project's Airflow TASKS: the official Airflow image plus the `silver` package (DuckDB, lakeFS,
 # pyarrow). The DAG files are not baked in: Airflow reads them from this repository (DAG bundle, ADR-010), and each
 # task pod runs this image (pod_override with MODBUS_PIPELINES_IMAGE, set in the platform repository).
-FROM docker.io/apache/airflow:3.3.2
+FROM docker.io/apache/airflow:3.4.0
 
 # Security: the official image still ships packages with CRITICAL vulnerabilities that already have fixes
 # (found by the Trivy step in CI). Upgrade only those, and drop a developer tool (prek) that tasks never use.
