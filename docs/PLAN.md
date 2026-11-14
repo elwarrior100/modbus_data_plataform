@@ -484,8 +484,13 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
 4. ✅ (2026-11-14) Cofre: Terraform criou compartment, OCI Vault, chave e `eso-reader` (e importou a VM `agente-01`
    sem a recriar); `vault-seed.sh` copiou 11 segredos; o ESO lê-os e os 13 Secrets do cluster passaram a vir do
    cofre com os mesmos valores (hash igual, nenhum pod reiniciado). Os scripts já não geram palavras-passe.
-5. Registo de imagens (GHCR) + CI arm64 no repositório do projeto; imagens com tag = SHA.
-6. DAGs por git-sync / DAG bundle e imagem por tarefa (ApplicationSet já existe); validar no cluster local; só depois a Oracle.
+5. ✅ (2026-11-14) CI (`.github/workflows/ci.yml`): testes em arm64 a cada push; no `main` publica `modbus-ingest`,
+   `modbus-ot-edge` e `modbus-pipelines` no GHCR (públicos), tag = SHA do commit. Os dois clusters correm essas imagens.
+6. ✅ (2026-11-14) Airflow com a imagem oficial; os DAGs vêm deste repositório por DAG bundle (fixos no commit) e cada
+   tarefa corre com `modbus-pipelines:<sha>` (`pod_override`); `parallelism = 2`, `max_active_runs = 1`. Provado no local.
+8. 🔵 (2026-11-14) Plataforma na Oracle, de raiz (sem migração): k3s, Argo CD, cofre por instance principal, Postgres,
+   SeaweedFS, lakeFS com `industrial-lake` e os hooks do G2, OpenMetadata, Airflow, recolha a correr desde 14:13 UTC.
+   **Falta a prova:** 24 h seguidas de recolha sem buracos (G2 `pass`) e uma hora com o hook a funcionar lá.
 7. ✅ (2026-11-14) Rede privada (Tailscale) entre o Mac e a VM da Oracle (`platform-oracle`); a porta 22 pública foi
    fechada por Terraform (`network.tf`): a VM não tem nenhuma porta aberta à internet, entra-se com `ssh ubuntu@platform-oracle`.
 
