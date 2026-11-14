@@ -151,7 +151,7 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
     <li class="part">Parte V · Operação</li>
     <li><a href="#orcamento"><span class="n">11</span>Orçamento de recursos</a></li>
     <li><a href="#incidentes"><span class="n">12</span>Incidentes e lições</a></li>
-    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44 → 56</a></li>
+    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44 → 56 → 67</a></li>
     <li><a href="#melhorias"><span class="n">13b</span>O que mudou depois da crítica</a></li>
     <li><a href="#monitorizacao"><span class="n">13c</span>Monitorização e alarmes</a></li>
     <li><a href="#runbook"><span class="n">14</span>Runbook: cluster do zero</a></li>
@@ -775,10 +775,10 @@ quality/  docs/  tests/
 <!-- ============================================================ 13 -->
 <section class="chapter" id="critica">
   <div class="chapnum">Capítulo 13 · Parte V</div>
-  <h2>Revisão crítica: de 44 para 56</h2>
-  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: a primeira deu 44/100; depois das correções, a segunda deu 56/100.</div>
+  <h2>Revisão crítica: 44 → 56 → 67</h2>
+  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: a primeira deu 44/100, a segunda 56/100 e a terceira 66,75/100.</div>
 
-  <p><span class="big">56</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (era 44)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
+  <p><span class="big">66,75</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (44 → 56 → 67)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
 
   <div class="score" id="scorecard"></div>
 
@@ -850,13 +850,20 @@ quality/  docs/  tests/
     <tr><td>Estado do Terraform só no Mac</td><td>Backend <code>oci</code> no bucket versionado <code>platform-tfstate</code></td><td>plan: "No changes" depois da migração</td></tr>
     <tr><td>CI frágil</td><td>Actions por SHA, Trivy antes do push, SBOM e proveniência, Dependabot</td><td>O Trivy travou a imagem de pipelines (ver abaixo)</td></tr>
   </table></div>
+  <h3>Depois da terceira revisão (66,75)</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Problema</th><th>Correção</th><th>Prova</th></tr>
+    <tr><td>Um pod privilegiado podia saltar para o nó e chegar ao cofre</td><td>ValidatingAdmissionPolicy: sem <code>privileged</code>, <code>hostPID</code>, <code>hostIPC</code> nem <code>hostPath</code> fora do kube-system (node-exporter sem hostPID)</td><td>Pod privilegiado no <code>ingest</code>: recusado</td></tr>
+    <tr><td>Qualquer namespace podia ler qualquer segredo do cofre</td><td>Regra: um ExternalSecret só lê <code>&lt;namespace&gt;-*</code> (mais as duas exceções derivadas)</td><td>ExternalSecret no <code>ingest</code> a pedir <code>data-postgres-auth</code>: recusado</td></tr>
+    <tr><td>Airflow 3.2.2 com vulnerabilidades críticas</td><td>Airflow 3.3.2 na plataforma; imagem das tarefas com os pacotes ainda marcados atualizados</td><td>Trivy: 0 críticas com correção; silver <code>success</code> no Mac; Oracle a correr 3.3.2</td></tr>
+  </table></div>
   <h3>O que não deu para corrigir, e porquê</h3>
   <ul>
     <li><strong>Chaves do lakeFS por aplicação.</strong> O lakeFS Community só admite um utilizador (o admin); mais utilizadores são da versão Enterprise. O servidor ACL open source é só uma referência "not fit for production". Ficou a proteção do <code>main</code> (só merges) e o limite está escrito no ADR-008.</li>
     <li><strong>Um hook não sabe quem faz o commit.</strong> O objeto <code>action</code> de um pre-commit não tem utilizador (descoberto com um hook que devolvia o próprio objeto).</li>
   </ul>
   <h3>A descoberta do Trivy</h3>
-  <p>Quando o CI passou a analisar as imagens, a de pipelines foi travada: a imagem oficial do Airflow 3.2.2 tem vulnerabilidades CRÍTICAS com correção (pacotes Debian, bibliotecas Python incluídas e o próprio Airflow, corrigido na 3.3.0). A plataforma usa a mesma imagem, por isso o próximo passo de segurança é atualizar o Airflow.</p>
+  <p>Quando o CI passou a analisar as imagens, a de pipelines foi travada: a imagem oficial do Airflow 3.2.2 tem vulnerabilidades CRÍTICAS com correção (pacotes Debian, bibliotecas Python incluídas e o próprio Airflow, corrigido na 3.3.0). Resolvido com a atualização para o Airflow 3.3.2, testada no Mac antes de ser promovida para a Oracle.</p>
   <h3>Incidentes provocados pelas próprias correções</h3>
   <ul>
     <li>O k3s esteve 2 minutos em ciclo: a opção <code>--shutdown-grace-period</code> já não existe no Kubernetes 1.36. Lição: ler as notas de versão antes de mexer no kubelet.</li>
@@ -971,9 +978,9 @@ quality/  docs/  tests/
 <script>
 (function () {
   var SCORES = [
-    ["Segurança", 5, 20, 5], ["Fiabilidade e backups", 5, 20, 2], ["Consistência GitOps", 7.5, 10, 5],
-    ["Terraform", 7.5, 10, 6], ["CI/CD e cadeia de fornecimento", 7, 10, 6], ["Observabilidade", 1, 10, 1],
-    ["Custo e recursos", 6.5, 10, 6], ["Documentação e ADRs", 7.5, 5, 6], ["Simplicidade para uma pessoa", 6, 5, 5]
+    ["Segurança", 6, 20, 5], ["Fiabilidade e backups", 6.5, 20, 2], ["Consistência GitOps", 8, 10, 5],
+    ["Terraform", 8, 10, 6], ["CI/CD e cadeia de fornecimento", 7, 10, 6], ["Observabilidade", 5, 10, 1],
+    ["Custo e recursos", 7, 10, 6], ["Documentação e ADRs", 7, 5, 6], ["Simplicidade para uma pessoa", 6.5, 5, 5]
   ];
   var sc = document.getElementById("scorecard");
   SCORES.forEach(function (s) {

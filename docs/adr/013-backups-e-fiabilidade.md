@@ -20,6 +20,14 @@ perder o disco é perder a história do lake.
 6. **Imagens fixas por digest** (TimescaleDB e SeaweedFS): os dois clusters estavam a correr builds diferentes.
 7. **Estado do Terraform** no bucket versionado `platform-tfstate`.
 
+8. **Monitorização em duas camadas:** Prometheus + Grafana dentro do cluster (`kube-prometheus-stack`, ~930 Mi na
+   Oracle) e **alarmes da OCI fora da VM**, por email (VM sem métricas há 10 min, CPU, memória, e nenhum backup em
+   26 h através da métrica `backup_success` que o job publica). O Grafana morre com a VM; os alarmes da OCI não.
+9. **Airflow 3.3.2** (a 3.2.2 tinha vulnerabilidades críticas, a do próprio Airflow corrigida na 3.3.0); a imagem
+   das tarefas atualiza os pacotes que o Trivy ainda marcava (0 críticas com correção). Testado no Mac, depois promovido.
+10. **Admissão** (ValidatingAdmissionPolicy): sem pods `hostNetwork`, `privileged`, `hostPID`, `hostIPC` ou `hostPath`
+    fora do `kube-system`, e cada ExternalSecret só lê segredos do cofre com o prefixo do seu namespace.
+
 ## Alternativas
 - **Velero:** backup de volumes do Kubernetes; mais peças e um bucket S3 compatível (precisaria de chaves).
 - **Réplica do Postgres:** não cabe nos 12 GB, e uma réplica copia também os erros.

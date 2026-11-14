@@ -493,6 +493,8 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
 8. 🔵 (2026-11-14) Plataforma na Oracle, de raiz (sem migração): k3s, Argo CD, cofre por instance principal, Postgres,
    SeaweedFS, lakeFS com `industrial-lake` e os hooks do G2, OpenMetadata, Airflow, recolha a correr desde 14:13 UTC.
    **Falta a prova:** 24 h seguidas de recolha sem buracos (G2 `pass`) e uma hora com o hook a funcionar lá.
+9. ✅ (2026-11-14) Revisão crítica independente (44 → 56 → 66,75/100) e correções: backups com restauro testado,
+   encerramento gracioso, admissão, NetworkPolicies, monitorização (Grafana) e alarmes da OCI, Airflow 3.3.2 (ADR-013).
 7. ✅ (2026-11-14) Rede privada (Tailscale) entre o Mac e a VM da Oracle (`platform-oracle`); a porta 22 pública foi
    fechada por Terraform (`network.tf`): a VM não tem nenhuma porta aberta à internet, entra-se com `ssh ubuntu@platform-oracle`.
 
