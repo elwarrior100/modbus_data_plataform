@@ -1,6 +1,6 @@
 # ADR-010: separar em repositório de plataforma (GitOps) + um repositório por projeto
 
-**Estado:** proposto (2026-11-12) · **Liga a:** ADR-005 (GitOps/Argo CD), docs/PLAN.md §9 (Oracle) e §12 (estrutura)
+**Estado:** aceite e implementado (2026-11-14) · **Liga a:** ADR-005 (GitOps/Argo CD), docs/PLAN.md §9 (Oracle) e §12 (estrutura)
 👉 Imagem: `docs/img-26-plataforma-e-projetos.svg`
 
 ## Contexto

@@ -1,6 +1,6 @@
 # ADR-011: segredos num cofre (OCI Vault) lidos pelo External Secrets Operator
 
-**Estado:** proposto (2026-11-14) · **Liga a:** ADR-010 (plataforma + projetos), docs/PLAN.md §12.1
+**Estado:** aceite e implementado (2026-11-14) · **Liga a:** ADR-010 (plataforma + projetos), docs/PLAN.md §12.1
 
 ## Contexto
 Hoje há ~14 segredos (Postgres, SeaweedFS, lakeFS, ingest, Airflow, OpenMetadata, acesso do Argo CD ao git), todos
@@ -17,7 +17,7 @@ O Stéphane quer o equivalente ao Azure Key Vault: um cofre gerido, fora dos clu
 2. **Ponte para o Kubernetes: External Secrets Operator (ESO)**, instalado pelo Argo CD. No git só há
    `ExternalSecret` ("o Secret X vem do segredo Y do cofre"); o ESO cria e atualiza o Secret do Kubernetes.
 3. **Quem cria o quê:**
-   - **Terraform** (`platform/terraform/oracle/`): o compartment, o cofre, a chave mestra, um utilizador IAM só de
+   - **Terraform** (repositório `platform`, `terraform/oracle/`): o compartment, o cofre, a chave mestra, um utilizador IAM só de
      leitura (`eso-reader`) e a política mínima (`read secret-bundles` só nesse compartment).
      **Nenhum valor de segredo passa pelo Terraform** (ficaria em claro no `tfstate`).
    - **Script `vault-seed.sh`**: cria cada segredo no cofre com a OCI CLI se ainda não existir. No cluster local,

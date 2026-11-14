@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Livro da Plataforma de Dados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Sans:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: a book. Fixed table of contents on the left (top on phones), one reading column (~68ch).
+   Each chapter: goal, explanation, diagram, how it was done, real pitfalls, self-check questions. */
+:root {
+  --paper: #f5f6f2;
+  --ink: #1d2328;
+  --muted: #59636b;
+  --rule: #d6dad3;
+  --accent: #1d5f7a;        /* steel blue: the platform */
+  --accent-soft: #e2edf1;
+  --warn: #9a5b00;
+  --warn-soft: #fbf0dc;
+  --bad: #a3322a;
+  --good: #2f6b3a;
+  --card: #ffffff;
+  --code-bg: #eceee8;
+  --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-head: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #14181b; --ink: #e3e7e4; --muted: #9aa5ad; --rule: #2c3439; --accent: #7cb8d1;
+    --accent-soft: #1c2b33; --warn: #e3a64a; --warn-soft: #2b2212; --bad: #e57f74; --good: #7fc28b;
+    --card: #1a1f23; --code-bg: #20272b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #14181b; --ink: #e3e7e4; --muted: #9aa5ad; --rule: #2c3439; --accent: #7cb8d1;
+  --accent-soft: #1c2b33; --warn: #e3a64a; --warn-soft: #2b2212; --bad: #e57f74; --good: #7fc28b;
+  --card: #1a1f23; --code-bg: #20272b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 18px; line-height: 1.6; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 100vh; }
+nav.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 28px 20px; border-right: 1px solid var(--rule); font-family: var(--font-head); font-size: 14px; }
+nav.toc h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+nav.toc ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+nav.toc a { display: flex; gap: 8px; text-decoration: none; color: var(--ink); padding: 5px 8px; border-radius: 6px; }
+nav.toc a:hover { background: var(--accent-soft); }
+nav.toc .n { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 1.6em; }
+nav.toc .part { margin-top: 14px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; padding-left: 8px; }
+.progress { margin: 18px 0 0; padding: 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); }
+.progress .bar { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.progress .fill { height: 100%; width: 0; background: var(--accent); }
+main { padding: 40px 32px 120px; }
+.col { max-width: 72ch; margin: 0 auto; }
+header.cover { border-bottom: 1px solid var(--rule); padding-bottom: 28px; margin-bottom: 8px; }
+header.cover .eyebrow { font-family: var(--font-head); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+h1, h2, h3, h4 { font-family: var(--font-head); line-height: 1.25; text-wrap: balance; }
+h1 { font-size: 40px; margin: 8px 0 12px; }
+h2 { font-size: 28px; margin: 0 0 8px; }
+h3 { font-size: 20px; margin: 32px 0 8px; }
+h4 { font-size: 16px; margin: 20px 0 6px; }
+section.chapter { padding-top: 56px; border-top: 1px solid var(--rule); margin-top: 56px; scroll-margin-top: 12px; }
+.chapnum { font-family: var(--font-head); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.goal { font-family: var(--font-head); font-size: 15px; background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 14px; border-radius: 0 8px 8px 0; margin: 14px 0 20px; }
+.goal b { color: var(--accent); }
+.pitfall { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 12px 14px; border-radius: 0 8px 8px 0; margin: 18px 0; }
+.pitfall b { color: var(--warn); }
+code, pre, kbd { font-family: var(--font-mono); font-size: .86em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
+pre code { background: none; padding: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 16px; margin: 14px 0; }
+.tablewrap { overflow-x: auto; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-head); font-size: 14px; color: var(--muted); font-weight: 600; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+figure { margin: 22px 0; }
+figure svg { width: 100%; height: auto; max-width: 100%; color: var(--ink); }
+figcaption { font-family: var(--font-head); font-size: 14px; color: var(--muted); margin-top: 6px; }
+.figwrap { overflow-x: auto; background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 12px; }
+svg .box { fill: var(--card); stroke: currentColor; stroke-width: 1.2; }
+svg .boxa { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+svg .boxw { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.2; }
+svg .ln { stroke: currentColor; stroke-width: 1.4; fill: none; }
+svg .lna { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+svg .dash { stroke-dasharray: 5 4; }
+svg text { fill: currentColor; font-family: var(--font-head); font-size: 13px; }
+svg text.s { font-size: 11.5px; fill: var(--muted); }
+svg text.t { font-weight: 600; }
+svg text.a { fill: var(--accent); }
+.steps { counter-reset: s; list-style: none; padding: 0; }
+.steps > li { counter-increment: s; position: relative; padding-left: 40px; margin: 10px 0; }
+.steps > li::before { content: counter(s); position: absolute; left: 0; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--paper); font-family: var(--font-head); font-size: 13px; display: grid; place-items: center; }
+.quiz { margin: 28px 0 0; padding: 18px; border: 1px solid var(--rule); border-radius: 10px; background: var(--card); }
+.quiz h3 { margin-top: 0; }
+.q { border-top: 1px solid var(--rule); padding: 12px 0; }
+.q:first-of-type { border-top: 0; }
+.q .qt { display: flex; gap: 10px; align-items: flex-start; }
+.q .qt label { flex: 1; cursor: pointer; }
+.q input[type=checkbox] { margin-top: 6px; width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
+details { margin-top: 6px; }
+summary { cursor: pointer; font-family: var(--font-head); font-size: 14px; color: var(--accent); }
+details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-soft); border-radius: 8px; font-size: 17px; }
+.score { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: center; font-family: var(--font-head); font-size: 15px; }
+.meter { height: 8px; background: var(--rule); border-radius: 4px; overflow: hidden; grid-column: 1 / -1; margin-bottom: 8px; }
+.meter > span { display: block; height: 100%; }
+.sev { display: inline-block; font-family: var(--font-head); font-size: 12px; padding: 1px 8px; border-radius: 10px; font-weight: 600; }
+.sev.h { background: var(--bad); color: var(--paper); }
+.sev.m { background: var(--warn); color: var(--paper); }
+.sev.l { background: var(--muted); color: var(--paper); }
+.big { font-family: var(--font-head); font-size: 44px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+.card h4 { margin-top: 0; }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--rule); padding: 18px 16px; }
+  main { padding: 24px 16px 100px; }
+  h1 { font-size: 31px; }
+  .two { grid-template-columns: 1fr; }
+  body { font-size: 17px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="toc" aria-label="Índice">
+  <h2>Índice</h2>
+  <ol>
+    <li><a href="#comecar"><span class="n">0</span>Como estudar este livro</a></li>
+    <li class="part">Parte I · Fundações</li>
+    <li><a href="#mapa"><span class="n">1</span>O mapa da plataforma</a></li>
+    <li><a href="#kubernetes"><span class="n">2</span>Kubernetes e k3s</a></li>
+    <li><a href="#repositorios"><span class="n">3</span>Plataforma e projetos</a></li>
+    <li><a href="#gitops"><span class="n">4</span>GitOps com Argo CD</a></li>
+    <li class="part">Parte II · Segurança</li>
+    <li><a href="#segredos"><span class="n">5</span>Segredos num cofre</a></li>
+    <li><a href="#rede"><span class="n">6</span>Rede sem portas abertas</a></li>
+    <li class="part">Parte III · Infraestrutura</li>
+    <li><a href="#terraform"><span class="n">7</span>Terraform e a Oracle</a></li>
+    <li><a href="#cicd"><span class="n">8</span>CI/CD e imagens</a></li>
+    <li class="part">Parte IV · Serviços</li>
+    <li><a href="#airflow"><span class="n">9</span>Airflow como plataforma</a></li>
+    <li><a href="#dados"><span class="n">10</span>Postgres, SeaweedFS, lakeFS</a></li>
+    <li class="part">Parte V · Operação</li>
+    <li><a href="#orcamento"><span class="n">11</span>Orçamento de recursos</a></li>
+    <li><a href="#incidentes"><span class="n">12</span>Incidentes e lições</a></li>
+    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44/100</a></li>
+    <li><a href="#runbook"><span class="n">14</span>Runbook: cluster do zero</a></li>
+    <li><a href="#exame"><span class="n">15</span>Exame final</a></li>
+    <li><a href="#glossario"><span class="n">G</span>Glossário</a></li>
+  </ol>
+  <div class="progress" aria-live="polite">
+    <div><span id="pdone">0</span> de <span id="ptotal">0</span> perguntas que já sei responder</div>
+    <div class="bar"><div class="fill" id="pfill"></div></div>
+  </div>
+</nav>
+
+<main>
+<div class="col">
+
+<header class="cover">
+  <div class="eyebrow">Livro de estudo · plataforma · 2026-11-14</div>
+  <h1>Livro da Plataforma de Dados</h1>
+  <p>Como foi construída a plataforma que corre o projeto Modbus, explicada como se a fosses construir tu, do zero. Cada capítulo diz o objetivo, explica as peças, mostra um diagrama, conta como foi feito na realidade (incluindo o que correu mal) e termina com perguntas para verificares que percebeste.</p>
+  <p>Repositórios: <a href="https://github.com/elwarrior100/platform">elwarrior100/platform</a> (a plataforma) e <a href="https://github.com/elwarrior100/modbus_data_plataform">elwarrior100/modbus_data_plataform</a> (o primeiro projeto).</p>
+</header>
+
+<!-- ============================================================ 0 -->
+<section class="chapter" id="comecar">
+  <div class="chapnum">Capítulo 0</div>
+  <h2>Como estudar este livro</h2>
+  <p>Este livro é sobre a <strong>plataforma</strong>: as máquinas, o Kubernetes, o GitOps, os segredos, a rede, a infraestrutura como código e a entrega de software. O pipeline de dados em si (bronze, silver, gates G1/G2) só aparece onde toca na plataforma; está explicado nos guias das fases 3 a 5 do projeto.</p>
+  <ol class="steps">
+    <li><strong>Lê um capítulo de cada vez, por ordem.</strong> Cada um assume os anteriores.</li>
+    <li><strong>Abre os ficheiros reais ao lado.</strong> Cada capítulo diz onde estão. Ler o código depois da explicação fixa muito melhor do que ler só o texto.</li>
+    <li><strong>Responde às perguntas antes de abrir a resposta.</strong> Em voz alta ou por escrito. Só marca "já sei responder" quando conseguires explicar sem espreitar.</li>
+    <li><strong>No fim, faz o exame (capítulo 15).</strong> São cenários: "o que acontece se…". Se acertares a maioria, sabes a arquitetura.</li>
+    <li><strong>Depois, refaz um pedaço com as tuas mãos.</strong> O capítulo 14 é um runbook para montar um cluster do zero. Fazê-lo é a prova final de mestria.</li>
+  </ol>
+  <p>O progresso fica guardado neste browser (no índice, à esquerda). Não sai do teu computador.</p>
+</section>
+
+<!-- ============================================================ 1 -->
+<section class="chapter" id="mapa">
+  <div class="chapnum">Capítulo 1 · Parte I</div>
+  <h2>O mapa da plataforma</h2>
+  <div class="goal"><b>Objetivo:</b> conseguir desenhar de memória as peças da plataforma, onde corre cada uma e por onde passa uma alteração de código até chegar a produção.</div>
+
+  <p>Uma <strong>plataforma de dados</strong> é o conjunto de serviços partilhados sobre os quais os projetos de dados correm: um orquestrador (Airflow), armazenamento (SeaweedFS e lakeFS), uma base de dados (Postgres), um catálogo (OpenMetadata), e a maquinaria para instalar, atualizar e proteger tudo isto. Um <strong>projeto</strong> (o Modbus) só traz o seu código, os seus DAGs e as suas imagens.</p>
+
+  <p>A plataforma corre em <strong>dois clusters iguais</strong>:</p>
+  <ul>
+    <li><strong>Local:</strong> uma VM Lima com k3s no teu Mac (8 CPU, 16 GB). Serve para desenvolver e experimentar. Desliga-se com o Mac.</li>
+    <li><strong>Oracle:</strong> uma VM Always Free (Ampere A1, 2 OCPU, 12 GB, arm64) com k3s. É o ambiente sempre ligado, onde a recolha corre 24 horas por dia.</li>
+  </ul>
+
+  <figure>
+    <div class="figwrap">
+    <svg viewBox="0 0 860 470" role="img" aria-label="Mapa: o código vai do repositório do projeto, pelo CI, para o GHCR; o repositório platform diz que imagem usar; o Argo CD de cada cluster aplica; os segredos vêm do OCI Vault; o acesso é pelo Tailscale.">
+      <defs><marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <rect class="box" x="20" y="20" width="220" height="70" rx="8"/>
+      <text class="t" x="34" y="46">repo modbus_data_plataform</text>
+      <text class="s" x="34" y="66">código, DAGs, Dockerfiles, testes</text>
+      <rect class="box" x="320" y="20" width="200" height="70" rx="8"/>
+      <text class="t" x="334" y="46">GitHub Actions (CI)</text>
+      <text class="s" x="334" y="66">testes + imagens arm64</text>
+      <rect class="box" x="600" y="20" width="240" height="70" rx="8"/>
+      <text class="t" x="614" y="46">GHCR (registo de imagens)</text>
+      <text class="s" x="614" y="66">modbus-*:&lt;sha do commit&gt;</text>
+      <line class="ln" x1="240" y1="55" x2="316" y2="55" marker-end="url(#ar1)"/><text class="s" x="252" y="48">push</text>
+      <line class="ln" x1="520" y1="55" x2="596" y2="55" marker-end="url(#ar1)"/><text class="s" x="532" y="48">publica</text>
+
+      <rect class="boxa" x="250" y="140" width="360" height="80" rx="8"/>
+      <text class="t a" x="266" y="166">repo platform (GitOps, público)</text>
+      <text class="s" x="266" y="186">terraform/ · platform/ · projects/modbus/ · envs/</text>
+      <text class="s" x="266" y="204">diz o que corre, com que imagem, em que ambiente</text>
+      <line class="ln dash" x1="700" y1="90" x2="560" y2="138" marker-end="url(#ar1)"/><text class="s" x="640" y="122">commit da tag</text>
+
+      <rect class="box" x="40" y="290" width="330" height="150" rx="8"/>
+      <text class="t" x="56" y="316">cluster local (Mac · Lima · k3s)</text>
+      <text class="s" x="56" y="338">Argo CD · ESO (chave eso-reader)</text>
+      <text class="s" x="56" y="356">Postgres · SeaweedFS · lakeFS</text>
+      <text class="s" x="56" y="374">Airflow · OpenMetadata · ingest · simulador</text>
+      <text class="s" x="56" y="392">8 CPU / 16 GB · desliga-se com o Mac</text>
+      <rect class="box" x="490" y="290" width="330" height="150" rx="8"/>
+      <text class="t" x="506" y="316">cluster Oracle (k3s · sempre ligado)</text>
+      <text class="s" x="506" y="338">Argo CD · ESO (instance principal)</text>
+      <text class="s" x="506" y="356">Postgres · SeaweedFS · lakeFS</text>
+      <text class="s" x="506" y="374">Airflow · OpenMetadata · ingest · simulador</text>
+      <text class="s" x="506" y="392">2 OCPU / 12 GB · nenhuma porta aberta</text>
+      <line class="lna" x1="360" y1="220" x2="230" y2="286" marker-end="url(#ar1)"/>
+      <line class="lna" x1="500" y1="220" x2="640" y2="286" marker-end="url(#ar1)"/>
+      <text class="s a" x="250" y="258">Argo CD puxa</text><text class="s a" x="560" y="258">Argo CD puxa</text>
+
+      <rect class="boxw" x="345" y="300" width="120" height="56" rx="8"/>
+      <text class="t" x="362" y="324">OCI Vault</text><text class="s" x="362" y="342">os segredos</text>
+      <line class="ln dash" x1="345" y1="328" x2="372" y2="328"/>
+      <line class="ln dash" x1="465" y1="328" x2="490" y2="328"/>
+      <rect class="box" x="345" y="380" width="120" height="56" rx="8"/>
+      <text class="t" x="362" y="404">Tailscale</text><text class="s" x="362" y="422">o teu acesso</text>
+    </svg>
+    </div>
+    <figcaption>O caminho de uma alteração: código → CI → imagem no GHCR → tag no repositório platform → o Argo CD de cada cluster aplica. Os segredos vêm do cofre; tu entras pelo Tailscale.</figcaption>
+  </figure>
+
+  <h3>Os princípios que guiam tudo</h3>
+  <ul>
+    <li><strong>Git é a fonte da verdade.</strong> O que corre num cluster é o que está no repositório <code>platform</code>. Alterar à mão no cluster é temporário: o Argo CD repõe o que diz o git.</li>
+    <li><strong>Nenhum segredo no git.</strong> Nem cifrado. Os segredos vivem num cofre e são lidos pelo cluster.</li>
+    <li><strong>Nenhuma porta aberta à internet.</strong> O acesso é por uma rede privada (Tailscale).</li>
+    <li><strong>Imagens imutáveis.</strong> Cada imagem tem como tag o SHA do commit que a produziu: sabes sempre que código está a correr.</li>
+    <li><strong>Custo zero e orçamento medido.</strong> Tudo cabe no Always Free da Oracle e nos planos grátis do GitHub e do Tailscale; os números de memória e CPU foram medidos, não estimados.</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 1</h3>
+    <div class="q" data-q="1.1"><div class="qt"><input type="checkbox" id="q1-1"><label for="q1-1">Qual é a diferença entre a plataforma e um projeto? Dá dois exemplos de cada.</label></div>
+      <details><summary>Ver resposta</summary><div>A plataforma são os serviços partilhados por todos os projetos (Airflow, Postgres, lakeFS, SeaweedFS, OpenMetadata, Argo CD, o cofre). Um projeto traz o que é só seu: código (collector, writer, transformação silver), DAGs, imagens e o seu repositório lakeFS (<code>industrial-lake</code>).</div></details></div>
+    <div class="q" data-q="1.2"><div class="qt"><input type="checkbox" id="q1-2"><label for="q1-2">Porque há dois clusters? Para que serve cada um?</label></div>
+      <details><summary>Ver resposta</summary><div>O local (Mac) é para desenvolver e experimentar com mais recursos; desliga-se com o Mac, por isso não serve para recolha contínua. O da Oracle está sempre ligado e é onde a recolha corre 24 h. Os dois correm a mesma plataforma, descrita no mesmo repositório, com pequenas diferenças por ambiente (<code>envs/local</code>, <code>envs/oracle</code>).</div></details></div>
+    <div class="q" data-q="1.3"><div class="qt"><input type="checkbox" id="q1-3"><label for="q1-3">Descreve, passo a passo, o caminho de uma alteração ao código do writer até estar a correr na Oracle.</label></div>
+      <details><summary>Ver resposta</summary><div>1) push para o <code>main</code> do repositório do projeto; 2) o CI corre os testes e publica <code>ghcr.io/elwarrior100/modbus-ingest:&lt;sha&gt;</code>; 3) um commit no repositório <code>platform</code> muda a tag da imagem em <code>projects/modbus/k8s/ingest/ingest.yaml</code>; 4) o Argo CD da Oracle vê o commit e atualiza o Deployment; 5) o Kubernetes substitui o pod pelo novo.</div></details></div>
+    <div class="q" data-q="1.4"><div class="qt"><input type="checkbox" id="q1-4"><label for="q1-4">Porque é que a tag de uma imagem é o SHA do commit e não <code>latest</code>?</label></div>
+      <details><summary>Ver resposta</summary><div>Com o SHA, a tag identifica exatamente o código que está lá dentro e nunca muda de significado. <code>latest</code> muda a cada build: dois clusters podem correr coisas diferentes com a "mesma" tag, e um rollback deixa de ser possível de forma segura.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section class="chapter" id="kubernetes">
+  <div class="chapnum">Capítulo 2 · Parte I</div>
+  <h2>Kubernetes e k3s</h2>
+  <div class="goal"><b>Objetivo:</b> perceber os objetos do Kubernetes que usamos, porque escolhemos o k3s, e porque é que parar uma VM com k3s pode corromper dados.</div>
+
+  <p>O <strong>Kubernetes</strong> é um sistema que mantém programas a correr segundo uma descrição: tu dizes "quero isto", ele faz com que seja verdade e volta a fazê-lo sempre que algo falha. O <strong>k3s</strong> é uma distribuição pequena do Kubernetes, num só binário, pensada para uma máquina só. É o que usamos nos dois clusters (v1.36.5+k3s1).</p>
+
+  <h3>Os objetos que aparecem nesta plataforma</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Objeto</th><th>O que é</th><th>Exemplo nosso</th></tr>
+    <tr><td><b>Pod</b></td><td>Um ou mais contentores que correm juntos. Morre e nasce outro: não guarda estado.</td><td>uma tarefa do Airflow</td></tr>
+    <tr><td><b>Deployment</b></td><td>"Mantém N pods iguais a correr". Substitui os que falham.</td><td><code>collector</code>, <code>writer</code>, <code>lakefs</code></td></tr>
+    <tr><td><b>StatefulSet</b></td><td>Como o Deployment, mas cada pod tem identidade e disco próprios e estáveis.</td><td><code>postgres-0</code>, <code>seaweedfs-0</code></td></tr>
+    <tr><td><b>Service</b></td><td>Nome DNS estável para chegar a pods que mudam.</td><td><code>postgres.data.svc.cluster.local</code></td></tr>
+    <tr><td><b>PersistentVolumeClaim</b></td><td>Pedido de disco que sobrevive ao pod.</td><td><code>data-postgres-0</code> (20 Gi)</td></tr>
+    <tr><td><b>Secret</b></td><td>Valores sensíveis entregues aos pods como variáveis ou ficheiros.</td><td><code>postgres-auth</code></td></tr>
+    <tr><td><b>Namespace</b></td><td>Uma "pasta" para separar recursos.</td><td><code>data</code>, <code>ingest</code>, <code>airflow</code></td></tr>
+  </table></div>
+
+  <h3>Como o disco funciona aqui</h3>
+  <p>O k3s traz o <code>local-path-provisioner</code>: cada PVC vira uma pasta no disco da própria VM (<code>/var/lib/rancher/k3s/storage/…</code>). É simples e grátis, mas tem duas consequências que importam: os dados vivem no disco da VM (se o disco se perde, perdem-se), e o tamanho pedido não é imposto (um PVC de 20 Gi pode crescer além disso).</p>
+
+  <h3>Parar uma VM com k3s: o problema do KillMode</h3>
+  <p>O serviço do k3s corre com <code>KillMode=process</code>: quando o sistema desliga, o systemd para o processo do k3s mas <strong>não</strong> pede aos contentores que terminem com calma. O Postgres e o SeaweedFS são mortos a meio de escrever. Foi exatamente isso que corrompeu o último commit do lakeFS duas vezes no Mac.</p>
+  <p>A solução no Mac foi o <code>scripts/vm-stop.sh</code>: primeiro um <code>kubectl drain</code> (pede a cada pod que termine, com SIGTERM e 60 s de tolerância), depois <code>sync</code>, e só então para a VM.</p>
+  <div class="pitfall"><b>Ainda em aberto na Oracle:</b> uma reinicialização da Oracle (manutenção, crash) não passa pelo <code>vm-stop.sh</code>. A correção é configurar o <em>graceful node shutdown</em> do kubelet (<code>shutdown-grace-period</code>). Está na lista do capítulo 13.</div>
+
+  <h3>O kernel que partia os sinais</h3>
+  <p>No Mac, a VM atualizou-se sozinha para o kernel 7.0.0-42, em que o perfil AppArmor dos contentores recusava sinais entre processos do mesmo contentor. O Postgres não conseguia pedir um checkpoint, e o <code>gosu</code> ficava preso. A solução foi fixar o kernel 7.0.0-38. Na Oracle (kernel 7.0.0-1013-oracle) testou-se antes de avançar: um pod enviou SIGTERM a um processo filho e recebeu o código 143 (sinal entregue).</p>
+
+  <h3>Onde estão os ficheiros</h3>
+  <ul>
+    <li><code>platform/envs/local/lima/industrial.yaml</code>: a VM do Mac.</li>
+    <li><code>platform/envs/oracle/bootstrap-vm.sh</code>: swap de 4 GB, sysctls e k3s fixo na mesma versão, com o nome Tailscale no certificado da API.</li>
+    <li><code>platform/scripts/vm-start.sh</code> e <code>vm-stop.sh</code>: ligar e desligar o Mac com segurança.</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 2</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q2-1"><label for="q2-1">Porque é que o Postgres é um StatefulSet e o writer é um Deployment?</label></div>
+      <details><summary>Ver resposta</summary><div>O Postgres precisa de um disco próprio e de uma identidade estável (<code>postgres-0</code>) que sobreviva a reinícios. O writer não guarda nada localmente: o estado está no Postgres (spool) e no lakeFS, por isso qualquer pod igual serve.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q2-2"><label for="q2-2">O que faz o <code>kubectl drain</code> e porque é que o <code>vm-stop.sh</code> o usa antes de <code>limactl stop</code>?</label></div>
+      <details><summary>Ver resposta</summary><div>Marca o nó como indisponível e pede a cada pod que termine com SIGTERM, dando-lhe tempo para gravar e fechar ficheiros. Como o k3s usa <code>KillMode=process</code>, parar a VM diretamente matava os contentores a meio de escrever, o que corrompeu dados do SeaweedFS/lakeFS.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q2-3"><label for="q2-3">Um PVC pede 20 Gi no <code>local-path</code>. O que impede o Postgres de ocupar 40 Gi?</label></div>
+      <details><summary>Ver resposta</summary><div>Nada: o <code>local-path</code> não impõe o tamanho. O limite real é o disco da VM. Por isso é preciso vigiar o disco (ou usar um volume dedicado).</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q2-4"><label for="q2-4">Porque é que a VM da Oracle tem swap, se o Kubernetes não deixa os pods usá-lo?</label></div>
+      <details><summary>Ver resposta</summary><div>É uma margem de segurança para o sistema operativo e o próprio k3s em picos de memória: em vez de o kernel matar um processo, pode empurrar páginas pouco usadas para o disco. Os pods continuam limitados à RAM.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section class="chapter" id="repositorios">
+  <div class="chapnum">Capítulo 3 · Parte I</div>
+  <h2>Plataforma e projetos: dois tipos de repositório</h2>
+  <div class="goal"><b>Objetivo:</b> explicar porque separámos o repositório em dois e porque não em mais (ADR-010).</div>
+
+  <p>No início estava tudo num repositório. Funcionava, mas misturava duas coisas que mudam por razões diferentes: o <strong>código</strong> (muda quando se programa) e a <strong>configuração dos ambientes</strong> (muda quando se decide o que corre e onde). E não servia para um segundo projeto.</p>
+
+  <div class="two">
+    <div class="card"><h4>platform (público)</h4><p>Terraform, plataforma partilhada, lista de projetos, ajustes por ambiente. Muda quando muda a configuração ou a versão de uma imagem.</p><pre><code>terraform/oracle/
+platform/  argocd/ airflow/ k8s/ openmetadata/
+projects/modbus/k8s/  ingest/ ot/
+envs/local/  envs/oracle/
+scripts/</code></pre></div>
+    <div class="card"><h4>um por projeto</h4><p>Código, DAGs, Dockerfiles, testes, docs e o CI que publica imagens. Muda quando se programa.</p><pre><code>ot/  ingest/  pipelines/
+quality/  docs/  tests/
+.github/workflows/ci.yml</code></pre></div>
+  </div>
+
+  <h3>Porque não um repositório por componente</h3>
+  <p>O simulador, o ingest e a silver partilham contratos (o envelope dos eventos, o catálogo de tags, o formato do bronze) e os testes atravessam-nos (a semana sintética usa os três). Separados, cada mudança de contrato exigiria versões coordenadas entre repositórios. Para uma pessoa, é custo sem ganho.</p>
+
+  <h3>Como foi feito sem perder a história</h3>
+  <ol class="steps">
+    <li><code>git subtree split --prefix=platform</code> criou um branch só com a história da pasta <code>platform/</code> (16 commits).</li>
+    <li>Esse branch foi clonado para <code>/Users/mac/platform</code> e reorganizado (<code>git mv</code>), para o git seguir os ficheiros.</li>
+    <li><code>gitleaks</code> correu sobre toda a história antes de a tornar pública: 0 fugas.</li>
+    <li>O Argo CD foi reapontado para o repositório novo, e só depois se apagou <code>platform/</code> do projeto.</li>
+  </ol>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 3</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q3-1"><label for="q3-1">Um colega quer criar um segundo projeto com outros DAGs. O que tem de mudar no repositório platform?</label></div>
+      <details><summary>Ver resposta</summary><div>Uma pasta nova <code>projects/&lt;nome&gt;/k8s/…</code> (o ApplicationSet cria as aplicações sozinho), uma entrada nova na lista de DAG bundles do Airflow, a variável com a imagem do projeto, os segredos dele no cofre, e o seu repositório lakeFS (<code>scripts/lakefs-repo.sh</code>). A plataforma em si não muda.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q3-2"><label for="q3-2">Porque é que o <code>gitleaks</code> correu antes de tornar o repositório público, e não depois?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque uma vez público, qualquer segredo na história fica exposto e pode ser copiado de imediato; apagá-lo depois não o "despublica". A verificação tem de ser feita antes.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q3-3"><label for="q3-3">Qual é o argumento contra um repositório por componente (ot, ingest, pipelines)?</label></div>
+      <details><summary>Ver resposta</summary><div>Os componentes partilham contratos e testes. Separá-los obrigaria a versionar e coordenar mudanças entre repositórios, o que para uma pessoa só acrescenta trabalho.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section class="chapter" id="gitops">
+  <div class="chapnum">Capítulo 4 · Parte I</div>
+  <h2>GitOps com Argo CD</h2>
+  <div class="goal"><b>Objetivo:</b> perceber o ciclo de reconciliação, a estrutura app-of-apps com uma raiz por ambiente, o ApplicationSet, e as regras de <code>prune</code> e <code>selfHeal</code>.</div>
+
+  <p><strong>GitOps</strong> quer dizer que o estado desejado do cluster está no git, e um agente dentro do cluster (o <strong>Argo CD</strong>) compara continuamente o git com o que está a correr e corrige as diferenças. Ninguém faz <code>kubectl apply</code> à mão para mudanças duradouras.</p>
+
+  <figure>
+    <div class="figwrap">
+    <svg viewBox="0 0 820 300" role="img" aria-label="Ciclo do Argo CD: lê o git, compara com o cluster, aplica a diferença, repete.">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <rect class="box" x="30" y="110" width="170" height="70" rx="8"/><text class="t" x="46" y="138">git (platform)</text><text class="s" x="46" y="158">estado desejado</text>
+      <rect class="boxa" x="320" y="40" width="190" height="70" rx="8"/><text class="t a" x="336" y="68">Argo CD compara</text><text class="s" x="336" y="88">git vs cluster, a cada ~3 min</text>
+      <rect class="box" x="620" y="110" width="170" height="70" rx="8"/><text class="t" x="636" y="138">cluster</text><text class="s" x="636" y="158">estado real</text>
+      <rect class="boxa" x="320" y="190" width="190" height="70" rx="8"/><text class="t a" x="336" y="218">aplica a diferença</text><text class="s" x="336" y="238">Synced / OutOfSync</text>
+      <line class="ln" x1="200" y1="130" x2="316" y2="85" marker-end="url(#ar2)"/><text class="s" x="216" y="96">lê</text>
+      <line class="ln" x1="620" y1="130" x2="514" y2="85" marker-end="url(#ar2)"/><text class="s" x="572" y="96">lê</text>
+      <line class="ln" x1="415" y1="110" x2="415" y2="186" marker-end="url(#ar2)"/>
+      <line class="ln" x1="510" y1="225" x2="650" y2="182" marker-end="url(#ar2)"/><text class="s" x="580" y="230">cria / altera / apaga</text>
+    </svg>
+    </div>
+    <figcaption>O ciclo de reconciliação. Se alguém mudar o cluster à mão, o "selfHeal" repõe o que diz o git.</figcaption>
+  </figure>
+
+  <h3>A árvore de aplicações</h3>
+  <ul>
+    <li><strong>Raiz por ambiente</strong> (<code>envs/local/root-app.yaml</code>, <code>envs/oracle/root-app.yaml</code>): uma <code>Application</code> com <em>duas fontes</em>: as aplicações partilhadas (<code>platform/argocd/apps</code>) e as do ambiente (<code>envs/&lt;env&gt;/apps</code>). Aplica-se uma vez por cluster, com <code>kubectl apply</code>.</li>
+    <li><strong>Aplicações partilhadas:</strong> <code>namespaces</code>, <code>data</code> (Postgres, SeaweedFS, lakeFS), <code>external-secrets</code> (chart Helm), <code>secrets</code> (os ExternalSecrets da plataforma) e o ApplicationSet <code>projects</code>.</li>
+    <li><strong>Aplicações do ambiente:</strong> <code>secret-store</code>, que é diferente em cada cluster (capítulo 5).</li>
+    <li><strong>ApplicationSet <code>projects</code>:</strong> um gerador que cria uma aplicação por pasta <code>projects/*/k8s/*</code>. Hoje gera <code>ingest</code> e <code>ot</code>.</li>
+  </ul>
+
+  <h3>Prune, selfHeal e sync waves</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Opção</th><th>O que faz</th><th>Onde a desligámos e porquê</th></tr>
+    <tr><td><code>selfHeal</code></td><td>Repõe o git se o cluster for mudado à mão.</td><td>Ligado em todas.</td></tr>
+    <tr><td><code>prune</code></td><td>Apaga do cluster o que deixou de estar no git.</td><td>Desligado em <code>data</code>, <code>namespaces</code>, <code>secrets</code> e nos projetos: um ficheiro mudado de sítio não pode apagar uma base de dados ou o spool.</td></tr>
+    <tr><td><code>sync-wave</code></td><td>Ordem de aplicação dentro da raiz.</td><td>0: ESO; 1: data, secrets, secret-store; 2: projetos.</td></tr>
+  </table></div>
+
+  <h3>A mudança de repositório, feita sem apagar nada</h3>
+  <p>Quando o Argo CD passou a ler o repositório novo, havia um risco: a raiz tinha <code>prune: true</code>, e as aplicações <code>ot</code> e <code>ingest</code> iam deixar de estar na pasta dela (passavam a vir do ApplicationSet). Fez-se em dois tempos: primeiro a raiz foi reapontada com o <code>prune</code> desligado; depois de confirmar que o ApplicationSet era o dono das duas, tirou-se a etiqueta de seguimento antiga e voltou a ligar-se o <code>prune</code>. Antes de tudo, <code>kubectl diff</code> mostrou que os manifests novos eram iguais ao que corria.</p>
+  <div class="pitfall"><b>Descoberta pelo caminho:</b> o Argo CD estava a ler um <code>main</code> antigo do projeto (o trabalho estava no branch <code>test</code>) e o <code>ingest</code> nem sequer era gerido por ele. Lição: confirma sempre que repositório e que branch cada aplicação lê (<code>kubectl -n argocd get applications</code>).</div>
+
+  <div class="pitfall"><b>Ainda não é GitOps a 100 %:</b> o Argo CD, o Airflow e o OpenMetadata são instalados por scripts com <code>helm</code>. Mudar a imagem das tarefas do Airflow obriga a correr o <code>install-airflow.sh</code> em cada cluster. A crítica aponta isto (capítulo 13).</div>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 4</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q4-1"><label for="q4-1">Alguém muda a imagem do writer à mão com <code>kubectl set image</code>. O que acontece e porquê?</label></div>
+      <details><summary>Ver resposta</summary><div>Em poucos minutos o Argo CD deteta a diferença e, como a aplicação tem <code>selfHeal</code>, repõe a imagem que está no git. A mudança manual desaparece.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q4-2"><label for="q4-2">Porque é que a aplicação <code>data</code> tem <code>prune: false</code>?</label></div>
+      <details><summary>Ver resposta</summary><div>Para que um manifest apagado ou movido no git não apague o StatefulSet do Postgres ou do SeaweedFS e, com eles, os dados. Com dados, é preferível que o Argo CD avise ("OutOfSync") em vez de apagar.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q4-3"><label for="q4-3">Porque é que cada ambiente tem a sua raiz, em vez de uma raiz única?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque há coisas diferentes por ambiente: a forma de ler o cofre (chave no Mac, instance principal na Oracle). A raiz de cada ambiente junta a parte partilhada com a parte própria, com duas fontes.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q4-4"><label for="q4-4">O que faz o ApplicationSet <code>projects</code>, e o que acontece quando crias <code>projects/novo/k8s/api/</code>?</label></div>
+      <details><summary>Ver resposta</summary><div>Gera uma Application por pasta que siga o padrão <code>projects/*/k8s/*</code>. Ao criares essa pasta e fazeres commit, aparece uma aplicação <code>api</code>, a aplicar os manifests dela no namespace <code>api</code>.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q4-5"><label for="q4-5">Porque é que a mudança de repositório se fez com o <code>prune</code> desligado primeiro?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque as aplicações <code>ot</code> e <code>ingest</code> iam sair da pasta da raiz. Com o <code>prune</code> ligado, a raiz apagaria essas aplicações antes de o ApplicationSet as recriar. Desligá-lo deu tempo para confirmar a nova posse.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section class="chapter" id="segredos">
+  <div class="chapnum">Capítulo 5 · Parte II</div>
+  <h2>Segredos num cofre</h2>
+  <div class="goal"><b>Objetivo:</b> explicar como uma palavra-passe vai do cofre até ao pod sem nunca passar pelo git, e o problema do "segredo zero" (ADR-011).</div>
+
+  <p>As palavras-passe (Postgres, SeaweedFS, lakeFS, Airflow, OpenMetadata) vivem no <strong>OCI Vault</strong>, o equivalente da Oracle ao Azure Key Vault. Cada cluster tem o <strong>External Secrets Operator (ESO)</strong>, que lê o cofre e cria os Secrets do Kubernetes. No git só existe a <em>referência</em>: "o Secret <code>postgres-auth</code> vem do segredo <code>data-postgres-auth</code> do cofre".</p>
+
+  <figure>
+    <div class="figwrap">
+    <svg viewBox="0 0 860 280" role="img" aria-label="Fluxo: o ExternalSecret no git pede ao ESO; o ESO autentica-se no cofre (com chave no Mac, sem chave na Oracle) e cria o Secret que o pod usa.">
+      <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <rect class="box" x="20" y="30" width="190" height="70" rx="8"/><text class="t" x="34" y="56">ExternalSecret (git)</text><text class="s" x="34" y="76">"postgres-auth vem de</text><text class="s" x="34" y="92">data-postgres-auth"</text>
+      <rect class="boxa" x="290" y="30" width="200" height="70" rx="8"/><text class="t a" x="304" y="56">External Secrets Operator</text><text class="s" x="304" y="76">lê o cofre a cada 1 h</text>
+      <rect class="boxw" x="590" y="30" width="230" height="70" rx="8"/><text class="t" x="604" y="56">OCI Vault (platform-secrets)</text><text class="s" x="604" y="76">11 segredos, JSON por Secret</text>
+      <line class="ln" x1="210" y1="65" x2="286" y2="65" marker-end="url(#ar3)"/>
+      <line class="ln" x1="490" y1="65" x2="586" y2="65" marker-end="url(#ar3)"/><text class="s" x="504" y="56">read secret-bundles</text>
+      <rect class="box" x="290" y="170" width="200" height="70" rx="8"/><text class="t" x="304" y="196">Secret postgres-auth</text><text class="s" x="304" y="216">criado pelo ESO</text>
+      <rect class="box" x="590" y="170" width="230" height="70" rx="8"/><text class="t" x="604" y="196">pod do Postgres</text><text class="s" x="604" y="216">lê a variável de ambiente</text>
+      <line class="ln" x1="390" y1="100" x2="390" y2="166" marker-end="url(#ar3)"/>
+      <line class="ln" x1="490" y1="205" x2="586" y2="205" marker-end="url(#ar3)"/>
+      <text class="s" x="20" y="160">Como o ESO prova quem é:</text>
+      <text class="s" x="20" y="182">· Mac: chave API do eso-reader</text>
+      <text class="s" x="20" y="200">  (o "segredo zero", em ~/.oci/eso-reader)</text>
+      <text class="s" x="20" y="222">· Oracle: instance principal</text>
+      <text class="s" x="20" y="240">  (a própria VM; nenhuma chave)</text>
+    </svg>
+    </div>
+    <figcaption>Do cofre ao pod. O git só guarda referências; o valor viaja do cofre para o cluster.</figcaption>
+  </figure>
+
+  <h3>As peças, uma a uma</h3>
+  <ul>
+    <li><strong>O cofre</strong> (<code>terraform/oracle/vault.tf</code>): tipo <code>DEFAULT</code> (grátis; o <code>VIRTUAL_PRIVATE</code> é pago), chave mestra AES-256 protegida por software (grátis), num compartment próprio <code>platform-secrets</code>.</li>
+    <li><strong>Um segredo do cofre por Secret do Kubernetes</strong>, com todas as chaves em JSON. Nome: <code>&lt;namespace&gt;-&lt;secret&gt;</code>. O ESO reconstrói o Secret com um só <code>dataFrom.extract</code>.</li>
+    <li><strong>Segredos derivados:</strong> o <code>lakefs-credentials</code> (em <code>ingest</code> e <code>airflow</code>) não é guardado: o ESO constrói-o a partir de <code>data-lakefs-auth</code>. Uma só fonte da verdade.</li>
+    <li><strong>ClusterSecretStore <code>oci-vault</code>:</strong> diz ao ESO onde está o cofre e como se autenticar. É o único objeto diferente entre ambientes.</li>
+  </ul>
+
+  <h3>O segredo zero</h3>
+  <p>Para ler o cofre, o ESO precisa de provar quem é. Essa prova é o "segredo zero": o único que não pode vir do cofre.</p>
+  <ul>
+    <li><strong>No Mac:</strong> a chave API de um utilizador só de leitura, <code>eso-reader</code>. A chave privada foi gerada no Mac e só a pública foi dada à Oracle. O script <code>eso-local-key.sh</code> põe-na num Secret do cluster, sem a mostrar.</li>
+    <li><strong>Na Oracle:</strong> <em>instance principal</em>. Um grupo dinâmico diz "esta VM pode ler segredos de <code>platform-secrets</code>". A VM prova quem é ao serviço de metadados da Oracle: não há nenhuma chave guardada no cluster.</li>
+  </ul>
+
+  <h3>Como se encheu o cofre sem quebrar nada</h3>
+  <ol class="steps">
+    <li><code>vault-seed.sh</code> leu os 11 Secrets que existiam no cluster local e <strong>copiou</strong> os valores para o cofre (gerar valores novos partiria as bases de dados). O pedido à Oracle vai num ficheiro temporário com permissão 600, nunca como argumento.</li>
+    <li>Verificação: o hash SHA-256 de cada segredo no cofre é igual ao do cluster (11 de 11).</li>
+    <li>Um ExternalSecret de teste leu <code>data-postgres-auth</code> para um Secret à parte: mesmo hash.</li>
+    <li>Os 13 ExternalSecrets reais foram aplicados: o ESO <em>adotou</em> os Secrets existentes com os mesmos valores. Nenhum pod reiniciou.</li>
+  </ol>
+
+  <div class="pitfall"><b>Erro a corrigir:</b> os ficheiros dizem que <code>deletionPolicy: Retain</code> mantém o Secret se o ExternalSecret for apagado. Não é verdade. Com <code>creationPolicy: Owner</code>, o Secret pertence ao ExternalSecret e o Kubernetes apaga-o com ele. A correção é <code>creationPolicy: Orphan</code> nos segredos de bases de dados.</div>
+  <div class="pitfall"><b>Risco aberto:</b> o instance principal autoriza a <em>VM inteira</em>. Qualquer pod que chegue ao serviço de metadados (169.254.169.254) pode ler o cofre. Falta uma NetworkPolicy que só deixe o ESO falar com esse endereço.</div>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 5</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q5-1"><label for="q5-1">Porque é que não pusemos os segredos cifrados no git (Sealed Secrets ou SOPS)?</label></div>
+      <details><summary>Ver resposta</summary><div>O repositório é público. Um segredo cifrado no git fica exposto a ataques offline para sempre, e a chave para o decifrar fica nos clusters. Um cofre externo dá também auditoria, rotação e uma fonte única para os dois clusters.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q5-2"><label for="q5-2">O que é o "segredo zero" e porque é que a Oracle não tem nenhum?</label></div>
+      <details><summary>Ver resposta</summary><div>É a credencial com que o ESO se autentica no cofre, que por isso não pode vir do cofre. Na Oracle usa-se instance principal: a VM é autorizada por uma política IAM e prova a identidade ao serviço de metadados da Oracle, sem chave guardada.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q5-3"><label for="q5-3">Porque é que o <code>vault-seed.sh</code> copia valores em vez de gerar novos?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque as bases de dados já usam as palavras-passe atuais. Gerar novas no cofre faria o ESO entregar valores que o Postgres não conhece, e as aplicações deixariam de conseguir ligar-se.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q5-4"><label for="q5-4">Explica porque é que <code>lakefs-credentials</code> é derivado e não guardado.</label></div>
+      <details><summary>Ver resposta</summary><div>É uma cópia de duas chaves de <code>lakefs-auth</code>. Guardar duas cópias permitia que divergissem numa rotação. Derivando, há uma só fonte: mudar <code>data-lakefs-auth</code> no cofre atualiza todos os sítios.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q5-5"><label for="q5-5">Que risco cria o instance principal, e como se fecha?</label></div>
+      <details><summary>Ver resposta</summary><div>Autoriza a VM inteira, por isso qualquer pod que alcance o serviço de metadados (169.254.169.254) pode pedir uma credencial e ler o cofre. Fecha-se com NetworkPolicies que bloqueiam esse endereço em todos os namespaces exceto <code>external-secrets</code>.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section class="chapter" id="rede">
+  <div class="chapnum">Capítulo 6 · Parte II</div>
+  <h2>Rede sem portas abertas</h2>
+  <div class="goal"><b>Objetivo:</b> perceber como acedes à Oracle sem nenhuma porta aberta à internet, e as alternativas aos túneis.</div>
+
+  <p>A VM da Oracle tem uma firewall (a <em>security list</em> da subnet) <strong>sem nenhuma regra de entrada</strong> exceto ICMP para o tamanho dos pacotes. Nem a porta 22 do SSH. Como se entra?</p>
+  <p>Pelo <strong>Tailscale</strong>: uma rede privada (VPN em malha) entre o Mac e a VM. O Tailscale só precisa de tráfego de <em>saída</em>: os dois lados ligam-se a um coordenador e encontram-se, diretamente ou por um relay (DERP) quando não conseguem. No nosso caso passa pelo relay de Madrid, cifrado de ponta a ponta, a ~30 ms.</p>
+
+  <figure>
+    <div class="figwrap">
+    <svg viewBox="0 0 820 220" role="img" aria-label="O Mac e a VM ligam-se para fora ao Tailscale e encontram-se por um relay; a internet não tem nenhuma porta de entrada na VM.">
+      <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <rect class="box" x="20" y="70" width="180" height="70" rx="8"/><text class="t" x="34" y="98">Mac</text><text class="s" x="34" y="118">100.66.9.26</text>
+      <rect class="boxa" x="320" y="20" width="180" height="60" rx="8"/><text class="t a" x="334" y="46">relay DERP (Madrid)</text><text class="s" x="334" y="64">cifrado ponta a ponta</text>
+      <rect class="box" x="620" y="70" width="180" height="70" rx="8"/><text class="t" x="634" y="98">platform-oracle</text><text class="s" x="634" y="118">100.108.9.15</text>
+      <line class="lna" x1="200" y1="95" x2="316" y2="60" marker-end="url(#ar4)"/><line class="lna" x1="620" y1="95" x2="504" y2="60" marker-end="url(#ar4)"/>
+      <text class="s a" x="214" y="70">saída</text><text class="s a" x="560" y="70">saída</text>
+      <rect class="boxw" x="320" y="150" width="180" height="56" rx="8"/><text class="t" x="334" y="174">internet</text><text class="s" x="334" y="192">porta 22: fechada</text>
+      <line class="ln dash" x1="500" y1="178" x2="616" y2="130"/><text class="s" x="540" y="168">✕</text>
+    </svg>
+    </div>
+    <figcaption>Os dois lados só fazem ligações de saída. Da internet para a VM não há nenhuma porta aberta.</figcaption>
+  </figure>
+
+  <h3>Como foi feito, com a ordem que evita ficares trancado</h3>
+  <ol class="steps">
+    <li>Instalar o Tailscale na VM (repositório oficial de pacotes) e no Mac; entrar com a mesma conta.</li>
+    <li>Testar <code>ssh ubuntu@platform-oracle</code> <strong>pelo Tailscale</strong> antes de mexer na firewall.</li>
+    <li>Desativar o "key expiry" da VM na consola do Tailscale, para ela não sair da rede ao fim de 6 meses.</li>
+    <li>Só então fechar a porta 22, por Terraform (<code>network.tf</code>). Depois: SSH pelo IP público dá timeout; pelo Tailscale entra.</li>
+    <li>Plano B se o Tailscale falhar: a consola de série da Oracle, que não usa a porta 22.</li>
+  </ol>
+
+  <h3>Ver os serviços: túneis ou Ingress</h3>
+  <ul>
+    <li><strong>Túneis</strong> (<code>scripts/ui.sh</code>): <code>kubectl port-forward</code> para cada serviço. Simples, mas só vivem enquanto o script corre.</li>
+    <li><strong>Ingress</strong> com o Traefik que o k3s já traz: regras "quem pedir <code>airflow.localhost</code> vai para o Airflow". Sempre disponível e declarado no git. No Mac já respondia na porta 80.</li>
+    <li>Na Oracle, o Ingress só deve escutar na rede do Tailscale, nunca na pública.</li>
+  </ul>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 6</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q6-1"><label for="q6-1">Como é que o SSH funciona se a porta 22 está fechada?</label></div>
+      <details><summary>Ver resposta</summary><div>O SSH passa dentro da rede privada do Tailscale. A VM e o Mac fazem ligações de saída ao Tailscale e falam um com o outro por esse caminho; a firewall da Oracle não precisa de deixar entrar nada.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q6-2"><label for="q6-2">Porque é que a porta 22 só foi fechada depois de testar o SSH pelo Tailscale?</label></div>
+      <details><summary>Ver resposta</summary><div>Para não ficares trancado fora: se o Tailscale não funcionasse, fechar a 22 deixava-te sem acesso exceto pela consola de série.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q6-3"><label for="q6-3">O que é o DERP e porque é que a ligação passa por ele?</label></div>
+      <details><summary>Ver resposta</summary><div>É um relay do Tailscale. Quando os dois lados não conseguem ligar-se diretamente (NAT, firewall sem UDP de entrada), o tráfego passa pelo relay, continuando cifrado de ponta a ponta. Uma ligação direta exigiria abrir a porta UDP 41641.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section class="chapter" id="terraform">
+  <div class="chapnum">Capítulo 7 · Parte III</div>
+  <h2>Terraform e a Oracle</h2>
+  <div class="goal"><b>Objetivo:</b> perceber o estado do Terraform, o <code>import</code> de recursos criados à mão, e o que nunca deve passar pelo Terraform.</div>
+
+  <p>O <strong>Terraform</strong> descreve infraestrutura em ficheiros (<code>.tf</code>) e torna-a real. Para saber o que já criou, guarda um <strong>estado</strong> (<code>terraform.tfstate</code>). O <code>plan</code> compara os ficheiros com o estado e com a realidade, e mostra o que vai criar, alterar ou destruir; o <code>apply</code> faz.</p>
+
+  <h3>O import: adotar sem recriar</h3>
+  <p>A VM <code>agente-01</code> e a firewall foram criadas na consola, por isso o Terraform não as conhecia: um <code>apply</code> tentaria criar outra VM (e o Always Free só tem lugar para uma). A solução foi um bloco <code>import</code>:</p>
+  <pre><code>import {
+  to = oci_core_instance.platform
+  id = var.instance_ocid        # vem do terraform.tfvars, fora do git
+}</code></pre>
+  <p>A regra de ouro: antes do <code>apply</code>, o <code>plan</code> tem de dizer <strong>"1 to import, 0 to add, 0 to change, 0 to destroy"</strong>. Para isso, os valores no <code>tfvars</code> foram copiados da VM real (nome, disco de 47 GB, a mesma chave SSH). Com o disco por omissão de 100 GB, o plan queria alterar a VM.</p>
+
+  <h3>Proteções escritas no código</h3>
+  <ul>
+    <li><code>ignore_changes = [source_details[0].source_id]</code>: uma imagem Ubuntu mais nova não força a recriação da VM.</li>
+    <li><code>enable_delete = false</code> no compartment dos segredos: um <code>destroy</code> não o apaga.</li>
+    <li><code>vault_type = "DEFAULT"</code> e <code>protection_mode = "SOFTWARE"</code>, escritos explicitamente: são os que não custam dinheiro.</li>
+    <li><strong>Nenhum valor de segredo no Terraform:</strong> ficaria em claro no <code>tfstate</code>. O Terraform cria o cofre e as permissões; os valores entram pelo <code>vault-seed.sh</code>.</li>
+  </ul>
+
+  <h3>O Always Free, em números</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Recurso</th><th>Limite grátis</th><th>Usamos</th></tr>
+    <tr><td>Ampere A1 (CPU / RAM)</td><td class="num">2 OCPU / 12 GB no total</td><td class="num">2 / 12 (tudo)</td></tr>
+    <tr><td>Disco (boot + blocos)</td><td class="num">200 GB</td><td class="num">47 GB</td></tr>
+    <tr><td>Segredos no cofre</td><td class="num">150</td><td class="num">11</td></tr>
+    <tr><td>Chaves de software</td><td>ilimitadas</td><td class="num">1</td></tr>
+  </table></div>
+  <p>A proteção de custos é um orçamento de 1 € com alerta por email. Atenção: um orçamento <em>avisa</em>, não trava. Quem trava são as quotas.</p>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 7</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q7-1"><label for="q7-1">Correste <code>terraform apply</code> numa pasta sem estado, e a VM já existia na consola. O que acontece?</label></div>
+      <details><summary>Ver resposta</summary><div>O Terraform não sabe que ela existe e tenta criar outra. Na Oracle falharia por falta de quota (ou, pior, gastava o que sobra). A solução é importar a existente antes.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q7-2"><label for="q7-2">Porque é que os valores dos segredos não são criados pelo Terraform?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque tudo o que o Terraform gere fica escrito no <code>terraform.tfstate</code>, em claro. Os segredos ficariam num ficheiro no Mac, copiável e fácil de perder ou partilhar por engano.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q7-3"><label for="q7-3">O que significa "0 to change" no plan de um import, e porque é obrigatório?</label></div>
+      <details><summary>Ver resposta</summary><div>Que a descrição nos <code>.tf</code> corresponde exatamente ao recurso real. Se houvesse alterações, o apply mexeria na VM; algumas, como a chave SSH ou a imagem, obrigam a recriá-la e apagavam o disco.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q7-4"><label for="q7-4">O estado do Terraform só existe no teu Mac. Que risco é esse e como se resolve?</label></div>
+      <details><summary>Ver resposta</summary><div>Se o perderes, o Terraform deixa de saber o que gere (terias de importar tudo de novo), e o ficheiro tem dados sensíveis. Resolve-se com um backend remoto num bucket da Oracle, com versões.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section class="chapter" id="cicd">
+  <div class="chapnum">Capítulo 8 · Parte III</div>
+  <h2>CI/CD e imagens</h2>
+  <div class="goal"><b>Objetivo:</b> perceber o que faz o CI, porque corre em arm64, e como uma imagem nova chega aos clusters.</div>
+
+  <p>O CI está em <code>.github/workflows/ci.yml</code> no repositório do projeto. Em cada push corre os testes dos quatro projetos Python; num push para o <code>main</code>, se os testes passarem, constrói e publica três imagens no GHCR:</p>
+  <ul>
+    <li><code>ghcr.io/elwarrior100/modbus-ingest:&lt;sha&gt;</code> (collector e writer)</li>
+    <li><code>ghcr.io/elwarrior100/modbus-ot-edge:&lt;sha&gt;</code> (simulador e gateway OPC UA)</li>
+    <li><code>ghcr.io/elwarrior100/modbus-pipelines:&lt;sha&gt;</code> (Airflow + biblioteca <code>silver</code>, para as tarefas)</li>
+  </ul>
+
+  <h3>Decisões e porquês</h3>
+  <ul>
+    <li><strong>Runners arm64 nativos</strong> (<code>ubuntu-24.04-arm</code>): o Mac e a Oracle são arm64, por isso não é preciso emular, e em repositórios públicos são grátis.</li>
+    <li><strong>Imagens públicas:</strong> os clusters descarregam-nas sem token, e os pacotes públicos são grátis.</li>
+    <li><strong>Permissões mínimas:</strong> só o job que publica tem <code>packages: write</code>.</li>
+    <li><strong>O CI não faz deploy.</strong> Publicar e implantar são passos separados: a implantação é um commit no <code>platform</code> (capítulo 1).</li>
+  </ul>
+
+  <div class="pitfall"><b>O incidente da conta bloqueada:</b> o primeiro CI falhou nos 8 jobs com "account is locked due to a billing issue". Não era o código: era a faturação da conta GitHub. Lição: quando um job nem arranca (0 passos executados), procura a causa fora do código, nas anotações do job.</div>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 8</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q8-1"><label for="q8-1">Porque é que o CI não faz deploy diretamente nos clusters?</label></div>
+      <details><summary>Ver resposta</summary><div>Para que o git do <code>platform</code> continue a ser a única fonte da verdade sobre o que corre, e para separar "existe uma imagem nova" de "decidimos usá-la neste ambiente". Também evita dar ao CI credenciais dos clusters.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q8-2"><label for="q8-2">O que se perde se as imagens forem construídas em amd64?</label></div>
+      <details><summary>Ver resposta</summary><div>Não correriam nos clusters arm64 sem emulação. Seria preciso construir multi-arquitetura com emulação (QEMU), mais lento, ou manter duas imagens.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q8-3"><label for="q8-3">Que três coisas faltam ao CI para ter uma cadeia de fornecimento mais segura?</label></div>
+      <details><summary>Ver resposta</summary><div>Fixar as actions por SHA em vez de tag, analisar vulnerabilidades das imagens (por exemplo Trivy) e assinar as imagens (por exemplo cosign).</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 9 -->
+<section class="chapter" id="airflow">
+  <div class="chapnum">Capítulo 9 · Parte IV</div>
+  <h2>Airflow como plataforma</h2>
+  <div class="goal"><b>Objetivo:</b> perceber como um Airflow partilhado corre DAGs de vários projetos, cada um com a sua imagem.</div>
+
+  <p>O Airflow corre com o <strong>KubernetesExecutor</strong>: cada tarefa nasce num pod novo e morre no fim, por isso só gasta memória enquanto trabalha. A plataforma usa a <strong>imagem oficial</strong> <code>apache/airflow:3.2.2</code>, sem código de nenhum projeto lá dentro.</p>
+
+  <figure>
+    <div class="figwrap">
+    <svg viewBox="0 0 860 250" role="img" aria-label="O dag-processor clona os DAGs do git; o scheduler lança um pod por tarefa com a imagem do projeto.">
+      <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <rect class="box" x="20" y="30" width="210" height="70" rx="8"/><text class="t" x="34" y="56">repo do projeto (git)</text><text class="s" x="34" y="76">pipelines/dags/*.py</text>
+      <rect class="boxa" x="310" y="30" width="230" height="70" rx="8"/><text class="t a" x="324" y="56">dag-processor</text><text class="s" x="324" y="76">GitDagBundle "modbus", 120 s</text>
+      <rect class="boxa" x="310" y="150" width="230" height="70" rx="8"/><text class="t a" x="324" y="176">scheduler</text><text class="s" x="324" y="196">parallelism 2, 1 run de cada vez</text>
+      <rect class="box" x="620" y="150" width="220" height="70" rx="8"/><text class="t" x="634" y="176">pod da tarefa</text><text class="s" x="634" y="196">modbus-pipelines:&lt;sha&gt;</text>
+      <line class="ln" x1="230" y1="65" x2="306" y2="65" marker-end="url(#ar5)"/><text class="s" x="240" y="56">clona</text>
+      <line class="ln" x1="425" y1="100" x2="425" y2="146" marker-end="url(#ar5)"/>
+      <line class="ln" x1="540" y1="185" x2="616" y2="185" marker-end="url(#ar5)"/><text class="s" x="548" y="176">pod_override</text>
+      <text class="s" x="620" y="60">a tarefa clona o mesmo commit</text><text class="s" x="620" y="78">do DAG antes de correr</text>
+    </svg>
+    </div>
+    <figcaption>Os DAGs vêm do git; o código das tarefas vem da imagem do projeto.</figcaption>
+  </figure>
+
+  <h3>As três ideias</h3>
+  <ol class="steps">
+    <li><strong>DAG bundles.</strong> <code>dag_bundle_config_list</code> lista um bundle por projeto (<code>GitDagBundle</code>: repositório, branch, pasta, intervalo). O provider de git já vem na imagem oficial. Um DAG novo aparece no Airflow sem imagem nova.</li>
+    <li><strong>Imagem por tarefa.</strong> O DAG lê <code>MODBUS_PIPELINES_IMAGE</code> e passa-a em <code>executor_config={"pod_override": …}</code>. Cada projeto traz as suas dependências sem colidir com os outros.</li>
+    <li><strong>Em série.</strong> <code>parallelism = 2</code> no Airflow inteiro e <code>max_active_runs = 1</code> no DAG. Medido: 1 180 horas em 137 s com um worker; uma hora normal demora ~1 s.</li>
+  </ol>
+
+  <h3>A prova, com output real</h3>
+  <p>No Mac, um run manual da silver: o pod usou <code>ghcr.io/elwarrior100/modbus-pipelines:44008786…</code>, clonou o DAG desse commit ("Cloning repository… version 44008786…") e o G2 recusou a hora 12 com razão (34 de 60 minutos com dados, porque a VM só arrancou às 12:27).</p>
+
+  <div class="pitfall"><b>Deriva possível:</b> o bundle segue o <code>main</code> do projeto, mas a imagem está fixa num SHA. Um DAG novo que precise de código novo correria na imagem antiga. A correção é fixar <code>tracking_ref</code> ao mesmo SHA da imagem e mudar os dois no mesmo commit.</div>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 9</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q9-1"><label for="q9-1">Mudaste o horário do DAG <code>silver_hourly</code>. O que tens de fazer para isso chegar ao Airflow?</label></div>
+      <details><summary>Ver resposta</summary><div>Só um push para o <code>main</code> do projeto. O dag-processor volta a clonar o repositório em até 120 s e o Airflow passa a usar a versão nova. Não é preciso imagem nova nem Helm.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q9-2"><label for="q9-2">E se mudares o código da biblioteca <code>silver</code>?</label></div>
+      <details><summary>Ver resposta</summary><div>Precisas de uma imagem nova (o CI publica-a com o SHA novo) e de mudar <code>MODBUS_PIPELINES_IMAGE</code> no <code>platform</code>, que hoje ainda obriga a correr o <code>install-airflow.sh</code> em cada cluster.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q9-3"><label for="q9-3">Porque é que a plataforma usa a imagem oficial do Airflow em vez de uma nossa?</label></div>
+      <details><summary>Ver resposta</summary><div>Para não misturar código de projetos na plataforma. Com vários projetos, uma imagem única obrigaria a reconstruí-la a cada mudança de qualquer projeto e juntaria as dependências de todos.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q9-4"><label for="q9-4">Na Oracle, ao ativar o DAG, o Airflow correu ~170 horas antigas. Porquê, e porque não foi um problema?</label></div>
+      <details><summary>Ver resposta</summary><div>O DAG tem <code>catchup=True</code> e começa em 07-11, por isso o Airflow cria runs para todas as horas desde então. Na Oracle essas horas não têm bronze, por isso cada run termina logo como "saltado", em série, a ~48 s cada.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 10 -->
+<section class="chapter" id="dados">
+  <div class="chapnum">Capítulo 10 · Parte IV</div>
+  <h2>Postgres, SeaweedFS e lakeFS na plataforma</h2>
+  <div class="goal"><b>Objetivo:</b> perceber como os serviços de dados são preparados num cluster novo e como cada aplicação recebe o seu utilizador e a sua base.</div>
+
+  <div class="tablewrap"><table>
+    <tr><th>Serviço</th><th>Papel</th><th>Detalhe da plataforma</th></tr>
+    <tr><td>Postgres (+Timescale)</td><td>Uma instância, uma base por aplicação: <code>ingest</code>, <code>airflow</code>, <code>openmetadata</code>, <code>lakefs</code></td><td>Cada aplicação tem o seu utilizador; a palavra-passe vem do cofre</td></tr>
+    <tr><td>SeaweedFS</td><td>Armazenamento S3 dos objetos do lake</td><td>Bucket <code>lake</code>, criado com <code>weed shell</code></td></tr>
+    <tr><td>lakeFS</td><td>"Git para dados" sobre o SeaweedFS</td><td>Metadados no Postgres; um repositório por projeto</td></tr>
+    <tr><td>OpenMetadata</td><td>Catálogo, linhagem, histórico de qualidade</td><td>Postgres externo, OpenSearch com heap de 1 GB, sem o Airflow e o MySQL do chart</td></tr>
+  </table></div>
+
+  <h3>Um utilizador por aplicação, com a palavra-passe do cofre</h3>
+  <p>O <code>scripts/lib.sh</code> tem <code>ensure_pg_role &lt;role&gt; &lt;db&gt;</code>: recebe a palavra-passe pelo stdin e garante que o utilizador e a base existem, com essa palavra-passe. Num cluster novo cria-os; num existente só volta a aplicar a mesma.</p>
+  <div class="pitfall"><b>O bug que isto teve:</b> um Secret não termina com quebra de linha. A primeira linha de SQL colava-se à palavra-passe: na Oracle o utilizador não era criado e, no Mac, o <code>ALTER ROLE</code> gravou uma palavra-passe errada no <code>openmetadata</code>. O teste não apanhou porque ligava por dentro do contentor do Postgres, onde a ligação é aceite sem palavra-passe. Lição: <strong>testa como a aplicação liga</strong>, por rede, com a palavra-passe tirada do Secret.</div>
+
+  <h3>Preparar o lakeFS num cluster novo</h3>
+  <p><code>scripts/lakefs-repo.sh &lt;repositório&gt; &lt;bucket&gt;</code> é idempotente e faz três coisas: cria o bucket no SeaweedFS; inicializa o lakeFS (que nasce "not_initialized") com o utilizador admin e a chave do cofre; cria o repositório do projeto. Depois, o projeto instala os seus hooks (<code>quality/install_hooks.py</code>): o <code>pre-merge</code> do G2 e a proteção <code>pre-commit</code>.</p>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 10</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q10-1"><label for="q10-1">Porque é que cada aplicação tem o seu utilizador no Postgres, em vez de todas usarem o superutilizador?</label></div>
+      <details><summary>Ver resposta</summary><div>Para limitar o estrago de uma credencial roubada ou de um bug: cada aplicação só toca na sua base. E para poderes revogar ou rodar uma palavra-passe sem afetar as outras.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q10-2"><label for="q10-2">Porque é que testar o login com <code>psql -h 127.0.0.1</code> dentro do pod do Postgres não prova nada?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque a configuração por omissão do Postgres aceita ligações locais de 127.0.0.1 sem palavra-passe (trust). O teste passa com qualquer palavra-passe. Tem de ser feito pela rede, como as aplicações fazem.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q10-3"><label for="q10-3">Onde vivem os metadados do lakeFS, e porque é que isso torna os backups do Postgres críticos?</label></div>
+      <details><summary>Ver resposta</summary><div>No Postgres. Os objetos estão no SeaweedFS, mas os commits, branches e o mapa de que ficheiro pertence a que versão estão no Postgres. Sem ele, os objetos ficam sem história.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 11 -->
+<section class="chapter" id="orcamento">
+  <div class="chapnum">Capítulo 11 · Parte V</div>
+  <h2>Orçamento de recursos</h2>
+  <div class="goal"><b>Objetivo:</b> saber quanto cada peça gasta e porque é que tudo corre em série.</div>
+
+  <div class="tablewrap"><table>
+    <tr><th>Medição</th><th>Valor</th></tr>
+    <tr><td>Núcleo + OpenMetadata (Mac, em repouso)</td><td class="num">~6 GB de RAM</td></tr>
+    <tr><td>OpenSearch / servidor OpenMetadata</td><td class="num">1,6 GB / 1,0 GB</td></tr>
+    <tr><td>Oracle com tudo, durante o catch-up</td><td class="num">57 % CPU, 62 % RAM (7,5 GB)</td></tr>
+    <tr><td>Uma hora de silver (45 mil linhas)</td><td class="num">0,5 s de CPU, 183 MB</td></tr>
+    <tr><td>1 160 horas, 2 workers, pod com 2 CPU</td><td class="num">70 s</td></tr>
+    <tr><td>1 180 horas, 1 worker</td><td class="num">137 s</td></tr>
+    <tr><td>Dados reais (SeaweedFS / Postgres)</td><td class="num">83 MB / 357 MB</td></tr>
+    <tr><td>Imagens de contentores (Mac)</td><td class="num">16 GB, o maior consumo de disco</td></tr>
+  </table></div>
+  <p>Conclusão: com 2 CPU, executar em série custa pouco (o dobro do tempo num backfill, que é raro) e dá um pico previsível que não compete com o Postgres e o lakeFS.</p>
+  <div class="pitfall"><b>Ainda por resolver:</b> os limites de memória somam ~15 GB num nó de 12 GB, e o Postgres pode ser o primeiro a ser morto sob pressão. É preciso dar-lhe prioridade (PriorityClass ou QoS Guaranteed) e limitar a CPU do OpenSearch.</div>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 11</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q11-1"><label for="q11-1">Porque é que a execução em série é aceitável aqui?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque uma hora de silver custa cerca de 1 s. Mesmo em série, um backfill de mais de mil horas leva cerca de 2 minutos. O ganho é um consumo de CPU previsível num nó de 2 CPU.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q11-2"><label for="q11-2">Os limites de memória somam mais do que a RAM do nó. Porque é que isso funciona, e quando deixa de funcionar?</label></div>
+      <details><summary>Ver resposta</summary><div>Os limites são máximos, não consumos: normalmente cada pod usa muito menos. Deixa de funcionar quando vários chegam ao limite ao mesmo tempo; aí o kernel mata processos, e sem prioridades pode matar o Postgres.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 12 -->
+<section class="chapter" id="incidentes">
+  <div class="chapnum">Capítulo 12 · Parte V</div>
+  <h2>Incidentes e lições</h2>
+  <div class="goal"><b>Objetivo:</b> aprender com o que correu mal. Cada incidente tem sintoma, causa, correção e lição.</div>
+
+  <div class="tablewrap"><table>
+    <tr><th>Incidente</th><th>Causa</th><th>Correção</th><th>Lição</th></tr>
+    <tr><td>Último commit do lakeFS ilegível (2×)</td><td>VM parada sem encerramento gracioso; o SeaweedFS perdeu o fim de um ficheiro</td><td>Hard reset do <code>main</code> para o último commit bom; lote reposto no spool; reconciliação 0 faltas</td><td>Nunca parar uma VM com dados sem drenar; ter backups</td></tr>
+    <tr><td>Postgres preso no arranque</td><td>Kernel 7.0.0-42: AppArmor recusava sinais nos contentores</td><td>Kernel fixado em 7.0.0-38</td><td>Fixar versões; testar sinais num kernel novo</td></tr>
+    <tr><td>Argo CD a aplicar código velho</td><td>Lia o <code>main</code> antigo; o trabalho estava no <code>test</code></td><td>Repositório e branch novos; <code>main</code> posto em dia</td><td>Verificar repo e branch de cada aplicação</td></tr>
+    <tr><td>OpenMetadata sem ligar à base</td><td>Bug no <code>ensure_pg_role</code> (falta de quebra de linha)</td><td><code>read</code>/<code>printf</code> corrigidos; palavra-passe reposta</td><td>Testar como a aplicação liga, não por atalhos</td></tr>
+    <tr><td>CI sem arrancar</td><td>Conta GitHub bloqueada por faturação</td><td>Resolvida na conta</td><td>Jobs com 0 passos: a causa está fora do código</td></tr>
+    <tr><td>Secret do OpenMetadata sem sincronizar na Oracle</td><td>O namespace <code>openmetadata</code> não estava declarado</td><td>Declarado no <code>00-namespaces.yaml</code></td><td>Um cluster novo revela o que só existia por acaso no antigo</td></tr>
+  </table></div>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 12</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q12-1"><label for="q12-1">Porque é que montar a Oracle "de raiz" revelou erros que o cluster local escondia?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque o cluster local tinha coisas criadas à mão ao longo do tempo (namespaces, utilizadores, inicializações) que não estavam no git nem nos scripts. Num cluster novo, só existe o que está descrito; tudo o que faltava apareceu.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q12-2"><label for="q12-2">Qual é o padrão comum a três destes incidentes?</label></div>
+      <details><summary>Ver resposta</summary><div>Uma verificação que parecia provar algo mas não provava (o teste de login por 127.0.0.1, o Argo CD "Synced" a um branch errado, um plan que assumia valores por omissão). A lição é verificar pelo caminho real que o sistema usa.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 13 -->
+<section class="chapter" id="critica">
+  <div class="chapnum">Capítulo 13 · Parte V</div>
+  <h2>Revisão crítica: 44/100</h2>
+  <div class="goal"><b>Objetivo:</b> saber onde a plataforma está fraca, por ordem de risco, e qual é o caminho para a melhorar. Revisão feita por um agente independente, só de leitura, a 2026-11-14.</div>
+
+  <p><span class="big">44</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
+
+  <div class="score" id="scorecard"></div>
+
+  <h3>Os cinco problemas graves</h3>
+  <ol>
+    <li><span class="sev h">alto</span> <strong>Não há backups.</strong> Postgres (com a história do lakeFS e o spool) e SeaweedFS estão no disco único da VM. Correção grátis: política de backup do volume na Oracle (5 backups grátis) e <code>pg_dump</code> diário para o Object Storage, com um teste de restauro.</li>
+    <li><span class="sev h">alto</span> <strong>Qualquer pod na Oracle pode ler o cofre</strong> (instance principal autoriza a VM). Correção: NetworkPolicy que bloqueia 169.254.169.254 exceto para o ESO.</li>
+    <li><span class="sev h">alto</span> <strong>Reinício da Oracle sem encerramento gracioso.</strong> Correção: <code>shutdown-grace-period</code> no kubelet e um teste com <code>sudo reboot</code>.</li>
+    <li><span class="sev h">alto</span> <strong>As aplicações usam a chave admin do lakeFS</strong>, e a exceção <code>gates_installer=true</code> é um metadado que qualquer um escreve. Correção: proteção do branch <code>main</code>, uma chave por aplicação, exceção ligada a quem faz o commit.</li>
+    <li><span class="sev h">alto</span> <strong>O comentário sobre <code>deletionPolicy</code> está errado</strong> e as palavras-passe podem ser apagadas com o ExternalSecret. Correção: <code>creationPolicy: Orphan</code>.</li>
+  </ol>
+  <h3>Médios e menores, em resumo</h3>
+  <ul>
+    <li><span class="sev m">médio</span> Argo CD, Airflow e OpenMetadata instalados por scripts, não por GitOps.</li>
+    <li><span class="sev m">médio</span> DAG a seguir o <code>main</code> e imagem fixa num SHA (deriva).</li>
+    <li><span class="sev m">médio</span> Os dois clusters partilham credenciais e tudo vai direto para a Oracle, sem promoção.</li>
+    <li><span class="sev m">médio</span> TimescaleDB e SeaweedFS com tags <code>latest</code>.</li>
+    <li><span class="sev m">médio</span> Memória sobrecomprometida; Postgres sem prioridade; disco quase todo pedido.</li>
+    <li><span class="sev m">médio</span> Nenhuma monitorização nem alerta.</li>
+    <li><span class="sev m">médio</span> Filer do SeaweedFS (8888) sem autenticação dentro do cluster.</li>
+    <li><span class="sev m">médio</span> Sem fronteiras entre projetos (store sem condições, <code>project: default</code>).</li>
+    <li><span class="sev l">baixo</span> Estado do Terraform só no Mac; credenciais de origem do OpenMetadata e Argo CD; scripts com o cluster local por omissão; actions sem SHA; documentação desatualizada; peso do OpenMetadata para um só projeto.</li>
+  </ul>
+  <h3>O que está bem</h3>
+  <ul>
+    <li>Nenhuma porta aberta à internet, fechada por Terraform.</li>
+    <li>Segredos nunca no git, no estado do Terraform nem em argumentos de comando.</li>
+    <li>IAM de privilégio mínimo; instance principal na Oracle.</li>
+    <li><code>prune: false</code> onde há dados; <code>ignore_changes</code> na imagem da VM.</li>
+    <li>Imagens com tag SHA, construídas em arm64 nativo.</li>
+  </ul>
+  <h3>O caminho, por ordem</h3>
+  <ol class="steps">
+    <li>Backups com teste de restauro. <em>(Fiabilidade 2 → ~7; global ~54.)</em></li>
+    <li>Encerramento gracioso e NetworkPolicy do metadata.</li>
+    <li><code>creationPolicy: Orphan</code> e imagens fixas por digest.</li>
+    <li>lakeFS: proteção do <code>main</code> e chaves por aplicação.</li>
+    <li>Airflow, OpenMetadata e Argo CD sob o Argo CD; DAG fixo ao SHA da imagem; alerta de "dead man's switch".</li>
+  </ol>
+
+  <div class="quiz">
+    <h3>Perguntas do capítulo 13</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13-1"><label for="q13-1">Porque é que a falta de backups pesa mais do que a falta de monitorização, se a monitorização teve nota 1?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque a monitorização avisa de problemas que ainda se podem corrigir, mas a falta de backups torna alguns problemas irreversíveis: perder o disco é perder a história do lake. Na ponderação, fiabilidade vale 20 e observabilidade 10.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13-2"><label for="q13-2">Explica, por palavras tuas, porque é que o gate G2 "só aguenta por convenção".</label></div>
+      <details><summary>Ver resposta</summary><div>Porque as aplicações usam a chave de administrador do lakeFS e a proteção dos hooks aceita qualquer commit marcado com <code>gates_installer=true</code>. Quem tiver essa chave pode alterar os hooks ou contornar o merge. O hook impede acidentes, não um utilizador com a chave admin.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 14 -->
+<section class="chapter" id="runbook">
+  <div class="chapnum">Capítulo 14 · Parte V</div>
+  <h2>Runbook: um cluster do zero</h2>
+  <div class="goal"><b>Objetivo:</b> conseguir montar a plataforma num cluster novo, seguindo os passos que foram usados na Oracle.</div>
+  <ol class="steps">
+    <li><strong>Máquina.</strong> Oracle: <code>terraform plan</code> → <code>apply</code> em <code>terraform/oracle/</code> (VM, rede, cofre). Mac: <code>limactl start --name industrial envs/local/lima/industrial.yaml</code>.</li>
+    <li><strong>k3s.</strong> Oracle: <code>./envs/oracle/bootstrap-vm.sh</code> (swap, sysctls, k3s fixo, kubeconfig em <code>~/.kube/oracle.yaml</code> pelo Tailscale).</li>
+    <li><strong>Argo CD.</strong> <code>KUBECONFIG=… ./scripts/install-argocd.sh</code>, depois <code>kubectl apply -f envs/&lt;env&gt;/root-app.yaml</code>.</li>
+    <li><strong>Segredo zero (só no Mac).</strong> <code>./scripts/eso-local-key.sh</code>.</li>
+    <li><strong>Esperar pelos Secrets.</strong> <code>./scripts/wait-secrets.sh</code>. O ESO cria-os a partir do cofre.</li>
+    <li><strong>Bases de dados.</strong> <code>./scripts/bootstrap-postgres-ingest.sh</code>.</li>
+    <li><strong>lakeFS do projeto.</strong> <code>./scripts/lakefs-repo.sh industrial-lake lake</code>, depois, no projeto, <code>quality/install_hooks.py</code>.</li>
+    <li><strong>Serviços.</strong> <code>./scripts/install-airflow.sh</code> e <code>./scripts/install-openmetadata.sh</code>; ativar os DAGs (<code>airflow dags unpause</code>).</li>
+    <li><strong>Verificar.</strong> <code>kubectl -n argocd get applications</code> (tudo Synced/Healthy), logs do writer a exportar lotes, e o teste de login pela rede para cada utilizador do Postgres.</li>
+  </ol>
+  <p>Todos os scripts são idempotentes: podes voltar a correr qualquer passo. E todos usam o cluster local por omissão: <strong>define sempre o <code>KUBECONFIG</code></strong> quando trabalhas na Oracle.</p>
+</section>
+
+<!-- ============================================================ 15 -->
+<section class="chapter" id="exame">
+  <div class="chapnum">Capítulo 15</div>
+  <h2>Exame final: cenários</h2>
+  <div class="goal"><b>Objetivo:</b> provar que sabes a arquitetura. Cada pergunta é uma situação real; responde antes de abrir.</div>
+  <div class="quiz">
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-1"><label for="qx-1">A Oracle reinicia de surpresa às 3 da manhã. O que pode correr mal, hoje, e o que mudarias?</label></div>
+      <details><summary>Ver resposta</summary><div>Os contentores são mortos sem encerramento gracioso (KillMode=process); o SeaweedFS ou o Postgres podem perder escritas e o lakeFS ficar com um commit ilegível. Sem backups, a recuperação seria manual. Mudaria: shutdown-grace-period no kubelet, backups automáticos com teste de restauro, e um alerta de "dead man's switch".</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-2"><label for="qx-2">Queres rodar a palavra-passe do Postgres do <code>airflow</code>. Que passos, por ordem?</label></div>
+      <details><summary>Ver resposta</summary><div>1) Nova versão do segredo <code>airflow-airflow-metadata</code> no cofre; 2) <code>ensure_pg_role airflow airflow</code> com a nova palavra-passe (em cada cluster que use esse valor); 3) o ESO atualiza o Secret (ou força o refresh); 4) reiniciar os pods do Airflow, que só leem a palavra-passe no arranque.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-3"><label for="qx-3">Um colega abre um PR que adiciona um DAG que chama a API do cofre. Porque é que isso é perigoso na Oracle?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque na Oracle qualquer pod pode obter credenciais de instance principal e ler todos os segredos do cofre. Um DAG, que é código vindo do git, teria acesso a todas as palavras-passe. Daí a NetworkPolicy que bloqueia o serviço de metadados.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-4"><label for="qx-4">O <code>terraform plan</code> diz "1 to destroy, 1 to add" na VM. O que fazes?</label></div>
+      <details><summary>Ver resposta</summary><div>Não aplico. Recriar a VM apaga o disco e os dados. Procuro o atributo que força a substituição (o plan marca-o com "forces replacement"), corrijo o <code>.tf</code> ou o <code>tfvars</code> para coincidir com a realidade, ou uso <code>ignore_changes</code>, até o plan mostrar 0 a destruir.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-5"><label for="qx-5">Um segundo projeto quer usar o mesmo Airflow. Lista o que crias e onde.</label></div>
+      <details><summary>Ver resposta</summary><div>No repositório do projeto: DAGs, Dockerfile, CI que publica a imagem. No <code>platform</code>: <code>projects/&lt;nome&gt;/k8s/…</code> (se tiver serviços), um bundle novo em <code>dag_bundle_config_list</code>, a variável com a imagem dele, os ExternalSecrets dele. No cofre: os segredos dele. No lakeFS: o seu repositório. Idealmente também uma AppProject e uma ResourceQuota.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-6"><label for="qx-6">O Argo CD mostra <code>ingest: Synced, Healthy</code> mas os pods estão em <code>ImagePullBackOff</code>. Como é possível e o que verificas?</label></div>
+      <details><summary>Ver resposta</summary><div>"Synced" quer dizer que o cluster tem o que o git diz, não que funciona. A imagem pode não existir ou ser privada. Verifico se a tag existe no GHCR e se é pública (pedido anónimo ao registo), e se o CI publicou esse SHA.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-7"><label for="qx-7">Perdeste o <code>terraform.tfstate</code>. O que acontece e como recuperas?</label></div>
+      <details><summary>Ver resposta</summary><div>Os recursos continuam a existir na Oracle, mas o Terraform deixa de saber deles; um apply tentaria criá-los de novo. Recupera-se com blocos <code>import</code> para cada recurso (VM, rede, cofre, IAM), verificando que o plan dá 0 a criar e 0 a destruir. Prevenção: backend remoto com versões.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="qx-8"><label for="qx-8">Explica a um entrevistador, em 60 segundos, a arquitetura da plataforma.</label></div>
+      <details><summary>Ver resposta</summary><div>Exemplo: "Uma plataforma de dados em k3s, em dois clusters iguais, um local e um sempre ligado na Oracle Always Free. Tudo é GitOps: um repositório público descreve o que corre em cada ambiente e o Argo CD aplica. Os projetos têm repositórios próprios; o CI testa e publica imagens arm64 com tag SHA. Os segredos estão no OCI Vault e chegam aos pods pelo External Secrets Operator, sem chave no cluster da Oracle. O acesso é só pelo Tailscale, sem portas abertas. O Airflow é partilhado: lê os DAGs do git de cada projeto e corre cada tarefa na imagem do projeto. Custa zero e o orçamento de 2 CPU e 12 GB foi medido."</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ G -->
+<section class="chapter" id="glossario">
+  <div class="chapnum">Glossário</div>
+  <h2>Termos</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Termo</th><th>Significado</th></tr>
+    <tr><td>App-of-apps</td><td>Uma aplicação do Argo CD cujo conteúdo são outras aplicações.</td></tr>
+    <tr><td>ApplicationSet</td><td>Gerador de aplicações do Argo CD a partir de um padrão (pastas, listas).</td></tr>
+    <tr><td>ClusterSecretStore</td><td>Configuração do ESO: onde está o cofre e como se autenticar.</td></tr>
+    <tr><td>DAG bundle</td><td>Origem dos ficheiros de DAG no Airflow 3 (pasta local ou repositório git).</td></tr>
+    <tr><td>DERP</td><td>Relay do Tailscale usado quando não há ligação direta.</td></tr>
+    <tr><td>ESO</td><td>External Secrets Operator: cria Secrets do Kubernetes a partir de um cofre externo.</td></tr>
+    <tr><td>ExternalSecret</td><td>Pedido ao ESO: "cria este Secret a partir deste segredo do cofre".</td></tr>
+    <tr><td>GHCR</td><td>GitHub Container Registry: o registo de imagens do GitHub.</td></tr>
+    <tr><td>Idempotente</td><td>Correr uma vez ou dez dá o mesmo resultado.</td></tr>
+    <tr><td>Import (Terraform)</td><td>Passar um recurso que já existe para a gestão do Terraform, sem o recriar.</td></tr>
+    <tr><td>Instance principal</td><td>Autenticação da Oracle em que a própria VM prova a sua identidade, sem chave.</td></tr>
+    <tr><td>KillMode=process</td><td>Configuração do systemd que, ao parar o k3s, não termina os contentores com calma.</td></tr>
+    <tr><td>pod_override</td><td>Alteração ao pod de uma tarefa do Airflow (aqui, a imagem).</td></tr>
+    <tr><td>Prune / selfHeal</td><td>Argo CD: apagar o que saiu do git / repor o que foi mudado à mão.</td></tr>
+    <tr><td>Segredo zero</td><td>A credencial que permite ler o cofre e que, por isso, não pode vir dele.</td></tr>
+    <tr><td>Security list</td><td>Firewall de uma subnet na Oracle.</td></tr>
+    <tr><td>tfstate</td><td>Ficheiro onde o Terraform guarda o que gere; contém dados sensíveis.</td></tr>
+  </table></div>
+</section>
+
+</div>
+</main>
+</div>
+
+<script>
+(function () {
+  var SCORES = [
+    ["Segurança", 5, 20], ["Fiabilidade e backups", 2, 20], ["Consistência GitOps", 5, 10],
+    ["Terraform", 6, 10], ["CI/CD e cadeia de fornecimento", 6, 10], ["Observabilidade", 1, 10],
+    ["Custo e recursos", 6, 10], ["Documentação e ADRs", 6, 5], ["Simplicidade para uma pessoa", 5, 5]
+  ];
+  var sc = document.getElementById("scorecard");
+  SCORES.forEach(function (s) {
+    var color = s[1] >= 6 ? "var(--good)" : s[1] >= 4 ? "var(--warn)" : "var(--bad)";
+    var a = document.createElement("div"); a.textContent = s[0] + " (peso " + s[2] + ")";
+    var b = document.createElement("div"); b.textContent = s[1] + "/10"; b.style.fontVariantNumeric = "tabular-nums";
+    var m = document.createElement("div"); m.className = "meter";
+    var f = document.createElement("span"); f.style.width = (s[1] * 10) + "%"; f.style.background = color; m.appendChild(f);
+    sc.appendChild(a); sc.appendChild(b); sc.appendChild(m);
+  });
+
+  var KEY = "livro-plataforma-progresso";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.q input[type=checkbox]'));
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { saved = {}; }
+  function update() {
+    var done = boxes.filter(function (b) { return b.checked; }).length;
+    document.getElementById("pdone").textContent = done;
+    document.getElementById("ptotal").textContent = boxes.length;
+    document.getElementById("pfill").style.width = (boxes.length ? (100 * done / boxes.length) : 0) + "%";
+  }
+  boxes.forEach(function (b) {
+    if (saved[b.id]) b.checked = true;
+    b.addEventListener("change", function () {
+      saved[b.id] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+      update();
+    });
+  });
+  update();
+})();
+</script>
+</body>
+</html>

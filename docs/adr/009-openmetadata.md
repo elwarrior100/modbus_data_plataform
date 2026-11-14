@@ -1,6 +1,6 @@
 # ADR-009: OpenMetadata no cluster (catálogo, linhagem, histórico dos gates)
 
-**Estado:** proposto (2026-11-11) · **Fase:** 5 · **Liga a:** ADR-005 do plano (catálogo), ADR-008 (gates)
+**Estado:** aceite e implementado (2026-11-11; desde 2026-11-14 instalado pelo Argo CD) · **Fase:** 5 · **Liga a:** decisão D5 do plano (catálogo), ADR-008 (gates)
 
 ## Contexto
 O plano exige o OpenMetadata como catálogo, linhagem e glossário, e como sítio onde fica o **histórico** dos gates

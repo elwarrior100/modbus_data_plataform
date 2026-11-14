@@ -106,30 +106,31 @@ interessante em vez de "mais um pipeline".
 
 ## 4. Decisões técnicas (registo)
 
-Cada linha vira um ADR curto em `docs/adr/`.
+Cada decisão tem um código (D1…D15) e é registada num ADR em `docs/adr/`. Os números dos ficheiros ADR são outra
+sequência (por ordem de escrita): a última coluna diz em que ADR está cada decisão.
 
-| # | Decisão | Escolha | Alternativas | Porquê |
-|---|---|---|---|---|
-| 001 | Runtime k8s | **k3s numa VM Linux (Lima)** | k3d em Docker, Pi cluster | k3s a sério, storage e rede realistas, reprodutível |
-| 002 | Object storage | **SeaweedFS** (MinIO deixou de publicar imagens; ver ADR-002) | MinIO, Ceph | API S3, Apache-2.0, leve |
-| 003 | Versionamento de dados | **lakeFS** *(requisito)* | Iceberg, Delta, nada | Branches, tags imutáveis e hooks pré-merge — é o motor dos gates e das releases |
-| 004 | Formato de tabela | **Parquet + partições Hive** | Iceberg, Delta | O lakeFS já dá atomicidade, time travel e histórico. Somar Iceberg duplicaria conceitos e triplicaria a fricção de integração |
-| 005 | Catálogo e governança | **OpenMetadata** *(requisito)* | DataHub, Amundsen | Catálogo, linhagem, glossário, testes de qualidade e profiler num só sítio |
-| 006 | Motor de qualidade | **OpenMetadata Data Quality** + hook lakeFS a impor | Soda, Great Expectations | Uma ferramenta só; resultados já aterram no catálogo, com histórico |
-| 007 | Fronteira OT/IT | **Servidor OPC UA** | Modbus TCP direto | Tipos, unidades, quality codes, subscriptions |
-| 008 | Base de dados | **PostgreSQL** *(requisito)* + TimescaleDB | ClickHouse, DuckDB servido | Backend de Airflow, lakeFS, OpenMetadata **e** serving layer. Timescale para o caminho live |
-| 009 | Transporte | **Sem broker na v1** (spool local no collector) | Redpanda/Kafka, NATS | Ver §4.1 |
-| 010 | Engine de transformação | **DuckDB** (lê via gateway S3 do lakeFS) | Spark, Polars, Trino | O volume não justifica Spark; DuckDB lê Parquet no S3 depressa e cabe em qualquer pod |
-| 011 | Orquestração | **Airflow 3, KubernetesExecutor** *(requisito)* | Dagster, Prefect | Confirmado na stack de referência; integra com lakeFS (hooks/operadores) e alimenta a linhagem do OpenMetadata |
-| 012 | Dashboard live | **Grafana** (fonte: Timescale) | app própria | Refresh curto, alerting incluído |
-| 013 | BI | **Superset** | Metabase, só Grafana | Camada semântica, exploração ad-hoc sobre gold |
-| 014 | ML tracking | **MLflow** | W&B (cloud → viola on-prem) | On-prem, registry, artefactos no SeaweedFS |
-| 015 | GitOps | **Argo CD** | Flux, kubectl à mão | Estado declarativo, drift detection |
+| # | Decisão | Escolha | Alternativas | Porquê | ADR |
+|---|---|---|---|---|---|
+| D1 | Runtime k8s | **k3s numa VM Linux (Lima)** | k3d em Docker, Pi cluster | k3s a sério, storage e rede realistas, reprodutível | [001](adr/001-runtime-kubernetes.md) |
+| D2 | Object storage | **SeaweedFS** (MinIO deixou de publicar imagens; ver ADR-002) | MinIO, Ceph | API S3, Apache-2.0, leve | [002](adr/002-armazenamento-s3.md) |
+| D3 | Versionamento de dados | **lakeFS** *(requisito)* | Iceberg, Delta, nada | Branches, tags imutáveis e hooks pré-merge — é o motor dos gates e das releases | [000](adr/000-spike-lakefs-duckdb.md), [006](adr/006-ingestao-e-bronze.md) |
+| D4 | Formato de tabela | **Parquet + partições Hive** | Iceberg, Delta | O lakeFS já dá atomicidade, time travel e histórico. Somar Iceberg duplicaria conceitos e triplicaria a fricção de integração | [000](adr/000-spike-lakefs-duckdb.md) |
+| D5 | Catálogo e governança | **OpenMetadata** *(requisito)* | DataHub, Amundsen | Catálogo, linhagem, glossário, testes de qualidade e profiler num só sítio | [009](adr/009-openmetadata.md) |
+| D6 | Motor de qualidade | **OpenMetadata Data Quality** + hook lakeFS a impor | Soda, Great Expectations | Uma ferramenta só; resultados já aterram no catálogo, com histórico | [008](adr/008-gates-e-imposicao.md) |
+| D7 | Fronteira OT/IT | **Servidor OPC UA** | Modbus TCP direto | Tipos, unidades, quality codes, subscriptions | [004](adr/004-gateway-opcua.md) |
+| D8 | Base de dados | **PostgreSQL** *(requisito)* + TimescaleDB | ClickHouse, DuckDB servido | Backend de Airflow, lakeFS, OpenMetadata **e** serving layer. Timescale para o caminho live | [006](adr/006-ingestao-e-bronze.md) |
+| D9 | Transporte | **Sem broker na v1** (spool local no collector) | Redpanda/Kafka, NATS | Ver §4.1 | [006](adr/006-ingestao-e-bronze.md) |
+| D10 | Engine de transformação | **DuckDB** (lê via gateway S3 do lakeFS) | Spark, Polars, Trino | O volume não justifica Spark; DuckDB lê Parquet no S3 depressa e cabe em qualquer pod | [000](adr/000-spike-lakefs-duckdb.md), [007](adr/007-airflow-e-silver.md) |
+| D11 | Orquestração | **Airflow 3, KubernetesExecutor** *(requisito)* | Dagster, Prefect | Confirmado na stack de referência; integra com lakeFS (hooks/operadores) e alimenta a linhagem do OpenMetadata | [007](adr/007-airflow-e-silver.md) |
+| D12 | Dashboard live | **Grafana** (fonte: Timescale) | app própria | Refresh curto, alerting incluído | (Fase 7) |
+| D13 | BI | **Superset** | Metabase, só Grafana | Camada semântica, exploração ad-hoc sobre gold | (Fase 7) |
+| D14 | ML tracking | **MLflow** | W&B (cloud → viola on-prem) | On-prem, registry, artefactos no SeaweedFS | (Fase 8) |
+| D15 | GitOps | **Argo CD** | Flux, kubectl à mão | Estado declarativo, drift detection | [005](adr/005-gitops-argocd.md), [010](adr/010-repos-gitops.md), [012](adr/012-promocao-entre-ambientes.md) |
 
 > **Regra:** antes de escrever o ADR, o Stéphane defende a escolha em duas frases. Se não
 > conseguir defender, não está pronto para decidir — investiga primeiro.
 
-### 4.1 Nota sobre o broker (ADR-009)
+### 4.1 Nota sobre o broker (decisão D9, ADR-006)
 
 A lista de serviços do projeto de referência não inclui broker, e o OpenMetadata traz
 consigo um custo de memória considerável (servidor + índice de pesquisa). Somar Kafka na v1
@@ -361,9 +362,10 @@ ausência de leakage nas features point-in-time; as previsões aparecem no dashb
 retrain a partir da tag registada reproduz as métricas.
 
 ### Fase 9 — Hardening e produto final
-Prometheus/Loki, alerting, CI (lint, testes, build de imagens), Argo CD, secrets (SOPS ou
-sealed-secrets), backups (versioning SeaweedFS + dump Postgres + garbage collection do lakeFS),
-README com arquitetura e demo, bootstrap de raiz. Broker (ADR-009) se o gatilho se verificar.
+Prometheus/Loki, alerting, ~~CI~~ (feito: testes, Trivy, SBOM, imagens no GHCR), ~~Argo CD~~ (feito), ~~secrets~~ (feito:
+OCI Vault + External Secrets Operator, ADR-011), backups (feito em parte: dump diário do Postgres para Object Storage e
+backup semanal do disco, ADR-013; falta o versionamento do SeaweedFS e a garbage collection do lakeFS),
+README com arquitetura e demo, bootstrap de raiz. Broker (decisão D9) se o gatilho se verificar.
 **DoD:** destruir a VM e reconstruir tudo a partir do repo em <30 min, sem passos manuais
 não documentados.
 
@@ -373,7 +375,7 @@ não documentados.
 
 Desde 2026 o Ampere A1 gratuito da Oracle baixou de 4 OCPU / 24 GB para **2 OCPU / 12 GB / 200 GB de disco no total
 da conta**. O desenvolvimento continua local (VM Lima, 8 CPU / 16 GB) e migra-se para a Oracle quando estabilizar
-(Terraform em `platform/terraform/oracle/`). Por isso o orçamento passa a ser o da Oracle.
+(Terraform em `terraform/oracle/` do repositório [platform](https://github.com/elwarrior100/platform)). Por isso o orçamento passa a ser o da Oracle.
 
 **Medido em 2026-11-11** (VM local, núcleo + OpenMetadata a correr): ~6 GB de RAM usados, dos quais o OpenMetadata
 ~2,6 GB (OpenSearch 1,6 + servidor 1,0); dados em disco pequenos (SeaweedFS 83 MB, Postgres 357 MB; as imagens dos
@@ -540,6 +542,5 @@ que for de k3s.
 ---
 
 ### O que eu faço enquanto fazes isto
-Não escrevo nada disto. Quando encalhares num dos 9 pontos, traz-me o erro e os ficheiros —
-eu digo-te onde olhar e porquê, e faço-te perguntas até perceberes o modelo do lakeFS a
-sério. Quando o ADR-000 estiver escrito, critico-o.
+*(Texto histórico da Fase 0, de quando a regra era o Stéphane escrever o código. Desde 2026-10-24 o Claude escreve o
+código e explica-o; ver CLAUDE.md.)*

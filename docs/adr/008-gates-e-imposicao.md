@@ -87,3 +87,16 @@ voltou a ficar ilegível. Duas causas distintas:
 - **`vm-stop.sh` + `vm-start.sh` testados:** drain de 2 min 38 s, VM parada, arranque em 70 s, todos os pods `Running`,
   kernel 7.0.0-38, reconciliação OK (545 540 amostras, 0 em falta/a mais/duplicadas). O writer falha 1–2 vezes enquanto o
   lakeFS arranca e recupera sozinho.
+
+
+## Limites do lakeFS open source descobertos em 2026-11-14
+
+- **O `main` está protegido** (regra de branch do lakeFS): não aceita escritas nem commits diretos, só merges. O
+  instalador dos hooks passou a fazer commit num branch temporário e merge.
+- **Só existe um utilizador.** Com autenticação básica, o lakeFS open source só admite o admin (mais utilizadores exigem
+  o servidor ACL à parte): as aplicações continuam com a chave de administrador. Testado: criar `app-writer` dá
+  "Already exists" e o utilizador não aparece.
+- **Um hook não sabe quem faz o commit.** O objeto `action` de um `pre-commit` traz o branch, a mensagem e os
+  metadados, mas nenhum utilizador. Por isso a exceção `gates_installer=true` não pode ser ligada a uma identidade.
+- **Consequência honesta:** o gate impede acidentes e escritas por fora do pipeline, mas não impede quem tenha a chave
+  de administrador. Fechar isto exige o servidor ACL do lakeFS (ou a versão Enterprise), com uma chave por aplicação.
