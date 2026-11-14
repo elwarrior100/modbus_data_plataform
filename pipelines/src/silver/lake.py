@@ -29,6 +29,17 @@ class Lake:
     def list(self, ref: str, prefix: str) -> list[str]:
         return sorted(o.path for o in self.repo.ref(ref).objects(prefix=prefix))
 
+    def partitions(self, ref: str, prefix: str) -> "list[str]":
+        """Os "diretórios" logo abaixo de `prefix` (ex.: bronze/dt=2026-11-14/), sem listar os ficheiros."""
+        return sorted(o.path for o in self.repo.ref(ref).objects(prefix=prefix, delimiter="/")
+                      if o.path.endswith("/"))
+
+    def delete(self, branch: str, paths: "list[str]") -> None:
+        """Apaga (no branch, por commitar) estes objetos, aos 1000 de cada vez (o limite da API)."""
+        b = self.repo.branch(branch)
+        for i in range(0, len(paths), 1000):
+            b.delete_objects(paths[i:i + 1000])
+
     def read(self, ref: str, path: str) -> bytes:
         return self.repo.ref(ref).object(path).reader(mode="rb").read()
 

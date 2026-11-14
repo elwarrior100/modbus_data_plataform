@@ -14,10 +14,21 @@ class FakeLake:
 
     def _view(self, ref):
         b = self.branches[ref]
-        return {**b["committed"], **b["staged"]}
+        return {p: d for p, d in {**b["committed"], **b["staged"]}.items() if d is not None}
 
     def list(self, ref, prefix):
         return sorted(p for p in self._view(ref) if p.startswith(prefix))
+
+    def partitions(self, ref, prefix):
+        out = set()
+        for p in self._view(ref):
+            if p.startswith(prefix) and "/" in p[len(prefix):]:
+                out.add(prefix + p[len(prefix):].split("/")[0] + "/")
+        return sorted(out)
+
+    def delete(self, branch, paths):
+        for p in paths:
+            self.branches[branch]["staged"][p] = None          # None = apagado (por commitar)
 
     def read(self, ref, path):
         return self._view(ref)[path]
@@ -34,6 +45,9 @@ class FakeLake:
         changed = {p: d for p, d in b["staged"].items() if b["committed"].get(p) != d}
         b["staged"] = {}
         b["committed"].update(changed)
+        for p in [p for p, d in b["committed"].items() if d is None]:
+            del b["committed"][p]
+            b.setdefault("deleted", set()).add(p)               # lembrado para o merge (como um merge a 3)
         if changed:
             self.commits[branch] += 1
         return bool(changed)
@@ -41,7 +55,11 @@ class FakeLake:
     def merge(self, branch, into, message):
         src, dst = self.branches[branch]["committed"], self.branches[into]["committed"]
         changed = {p: d for p, d in src.items() if dst.get(p) != d}
+        gone = [p for p in self.branches[branch].get("deleted", ()) if p in dst]   # só o que o branch apagou
         dst.update(changed)
+        for p in gone:
+            del dst[p]
+        changed.update(dict.fromkeys(gone))
         if changed:
             self.commits[into] += 1
         return bool(changed)

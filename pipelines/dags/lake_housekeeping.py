@@ -1,6 +1,8 @@
-"""Limpeza diária dos branches de trabalho do lakeFS (política em silver/retention.py e ADR-007).
+"""Limpeza diária do lake (políticas em silver/retention.py; ADR-007 e ADR-015).
 
-Começa em simulação: com `APPLY = False` só regista o que apagaria. Passa a True depois de rever o relatório."""
+- prune_branches: branches de trabalho velhos. Em simulação (`APPLY = False`): só regista o que apagaria.
+- expire_bronze: bronze crua com mais de 15 dias sai do main (decisão de 2026-11-14). Aplicada (`BRONZE_APPLY`).
+  A silver e as atestações dos gates ficam para sempre."""
 from datetime import datetime, timezone
 
 from airflow.sdk import DAG, task
@@ -15,6 +17,7 @@ _IMAGE = os.environ.get("MODBUS_PIPELINES_IMAGE")
 PROJECT_IMAGE = {"pod_override": k8s.V1Pod(spec=k8s.V1PodSpec(containers=[k8s.V1Container(name="base", image=_IMAGE)]))} if _IMAGE else {}
 
 APPLY = False
+BRONZE_APPLY = True
 
 with DAG("lake_housekeeping", start_date=datetime(2026, 11, 9, tzinfo=timezone.utc), schedule="30 3 * * *",
          catchup=False, tags=["manutenção"]):
@@ -31,4 +34,19 @@ with DAG("lake_housekeeping", start_date=datetime(2026, 11, 9, tzinfo=timezone.u
         return {"deleted": len(report.delete), "applied": APPLY, "keep_merged": report.keep_merged,
                 "keep_unmerged": report.keep_unmerged, "ignored": report.ignored}
 
+    @task(executor_config=PROJECT_IMAGE)
+    def expire_bronze() -> dict:
+        from datetime import datetime, timezone
+
+        from silver.lake import Lake
+        from silver.retention import KEEP_BRONZE_DAYS, expire_bronze
+
+        today = datetime.now(timezone.utc).date()
+        report = expire_bronze(Lake.from_env(), today, dry_run=not BRONZE_APPLY)
+        print(f"bronze ({KEEP_BRONZE_DAYS} dias): {'saíram' if BRONZE_APPLY else 'sairiam'} {len(report.expired)} dias, "
+              f"{report.objects} objetos {report.expired[:5]}; ficam {report.kept} dias; merge: {report.merged}")
+        return {"expired": report.expired, "objects": report.objects, "kept": report.kept,
+                "merged": report.merged, "applied": BRONZE_APPLY}
+
     prune_branches()
+    expire_bronze()
