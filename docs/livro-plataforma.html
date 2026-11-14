@@ -156,6 +156,13 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
     <li><a href="#monitorizacao"><span class="n">13c</span>Monitorização e alarmes</a></li>
     <li><a href="#runbook"><span class="n">14</span>Runbook: cluster do zero</a></li>
     <li><a href="#exame"><span class="n">15</span>Exame final</a></li>
+    <li class="part">Parte VI · Rumo a expert</li>
+    <li><a href="#egress"><span class="n">16</span>Regras de rede na prática</a></li>
+    <li><a href="#fundamentos"><span class="n">17</span>Fundamentos de engenharia de dados</a></li>
+    <li><a href="#qualidade"><span class="n">18</span>Qualidade e observabilidade de dados</a></li>
+    <li><a href="#orquestracao"><span class="n">19</span>Orquestração e governança</a></li>
+    <li><a href="#plataforma-a-fundo"><span class="n">20</span>Plataforma e segurança a fundo</a></li>
+    <li><a href="#roteiro"><span class="n">21</span>Roteiro para expert</a></li>
     <li><a href="#glossario"><span class="n">G</span>Glossário</a></li>
   </ol>
   <div class="progress" aria-live="polite">
@@ -170,7 +177,7 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
 <header class="cover">
   <div class="eyebrow">Livro de estudo · plataforma · atualizado 2026-11-14 (depois da crítica)</div>
   <h1>Livro da Plataforma de Dados</h1>
-  <p>Como foi construída a plataforma que corre o projeto Modbus, explicada como se a fosses construir tu, do zero. Cada capítulo diz o objetivo, explica as peças, mostra um diagrama, conta como foi feito na realidade (incluindo o que correu mal) e termina com perguntas para verificares que percebeste.</p>
+  <p>Como foi construída a plataforma que corre o projeto Modbus, explicada como se a fosses construir tu, do zero, e (na Parte VI) os fundamentos para seres expert em engenharia de dados em todos estes temas. Cada capítulo diz o objetivo, explica as peças, mostra um diagrama, conta como foi feito na realidade (incluindo o que correu mal) e termina com perguntas para verificares que percebeste.</p>
   <p>Repositórios: <a href="https://github.com/elwarrior100/platform">elwarrior100/platform</a> (a plataforma) e <a href="https://github.com/elwarrior100/modbus_data_plataform">elwarrior100/modbus_data_plataform</a> (o primeiro projeto).</p>
 </header>
 
@@ -952,6 +959,282 @@ quality/  docs/  tests/
   </div>
 </section>
 
+<!-- ============================================================ 16 -->
+<section class="chapter" id="egress">
+  <div class="chapnum">Capítulo 16 · Parte VI · Rumo a expert</div>
+  <h2>Regras de rede na prática (ingress e egress)</h2>
+  <div class="goal"><b>Objetivo:</b> saber ler, testar, alterar e depurar as NetworkPolicies desta plataforma, sozinho.</div>
+  <p>Uma <strong>NetworkPolicy</strong> diz que tráfego um pod pode <em>receber</em> (ingress) e <em>enviar</em> (egress). Por omissão o Kubernetes deixa tudo passar; assim que uma política <em>seleciona</em> um pod numa direção, só passa o que essa política (ou outra que também o selecione) permite. As políticas <strong>somam-se</strong>: não há "deny" explícito, há "nada foi permitido".</p>
+  <figure>
+    <div class="figwrap">
+    <svg viewBox="0 0 860 250" role="img" aria-label="ingest só pode falar com o gateway OPC UA, o Postgres e o lakeFS; o Postgres só aceita os namespaces que o usam; a internet está fechada.">
+      <defs><marker id="ar9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <rect class="box" x="20" y="90" width="150" height="60" rx="8"/><text class="t" x="34" y="116">ingest</text><text class="s" x="34" y="134">collector, writer</text>
+      <rect class="box" x="300" y="20" width="160" height="50" rx="8"/><text class="t" x="314" y="50">ot (OPC UA 4840)</text>
+      <rect class="boxa" x="300" y="100" width="160" height="50" rx="8"/><text class="t a" x="314" y="130">data: Postgres 5432</text>
+      <rect class="boxa" x="300" y="180" width="160" height="50" rx="8"/><text class="t a" x="314" y="210">data: lakeFS 8000</text>
+      <rect class="boxw" x="640" y="90" width="190" height="60" rx="8"/><text class="t" x="654" y="116">internet / github</text><text class="s" x="654" y="134">fora da lista: recusado</text>
+      <line class="lna" x1="170" y1="110" x2="296" y2="48" marker-end="url(#ar9)"/>
+      <line class="lna" x1="170" y1="120" x2="296" y2="125" marker-end="url(#ar9)"/>
+      <line class="lna" x1="170" y1="132" x2="296" y2="203" marker-end="url(#ar9)"/>
+      <line class="ln dash" x1="460" y1="120" x2="636" y2="120"/><text class="s" x="520" y="112">✕ egress</text>
+      <text class="s" x="480" y="160">o Postgres também só aceita</text><text class="s" x="480" y="176">ingest, airflow, openmetadata,</text><text class="s" x="480" y="192">backup e o lakeFS (ingress)</text>
+    </svg>
+    </div>
+    <figcaption>Duas fechaduras: a saída do ingest (egress) e a entrada do Postgres (ingress). As duas têm de deixar.</figcaption>
+  </figure>
+  <h3>O que está em vigor</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Namespace</th><th>Saída (egress)</th><th>Entrada (ingress)</th></tr>
+    <tr><td><code>data</code></td><td>só entre os próprios pods + DNS</td><td>Postgres: lakeFS, ingest, airflow, openmetadata, backup. lakeFS: ingest, airflow, ops. SeaweedFS: lakeFS e a cópia do lake</td></tr>
+    <tr><td><code>ingest</code></td><td>ot:4840, data:5432/8000, DNS</td><td>livre</td></tr>
+    <tr><td><code>ot</code></td><td>só DNS</td><td>livre</td></tr>
+    <tr><td><code>openmetadata</code></td><td>próprio namespace, data:5432, API do Kubernetes</td><td>livre</td></tr>
+    <tr><td><code>backup</code> / <code>ops</code></td><td>DNS, data, metadados (169.254.169.254:80), APIs da OCI (443)</td><td>livre</td></tr>
+    <tr><td><code>airflow</code>, <code>argocd</code>, <code>monitoring</code></td><td>tudo menos os metadados (precisam do GitHub e de repositórios)</td><td>livre</td></tr>
+  </table></div>
+  <p>Ficheiros: <code>platform/k8s/network-policies/</code>, <code>platform/k8s/seaweedfs/networkpolicy.yaml</code>, <code>envs/oracle/backup/networkpolicy.yaml</code>, <code>envs/oracle/ops/networkpolicy.yaml</code>.</p>
+  <h3>Testar uma ligação (o comando que vais usar mais)</h3>
+  <p>Cria um pod descartável no namespace de <em>origem</em> e tenta ligar ao destino. O pod tem de cumprir o Pod Security <code>baseline</code>; com o <code>securityContext</code> abaixo cumpre até o <code>restricted</code>.</p>
+  <pre><code># de onde?  (troca "ingest" pelo namespace de origem)
+kubectl -n ingest run nettest --rm -it --restart=Never --image=busybox:1.37 \
+  --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":1000,"seccompProfile":{"type":"RuntimeDefault"}},
+  "containers":[{"name":"t","image":"busybox:1.37","stdin":true,"tty":true,
+  "securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' -- sh
+
+# dentro do pod:
+sleep 5                                               # as regras chegam a um pod novo uns segundos depois
+nc -z -w 3 postgres.data.svc.cluster.local 5432 && echo aberto || echo recusado
+nc -z -w 3 lakefs.data.svc.cluster.local 8000   && echo aberto || echo recusado
+nc -z -w 3 github.com 443                       && echo aberto || echo recusado   # deve dar recusado</code></pre>
+  <h3>Juntar uma regra (exemplo real)</h3>
+  <p>Imagina que o writer passa a enviar métricas para o Prometheus (porta 9090, namespace <code>monitoring</code>). Em <code>platform/k8s/network-policies/egress-allowlists.yaml</code>, na política do <code>ingest</code>, junta:</p>
+  <pre><code>    - to:   # Prometheus (o writer envia métricas)
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+      ports: [{port: 9090, protocol: TCP}]</code></pre>
+  <p>Commit no <code>main</code> → o Argo CD aplica no Mac → testas com o pod acima → <code>./scripts/promote-oracle.sh</code>. Se o destino também tiver uma regra de entrada, tens de abrir lá também (as duas fechaduras).</p>
+  <h3>Depurar quando algo deixou de ligar</h3>
+  <ol class="steps">
+    <li><strong>É rede ou é a aplicação?</strong> "Connection refused" ou "timeout" logo no primeiro segundo de um pod novo é o atraso do kube-router (repete). Se persiste, é regra.</li>
+    <li><strong>Que políticas selecionam a origem e o destino?</strong> <code>kubectl get networkpolicy -n &lt;ns&gt;</code> e <code>kubectl describe networkpolicy -n &lt;ns&gt; &lt;nome&gt;</code>.</li>
+    <li><strong>Testa as duas pontas</strong> com o pod de teste: da origem para o destino, e de outro namespace autorizado (para saber se é a saída ou a entrada).</li>
+    <li><strong>Etiquetas certas?</strong> As regras usam <code>kubernetes.io/metadata.name</code> (o nome do namespace) e <code>app</code> dos pods: <code>kubectl get pods --show-labels</code>.</li>
+  </ol>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 16</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q16-1"><label for="q16-1">Um pod no <code>ot</code> tenta ligar ao Postgres. Quantas regras o impedem, e quais?</label></div>
+      <details><summary>Ver resposta</summary><div>Duas: a saída do <code>ot</code> só permite DNS (egress-allowlist) e a entrada do Postgres só aceita lakeFS, ingest, airflow, openmetadata e backup (postgres-clients).</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q16-2"><label for="q16-2">Porque é que o <code>airflow</code> não tem uma lista de saída fechada como o <code>ingest</code>?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque precisa da internet: o dag-processor e cada tarefa clonam o DAG bundle do GitHub. Fica com tudo aberto exceto o endereço de metadados, que daria acesso ao cofre.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q16-3"><label for="q16-3">O backup falhou com 'Connection refused' mas um teste manual passou. Qual era a causa?</label></div>
+      <details><summary>Ver resposta</summary><div>O kube-router junta o IP de um pod novo às listas de origem permitidas uns segundos depois de ele arrancar. O pg_dump tentava logo no primeiro segundo; o teste esperava. A correção foi esperar pelo pg_isready.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q16-4"><label for="q16-4">Uma regra nova de saída no <code>ingest</code> não chega para o writer falar com um serviço no <code>data</code>. Porquê?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque o destino pode ter uma regra de entrada (ingress) que não inclui o <code>ingest</code>. É preciso abrir as duas fechaduras.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 17 -->
+<section class="chapter" id="fundamentos">
+  <div class="chapnum">Capítulo 17 · Parte VI · Rumo a expert</div>
+  <h2>Fundamentos de engenharia de dados (com este projeto como exemplo)</h2>
+  <div class="goal"><b>Objetivo:</b> dominar os conceitos que aparecem em qualquer equipa ou entrevista de dados, ligados ao que construíste.</div>
+  <div class="tablewrap"><table>
+    <tr><th>Conceito</th><th>O que é</th><th>Onde está no projeto</th></tr>
+    <tr><td><b>OLTP vs OLAP</b></td><td>Sistemas de operações (muitas escritas pequenas) vs sistemas de análise (leituras grandes por colunas)</td><td>O spool no Postgres é OLTP; o lake em Parquet é OLAP</td></tr>
+    <tr><td><b>Lake, warehouse, lakehouse</b></td><td>Ficheiros baratos em object storage; base analítica gerida; ficheiros abertos com garantias de base de dados (versões, atomicidade)</td><td>SeaweedFS + Parquet + lakeFS = lakehouse</td></tr>
+    <tr><td><b>Arquitetura medalhão</b></td><td>Bronze (bruto, imutável), silver (limpo, tipado), gold (pronto para o negócio)</td><td>Bronze pelo writer, silver pelo Airflow, gold na Fase 6</td></tr>
+    <tr><td><b>ETL vs ELT</b></td><td>Transformar antes ou depois de carregar</td><td>ELT: o bronze guarda o bruto e a silver transforma depois (reprocessável)</td></tr>
+    <tr><td><b>Idempotência</b></td><td>Correr uma vez ou várias dá o mesmo resultado</td><td>run_hour: branch, transformação determinística, merge "já feito" = sucesso</td></tr>
+    <tr><td><b>Write-Audit-Publish</b></td><td>Escrever isolado, validar, só então publicar</td><td>Branch lakeFS → G2 → merge para o main (com o hook a impor)</td></tr>
+    <tr><td><b>Backfill e catch-up</b></td><td>Reprocessar o passado</td><td>catchup=True no silver_hourly; em série</td></tr>
+    <tr><td><b>Dados atrasados</b></td><td>Eventos que chegam depois da janela</td><td>Partição por hora de receção (ingest_ts) e flag <code>late</code></td></tr>
+    <tr><td><b>Semântica de entrega</b></td><td>at-most-once, at-least-once, exactly-once</td><td>at-least-once com deduplicação por event_id = exactly-once efetivo</td></tr>
+    <tr><td><b>Evolução de esquema</b></td><td>Mudar colunas sem partir quem lê</td><td>Contratos do bronze/silver e o catálogo de tags</td></tr>
+  </table></div>
+  <h3>Formatos e particionamento</h3>
+  <ul>
+    <li><b>Parquet</b> é colunar: guarda cada coluna junta, comprimida, em <em>row groups</em> com estatísticas (min/max). Quem lê só uma coluna, ou filtra por valor, salta o resto (<em>predicate pushdown</em>). Por isso o DuckDB lê uma hora em milissegundos.</li>
+    <li><b>Particionar</b> é dividir em pastas (<code>dt=…/hour=…</code>) para ler só o que interessa. Demasiadas partições pequenas é tão mau como poucas grandes (o problema dos "small files").</li>
+    <li><b>Formatos de tabela</b> (Iceberg, Delta) juntam ao Parquet transações, versões e evolução de esquema dentro dos metadados da tabela. Aqui o lakeFS dá versões ao repositório inteiro; numa equipa maior, Iceberg é o padrão a conhecer.</li>
+  </ul>
+  <h3>Modelação para o gold (o próximo passo)</h3>
+  <ul>
+    <li><b>Modelo dimensional</b> (Kimball): tabelas de <em>factos</em> (medições, eventos) e de <em>dimensões</em> (ativo, tag, tempo).</li>
+    <li><b>SCD tipo 2</b>: guardar a história de uma dimensão (o PUMP-01 mudou de linha de produção em março) com <code>valid_from</code>/<code>valid_to</code>.</li>
+    <li><b>Agregados</b>: médias horárias, OEE, tempos de paragem. São o produto que os dashboards e o ML consomem.</li>
+  </ul>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 17</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q17-1"><label for="q17-1">Porque é que o bronze guarda o valor bruto (texto) em vez do número já convertido?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque o bronze é a prova do que chegou. Se a conversão tiver um bug, reprocessa-se a silver a partir do bronze; se o bronze já estivesse convertido, o erro seria irreversível (ELT, não ETL).</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q17-2"><label for="q17-2">Como é que o projeto consegue 'exactly-once' com um transporte que é 'at-least-once'?</label></div>
+      <details><summary>Ver resposta</summary><div>O collector pode reenviar, mas cada evento tem um event_id determinístico e o spool e a silver deduplicam por ele. Reenvios não criam duplicados.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q17-3"><label for="q17-3">Porque é que o Parquet é bom para análise e mau para escritas pequenas?</label></div>
+      <details><summary>Ver resposta</summary><div>Por ser colunar e comprimido por blocos: ler colunas e filtrar é rápido, mas mudar uma linha obriga a reescrever o ficheiro. Por isso o spool (escritas pequenas) está no Postgres e o lake em Parquet.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q17-4"><label for="q17-4">O que acontece se particionares por minuto em vez de por hora?</label></div>
+      <details><summary>Ver resposta</summary><div>60 vezes mais ficheiros, cada um muito pequeno: mais metadados, mais pedidos ao S3, pior compressão e leituras mais lentas (o problema dos small files).</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 18 -->
+<section class="chapter" id="qualidade">
+  <div class="chapnum">Capítulo 18 · Parte VI · Rumo a expert</div>
+  <h2>Qualidade, contratos e observabilidade de dados</h2>
+  <div class="goal"><b>Objetivo:</b> saber desenhar a qualidade de dados como um sistema: contratos, testes, gates, SLOs e alertas.</div>
+  <h3>As seis dimensões de qualidade (e onde as medimos)</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Dimensão</th><th>Pergunta</th><th>No projeto</th></tr>
+    <tr><td>Completude</td><td>Chegou tudo?</td><td>G2-01 (minutos com dados por ativo)</td></tr>
+    <tr><td>Unicidade</td><td>Há duplicados?</td><td>G2-02 (event_id repetido)</td></tr>
+    <tr><td>Validade</td><td>Os valores fazem sentido?</td><td>G2-03 (fora do intervalo), G1 (esquema)</td></tr>
+    <tr><td>Exatidão</td><td>Corresponde à realidade?</td><td>G2-04 (qualidade OPC UA), G2-07 (relógio)</td></tr>
+    <tr><td>Frescura</td><td>Chegou a tempo?</td><td>G2-05 e o alarme <code>silver_fresh</code></td></tr>
+    <tr><td>Consistência</td><td>Bate certo entre sistemas?</td><td>Reconciliação spool ↔ lakeFS (0 em falta, 0 duplicados)</td></tr>
+  </table></div>
+  <h3>Contratos de dados</h3>
+  <p>Um <b>contrato</b> é um acordo escrito entre quem produz e quem consome: esquema, significado, limites, frescura esperada e o que acontece quando falha. Aqui: <code>docs/silver-contract.md</code> e <code>docs/gates-contract.md</code>. O gate transforma o contrato em código; o hook transforma o código em regra.</p>
+  <h3>SLI, SLO, SLA e orçamento de erro</h3>
+  <ul>
+    <li><b>SLI</b> (indicador): uma medida, por ex. "% de horas com silver publicada até às :20".</li>
+    <li><b>SLO</b> (objetivo): o valor que te comprometes a cumprir, por ex. "99 % por mês".</li>
+    <li><b>SLA</b>: o compromisso com consequências para um cliente. Raramente se aplica a um projeto pessoal.</li>
+    <li><b>Orçamento de erro</b>: 1 % de 720 horas = ~7 horas por mês que podem falhar. Gasto o orçamento, param-se as mudanças arriscadas.</li>
+  </ul>
+  <h3>Observabilidade: plataforma vs dados</h3>
+  <ul>
+    <li><b>Plataforma</b> (métodos USE e RED): utilização, saturação e erros dos recursos; taxa, erros e duração dos pedidos. É o Prometheus/Grafana.</li>
+    <li><b>Dados</b>: frescura, volume, esquema, distribuição, linhagem. É o G2, o alarme de frescura e, a seguir, o histórico no OpenMetadata.</li>
+    <li><b>Dead man's switch</b>: alarmes que disparam quando um sinal esperado <em>não</em> chega (backup, cópia do lake, silver). Apanham também o que nem chegou a correr.</li>
+    <li><b>Fadiga de alertas</b>: cada alerta tem de pedir uma ação. Um alerta que se ignora é pior do que nenhum.</li>
+  </ul>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 18</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q18-1"><label for="q18-1">Define um SLO razoável para a silver deste projeto e o orçamento de erro mensal.</label></div>
+      <details><summary>Ver resposta</summary><div>Por exemplo: 'a silver de cada hora está no main até às :30 da hora seguinte em 98 % das horas por mês'. Em 720 horas, o orçamento é ~14 horas falhadas por mês.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q18-2"><label for="q18-2">Porque é que um gate deve bloquear e não corrigir?</label></div>
+      <details><summary>Ver resposta</summary><div>Corrigir esconde o problema e muda dados sem rasto. Bloquear torna o problema visível, guarda o branch para autópsia e deixa a decisão a quem conhece o contexto.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q18-3"><label for="q18-3">Qual é a diferença entre o alarme da CPU e o alarme de frescura da silver?</label></div>
+      <details><summary>Ver resposta</summary><div>O da CPU é observabilidade da plataforma (um recurso a saturar). O de frescura é observabilidade dos dados (o produto deixou de ser entregue), mesmo com a plataforma 'verde'.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 19 -->
+<section class="chapter" id="orquestracao">
+  <div class="chapnum">Capítulo 19 · Parte VI · Rumo a expert</div>
+  <h2>Orquestração e governança a fundo</h2>
+  <div class="goal"><b>Objetivo:</b> perceber os padrões de orquestração e de governança que separam um júnior de um sénior.</div>
+  <h3>Orquestração</h3>
+  <ul>
+    <li><b>Tarefas idempotentes e atómicas</b>: cada tarefa ou faz tudo ou não faz nada visível (aqui, o merge é o momento atómico).</li>
+    <li><b>Retries com cabeça</b>: repetir erros transitórios (rede), não repetir erros determinísticos (o G2 usa <code>AirflowFailException</code>).</li>
+    <li><b>Agendamento por intervalo de dados</b>: a corrida das 10:10 trata a hora 09 (a hora fechada), não "agora".</li>
+    <li><b>Agendamento por dados</b> (assets/datasets no Airflow 3): uma DAG corre quando outra produz um dado, em vez de a uma hora fixa. É o caminho natural para o gold.</li>
+    <li><b>Executores</b>: KubernetesExecutor (um pod por tarefa, isolamento e imagens por projeto) vs Celery (workers sempre ligados, menos latência).</li>
+    <li><b>Ferramentas vizinhas</b>: dbt (transformações SQL testadas e documentadas), Dagster (orientado a assets). Saber quando cada uma ajuda conta numa entrevista.</li>
+  </ul>
+  <h3>Governança</h3>
+  <ul>
+    <li><b>Catálogo</b>: onde estão os dados, o que significam, quem é dono (OpenMetadata).</li>
+    <li><b>Linhagem</b>: de onde vem cada coluna (OPC UA → bronze → silver → gold). O padrão aberto é o <b>OpenLineage</b>, que o Airflow emite.</li>
+    <li><b>Glossário</b>: os termos do negócio (OEE, paragem, ativo) ligados às colunas.</li>
+    <li><b>Dados pessoais e RGPD</b>: identificar, minimizar, mascarar, apagar a pedido. Aqui não há dados pessoais, mas numa empresa é o primeiro tema da governança.</li>
+    <li><b>Retenção</b>: quanto tempo se guarda cada camada e porquê (branches com 7/30 dias, dumps com 14 dias).</li>
+  </ul>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 19</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q19-1"><label for="q19-1">Porque é que o G2 falhado não tem retries, mas um erro de rede tem?</label></div>
+      <details><summary>Ver resposta</summary><div>Repetir não muda o resultado de um gate: os dados são os mesmos. Um erro de rede é transitório e pode passar na tentativa seguinte.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q19-2"><label for="q19-2">Como passarias o gold de 'agendado à hora' para 'agendado por dados'?</label></div>
+      <details><summary>Ver resposta</summary><div>Declarando a silver de cada hora como um asset que o silver_hourly produz, e fazendo a DAG do gold depender desse asset. O Airflow corre o gold quando a silver é publicada.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q19-3"><label for="q19-3">O que dá a linhagem numa investigação de um número errado num dashboard?</label></div>
+      <details><summary>Ver resposta</summary><div>Mostra o caminho inverso do número até à fonte: que tabelas, que transformações e que corridas o produziram. Permite encontrar a hora e o passo onde o erro entrou.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 20 -->
+<section class="chapter" id="plataforma-a-fundo">
+  <div class="chapnum">Capítulo 20 · Parte VI · Rumo a expert</div>
+  <h2>Engenharia de plataforma e segurança a fundo</h2>
+  <div class="goal"><b>Objetivo:</b> conhecer os princípios por trás de cada escolha, para os aplicares a qualquer plataforma.</div>
+  <h3>Fiabilidade</h3>
+  <ul>
+    <li><b>RPO e RTO</b>: quanto se pode perder (RPO) e quanto tempo se pode estar parado (RTO). Aqui: RPO ≈ 1 dia para a base (dump diário), ≈ 1 dia para os objetos (cópia noturna), RTO ≈ horas (reconstruir a VM e restaurar).</li>
+    <li><b>Regra 3-2-1</b>: 3 cópias, 2 meios diferentes, 1 fora do sítio. A plataforma tem a cópia viva, o Object Storage e o backup do disco, mas tudo na mesma conta e região. O passo seguinte seria uma cópia noutra região.</li>
+    <li><b>Um backup só existe se o restauro foi testado</b>: o <code>pg-restore-test.sh</code> e o <code>_COMPLETE</code>.</li>
+    <li><b>Encerramento gracioso e prioridades</b>: o que corre quando a máquina para ou falta memória (capítulos 2 e 13b).</li>
+  </ul>
+  <h3>Segurança em camadas (defesa em profundidade)</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Camada</th><th>Controlo nesta plataforma</th></tr>
+    <tr><td>Rede externa</td><td>Nenhuma porta aberta; acesso só pelo Tailscale</td></tr>
+    <tr><td>Identidade e segredos</td><td>Cofre OCI, ESO, instance principal, IAM de privilégio mínimo, palavras-passe por ambiente</td></tr>
+    <tr><td>Admissão</td><td>Sem hostNetwork, privileged, hostPID/IPC, hostPath; ExternalSecrets só com o próprio prefixo; Pod Security baseline</td></tr>
+    <tr><td>Rede interna</td><td>Bloqueio dos metadados; listas de saída; entrada no Postgres/lakeFS/SeaweedFS só para quem usa</td></tr>
+    <tr><td>Dados</td><td>main protegido no lakeFS; gate G2 com hook; backups que a VM não pode apagar nem sobrescrever</td></tr>
+    <tr><td>Cadeia de fornecimento</td><td>Actions e imagens fixas por SHA/digest, Trivy, SBOM, proveniência, Dependabot</td></tr>
+  </table></div>
+  <p><b>Raio de explosão</b> (blast radius): pergunta sempre "se este pod for comprometido, o que é que o atacante consegue?". Foi assim que se encontrou o namespace <code>backup</code> com credenciais a mais.</p>
+  <p><b>Modelação de ameaças simples</b> (STRIDE): para cada peça, pensa em falsificação de identidade, adulteração, repúdio, fuga de informação, negação de serviço e elevação de privilégios.</p>
+  <h3>FinOps</h3>
+  <p>Custo como requisito: medir antes de comprar (o orçamento de 12 GB foi medido), alertas de orçamento, limites de tamanho, e execução em série num nó pequeno. Em cloud paga, o mesmo raciocínio corta faturas.</p>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 20</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q20-1"><label for="q20-1">Qual é o RPO e o RTO atuais desta plataforma, e o que os melhoraria?</label></div>
+      <details><summary>Ver resposta</summary><div>RPO ≈ 1 dia (dump e cópia noturnos) e RTO ≈ horas (reconstruir e restaurar). Melhoram com dumps mais frequentes (ou WAL archiving para RPO de minutos) e com uma reconstrução automatizada e ensaiada.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q20-2"><label for="q20-2">Porque é que a VM pode criar backups mas não apagá-los?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque um atacante (ou um bug) com a identidade da VM poderia apagar os backups antes de estragar os dados. Separar quem escreve de quem apaga protege contra ransomware e erros.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q20-3"><label for="q20-3">Dá um exemplo de defesa em profundidade neste projeto.</label></div>
+      <details><summary>Ver resposta</summary><div>Para ler o cofre a partir de um pod comprometido: a NetworkPolicy bloqueia os metadados; mesmo que não bloqueasse, a admissão impede hostNetwork e privileged; e mesmo um ExternalSecret só lê segredos com o prefixo do seu namespace. Três camadas, cada uma suficiente sozinha.</div></details></div>
+  </div>
+</section>
+
+<!-- ============================================================ 21 -->
+<section class="chapter" id="roteiro">
+  <div class="chapnum">Capítulo 21 · Parte VI · Rumo a expert</div>
+  <h2>Roteiro para expert: competências, laboratórios e próximos projetos</h2>
+  <div class="goal"><b>Objetivo:</b> ter um plano concreto para passar de 'percebo' a 'domino', usando este projeto como laboratório.</div>
+  <h3>Matriz de competências</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Área</th><th>Já consegues (com este projeto)</th><th>Nível seguinte</th></tr>
+    <tr><td>Ingestão</td><td>Collector com spool, deduplicação, bronze imutável</td><td>Streaming com um broker (Kafka/Redpanda), CDC de uma base (Debezium)</td></tr>
+    <tr><td>Transformação</td><td>DuckDB, SQL determinístico, WAP</td><td>dbt com testes e documentação; Spark para volumes grandes</td></tr>
+    <tr><td>Armazenamento</td><td>Parquet, partições, lakeFS</td><td>Iceberg (snapshots, evolução de esquema, compaction)</td></tr>
+    <tr><td>Orquestração</td><td>Airflow 3, KubernetesExecutor, bundles, catch-up</td><td>Agendamento por assets, sensores, SLAs no Airflow</td></tr>
+    <tr><td>Qualidade</td><td>Gates com imposição, reconciliação</td><td>Testes de distribuição e deteção de anomalias</td></tr>
+    <tr><td>Governança</td><td>Catálogo instalado</td><td>Linhagem OpenLineage ponta a ponta, glossário, donos</td></tr>
+    <tr><td>Plataforma</td><td>k3s, GitOps, Terraform, cofre, rede, backups, alarmes</td><td>Multi-nó, upgrades sem paragem, DR noutra região</td></tr>
+  </table></div>
+  <h3>Laboratórios no teu próprio projeto (por ordem)</h3>
+  <ol class="steps">
+    <li><b>Partir e recuperar:</b> apaga um ficheiro de silver no Mac e reconstrói-o a partir do bronze com o Airflow (idempotência).</li>
+    <li><b>Ensaio de restauro do lake</b> no Mac: restaura a base do lakeFS e os objetos a partir dos backups da Oracle, e lê o main.</li>
+    <li><b>Uma regra de rede nova:</b> segue o capítulo 16 para um serviço inventado; prova o antes e o depois com o pod de teste.</li>
+    <li><b>Uma regra de qualidade nova</b> (G2-08: valores parados por mais de N minutos), com teste, contrato e calibração.</li>
+    <li><b>O gold</b> (Fase 6): modelo dimensional, agendamento por assets, release com tag no lakeFS.</li>
+    <li><b>Linhagem</b> no OpenMetadata a partir do OpenLineage do Airflow.</li>
+    <li><b>Streaming:</b> o mesmo pipeline com um broker em vez do spool, e comparar latência e complexidade.</li>
+  </ol>
+  <h3>Leituras que valem o tempo</h3>
+  <ul>
+    <li><i>Designing Data-Intensive Applications</i> (Martin Kleppmann): a base teórica (replicação, partições, consistência, streams).</li>
+    <li><i>Fundamentals of Data Engineering</i> (Joe Reis e Matt Housley): o ciclo de vida dos dados e as escolhas de arquitetura.</li>
+    <li><i>The Data Warehouse Toolkit</i> (Ralph Kimball): modelação dimensional para o gold.</li>
+    <li><i>Site Reliability Engineering</i> (Google): SLOs, orçamentos de erro, operações.</li>
+    <li><i>Kubernetes: Up and Running</i>: para ires além do que o k3s esconde.</li>
+  </ul>
+  <h3>Para entrevistas de system design de dados</h3>
+  <p>Estrutura que funciona: requisitos (volume, latência, frescura) → fontes e ingestão → armazenamento e formatos → transformação e orquestração → qualidade e governança → servir (BI/ML) → operação (custo, segurança, falhas). Este projeto cobre todas as caixas: usa-o como o teu exemplo.</p>
+  <div class="quiz">
+    <h3>Perguntas do capítulo 21</h3>
+    <div class="q"><div class="qt"><input type="checkbox" id="q21-1"><label for="q21-1">Num system design de dados, quais são as primeiras três perguntas que fazes?</label></div>
+      <details><summary>Ver resposta</summary><div>Volume (quantos eventos e bytes por dia), latência/frescura exigida (segundos, minutos, horas) e quem consome e para quê (dashboards, ML, operações). Elas decidem batch vs streaming, formatos e custos.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q21-2"><label for="q21-2">Quando trocarias o spool no Postgres por um broker como Kafka?</label></div>
+      <details><summary>Ver resposta</summary><div>Quando houver vários consumidores do mesmo fluxo, necessidade de baixa latência para tempo real, ou volume que o Postgres não aguente. Para um produtor e um consumidor de hora a hora, o spool é mais simples.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q21-3"><label for="q21-3">Que laboratório te dá mais confiança antes de uma entrevista, e porquê?</label></div>
+      <details><summary>Ver resposta</summary><div>O ensaio de restauro (partir e recuperar): obriga a perceber todas as peças (dados, metadados, ordem, verificação) e é o tipo de história concreta que convence numa entrevista.</div></details></div>
+  </div>
+</section>
+
 <!-- ============================================================ G -->
 <section class="chapter" id="glossario">
   <div class="chapnum">Glossário</div>
@@ -975,6 +1258,16 @@ quality/  docs/  tests/
     <tr><td>Segredo zero</td><td>A credencial que permite ler o cofre e que, por isso, não pode vir dele.</td></tr>
     <tr><td>Security list</td><td>Firewall de uma subnet na Oracle.</td></tr>
     <tr><td>tfstate</td><td>Ficheiro onde o Terraform guarda o que gere; contém dados sensíveis.</td></tr>
+    <tr><td>NetworkPolicy</td><td>Regra de que tráfego um pod pode receber (ingress) ou enviar (egress).</td></tr>
+    <tr><td>Pod Security Standards</td><td>Níveis privileged / baseline / restricted que o Kubernetes impõe por namespace.</td></tr>
+    <tr><td>ValidatingAdmissionPolicy</td><td>Regra (em CEL) que o próprio Kubernetes avalia antes de aceitar um objeto.</td></tr>
+    <tr><td>Dead man's switch</td><td>Alarme que dispara quando um sinal periódico deixa de chegar.</td></tr>
+    <tr><td>RPO / RTO</td><td>Quanto se pode perder / quanto tempo se pode estar parado, numa recuperação.</td></tr>
+    <tr><td>SLI / SLO / SLA</td><td>Indicador medido / objetivo assumido / compromisso com consequências.</td></tr>
+    <tr><td>Blast radius</td><td>O que um atacante consegue a partir de uma peça comprometida.</td></tr>
+    <tr><td>Medalhão</td><td>Camadas bronze (bruto), silver (limpo), gold (negócio).</td></tr>
+    <tr><td>Predicate pushdown</td><td>Saltar blocos de um ficheiro colunar usando as estatísticas min/max.</td></tr>
+    <tr><td>OpenLineage</td><td>Padrão aberto para eventos de linhagem entre ferramentas de dados.</td></tr>
   </table></div>
 </section>
 
