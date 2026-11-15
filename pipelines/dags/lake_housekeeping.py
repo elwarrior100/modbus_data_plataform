@@ -1,6 +1,7 @@
 """Limpeza diária do lake (políticas em silver/retention.py; ADR-007 e ADR-015).
 
-- prune_branches: branches de trabalho velhos. Em simulação (`APPLY = False`): só regista o que apagaria.
+- prune_branches: branches de trabalho velhos (juntados há > 7 dias, por juntar há > 30). Aplicada desde 2026-11-15
+  (o relatório em simulação listou só branches `etl-*` já juntados); sem isto a GC do lakeFS não liberta a bronze.
 - expire_bronze: bronze crua com mais de 15 dias sai do main (decisão de 2026-11-14). Aplicada (`BRONZE_APPLY`).
   A silver e as atestações dos gates ficam para sempre."""
 from datetime import datetime, timezone
@@ -16,7 +17,7 @@ from kubernetes.client import models as k8s
 _IMAGE = os.environ.get("MODBUS_PIPELINES_IMAGE")
 PROJECT_IMAGE = {"pod_override": k8s.V1Pod(spec=k8s.V1PodSpec(containers=[k8s.V1Container(name="base", image=_IMAGE)]))} if _IMAGE else {}
 
-APPLY = False
+APPLY = True
 BRONZE_APPLY = True
 
 with DAG("lake_housekeeping", start_date=datetime(2026, 11, 9, tzinfo=timezone.utc), schedule="30 3 * * *",
