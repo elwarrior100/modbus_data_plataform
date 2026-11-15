@@ -592,3 +592,10 @@ código e explica-o; ver CLAUDE.md.)*
    execuções do CronJob. Por fazer (9.ª): teste de arranque com as aplicações filhas no commit em teste; sweep com
    lista visível e marca recente (< 48 h); regra de saída para a API só no pod gc-freshness e IP privado fixo no
    Terraform; política do Tailscale no git; re-scan semanal de todas as imagens; disco só de leitura no backup/ops.
+21. ✅ (2026-11-15) **Custo zero reposto**: a cópia do lake e o ensaio passavam os 50 mil pedidos grátis do Object
+   Storage (88 mil em 2 dias, €0,012). Agora em pacotes (ADR-016): ~4 pedidos por noite; ensaio a partir dos pacotes
+   (1890/1890 MD5); alarme se um dia passar de 1 500 pedidos. Também: disco só de leitura no backup/ops, teste de
+   arranque da árvore toda no commit, poda/GC com lista à vista, scan semanal de todas as imagens (apanhou o modelo
+   das tarefas do Airflow em 3.2.2), política do Tailscale no git, `new-project.sh`.
+   - ⬜ **Início de dezembro:** `./scripts/lake-backup-prune.sh --apply` para retirar a cópia antiga objeto a objeto
+     (~12 900 pedidos, cabem no orçamento novo).
