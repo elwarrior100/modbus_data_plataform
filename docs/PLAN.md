@@ -587,3 +587,8 @@ código e explica-o; ver CLAUDE.md.)*
    projetos do Argo CD criados depois das aplicações: corrigido com sync-wave -1).
 19. ⬜ Ideia: `scripts/new-project.sh <nome>` (namespace, rede, AppProject, segredos, pasta de manifests) e um token
    do GitHub para o CI do projeto atualizar sozinho a imagem/DAG bundle na plataforma.
+20. ✅ (2026-11-15) 9.ª revisão: **86,25/100**. Corrigido logo: despejo por memória no kubelet (k3s `config.yaml`) e
+   comentários falsos sobre prioridade; `promote-oracle.sh` só aceita commits do `main`; sinal de vida da GC só conta
+   execuções do CronJob. Por fazer (9.ª): teste de arranque com as aplicações filhas no commit em teste; sweep com
+   lista visível e marca recente (< 48 h); regra de saída para a API só no pod gc-freshness e IP privado fixo no
+   Terraform; política do Tailscale no git; re-scan semanal de todas as imagens; disco só de leitura no backup/ops.

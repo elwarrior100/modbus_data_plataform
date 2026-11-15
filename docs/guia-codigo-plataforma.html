@@ -85,11 +85,9 @@ table.map td:first-child{font-family:var(--font-code);font-size:13px;white-space
 <div class="wrap">
 <nav id="nav">
   <h1>Guia do código da plataforma</h1>
-  <div class="sub">Repositório <code>platform</code>, explicado do zero. Parte 1 de 6.</div>
-  <div class="part">Parte 1 · Os alicerces</div>
+  <div class="sub">Repositório <code>platform</code>, explicado do zero. Partes 1 e 2 de 6.</div>
   <div id="navlinks"></div>
   <div class="part">A seguir</div>
-  <div class="soon">Parte 2 · Os dados (Postgres, SeaweedFS, lakeFS)</div>
   <div class="soon">Parte 3 · As fechaduras (admissão, rede, projetos)</div>
   <div class="soon">Parte 4 · Backups, ensaios e GC</div>
   <div class="soon">Parte 5 · Terraform e a Oracle</div>
@@ -536,31 +534,269 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 REF="${1:-main}"
 git fetch -q origin
-SHA="$(git rev-parse "origin/$REF" 2>/dev/null || git rev-parse "$REF")"
+# a branch name resolves on origin; a commit SHA resolves as itself (--verify: no output when it does not resolve)
+SHA="$(git rev-parse -q --verify "origin/$REF^{commit}" || git rev-parse --verify "$REF^{commit}")"
 git merge-base --is-ancestor origin/oracle "$SHA" || { echo "refused: $SHA is not ahead of oracle (not a fast-forward)" >&2; exit 1; }
+# only commits that are on main, i.e. that the local cluster (which follows main) has already run
+git merge-base --is-ancestor "$SHA" origin/main || { echo "refused: $SHA is not on main (it never ran on the local cluster)" >&2; exit 1; }
 echo "oracle: $(git rev-parse --short origin/oracle) -> $(git rev-parse --short "$SHA")"
 git log --oneline "origin/oracle..$SHA"
 git push origin "$SHA:refs/heads/oracle"</script>
-<script type="application/json" id="n-prom">[
- [1,"A primeira linha de qualquer script: \"corre isto com o bash\"."],
- [6,"<b>O cinto de segurança de todos os nossos scripts.</b> <code>-e</code>: pára ao primeiro erro. <code>-u</code>: pára se usares uma variável que não existe (um erro de escrita não apaga \"tudo\"). <code>pipefail</code>: um erro no meio de um <code>a | b</code> também conta."],
- [7,"Vai para a raiz do repositório, venhas de onde vieres."],
- [8,"Se não disseres que commit, usa o <code>main</code>. (<code>${1:-main}</code> = \"o primeiro argumento, ou main se não houver\".)"],
- [9,"Atualiza o que sabe do GitHub, para comparar com a versão verdadeira e não com uma cópia velha."],
- [11,"<b>A regra de ferro.</b> \"O oracle atual é antepassado deste commit?\" Se não for (alguém tentou saltar para um ramo ao lado), recusa e explica porquê."],
- [12,"Mostra de onde para onde vai…"],
- [13,"…e a lista de commits que entram. É o momento de ler antes de carregar."],
- [14,"Move o marcador no GitHub. A partir daqui, o Argo CD da Oracle vê a mudança sozinho."]
-]</script>
+<script type="application/json" id="n-prom">[[1, "A primeira linha de qualquer script: \"corre isto com o bash\"."], [6, "<b>O cinto de segurança de todos os nossos scripts.</b> <code>-e</code>: pára ao primeiro erro. <code>-u</code>: pára se usares uma variável que não existe. <code>pipefail</code>: um erro no meio de um <code>a | b</code> também conta."], [7, "Vai para a raiz do repositório, venhas de onde vieres."], [8, "Se não disseres que commit, usa o <code>main</code>. (<code>${1:-main}</code> = \"o primeiro argumento, ou main se não houver\".)"], [9, "Atualiza o que sabe do GitHub, para comparar com a versão verdadeira e não com uma cópia velha."], [11, "Transforma o nome (um ramo, ou um commit) no código exato do commit. O <code>--verify</code> foi uma correção de hoje: sem ele, pedir um commit específico deixava lixo nesta variável."], [12, "<b>Regra de ferro 1.</b> \"O oracle atual é antepassado deste commit?\" Se não for, o ramo andaria para trás ou para o lado: recusa."], [14, "<b>Regra de ferro 2</b> (9.ª revisão). \"Este commit está no main?\" Se não estiver, nunca correu no Mac: recusa."], [16, "Mostra a lista de commits que entram: o momento de ler antes de carregar."], [17, "Move o marcador no GitHub. A partir daqui, o Argo CD da Oracle vê a mudança sozinho. É um avanço simples (não um <code>--force</code>), por isso a proteção de ramos do GitHub deixa passar."]]</script>
   <div class="whatif"><b>E se isto não existisse?</b>Para levar uma mudança à Oracle farias um <code>git push --force</code> no ramo oracle. Um dia empurravas um ramo errado, e a Oracle recuava ou recebia algo que nunca correu no Mac.</div>
-  <details class="q"><summary>Pergunta: ontem uma promoção fez a Oracle reiniciar o k3s. O script tinha um bug?</summary><p>Não: o script fez o que devia. O problema foi o <b>tamanho</b> da mudança: reiniciou de uma vez o OpenSearch, o OpenMetadata, o Prometheus e o Argo CD numa VM de 2 CPUs. A lição ficou no runbook: mudanças pesadas promovem-se aos poucos.</p></details>
+  <details class="q"><summary>Pergunta: uma promoção fez a Oracle reiniciar o k3s. O script tinha um bug?</summary><p>Não: o script fez o que devia. O problema foi o <b>tamanho</b> da mudança: reiniciou de uma vez o OpenSearch, o OpenMetadata, o Prometheus e o Argo CD numa VM de 2 CPUs. A lição ficou no runbook: mudanças pesadas promovem-se aos poucos.</p></details>
   <label class="got"><input type="checkbox" data-done="l9"> Percebi esta lição</label>
 </section>
 
+<!-- PARTE 2 -->
+<section class="lesson" id="l10" data-title="Os três guardiões dos dados" data-part="2">
+  <div class="kicker">Parte 2 · Lição 10</div>
+  <h2>Os três guardiões dos dados</h2>
+  <div class="simple"><b>Em português simples</b>Pensa numa <b>biblioteca</b>. O <b>SeaweedFS</b> é o <b>armazém</b> onde estão as caixas com os livros (os ficheiros Parquet), arrumadas por números sem significado. O <b>lakeFS</b> é o <b>bibliotecário</b>: sabe que livro está em que caixa, guarda o histórico de cada versão (como um git) e só deixa entrar na prateleira principal o que passou nos controlos. O <b>Postgres</b> é o <b>caderno do bibliotecário</b>: é lá que ele escreve esse índice, e também a "sala de espera" (o spool) onde os dados ficam até serem arrumados.</div>
+  <div class="fig">
+<svg viewBox="0 0 680 230" role="img" aria-label="Escrita, lakeFS, SeaweedFS e Postgres">
+  <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="var(--muted)" stroke-width="1.6"/></marker></defs>
+  <g font-size="13">
+    <rect x="14" y="80" width="140" height="60" rx="8" fill="var(--paper)" stroke="var(--line)"/>
+    <text x="84" y="106" text-anchor="middle" font-weight="600" fill="var(--ink)">writer / Airflow</text>
+    <text x="84" y="126" text-anchor="middle" fill="var(--muted)">escrevem dados</text>
+    <rect x="250" y="80" width="170" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="335" y="106" text-anchor="middle" font-weight="600" fill="var(--ink)">lakeFS</text>
+    <text x="335" y="126" text-anchor="middle" fill="var(--muted)">o bibliotecário (git)</text>
+    <rect x="510" y="20" width="156" height="60" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="588" y="46" text-anchor="middle" font-weight="600" fill="var(--ink)">SeaweedFS</text>
+    <text x="588" y="66" text-anchor="middle" fill="var(--muted)">o armazém (S3)</text>
+    <rect x="510" y="140" width="156" height="60" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="588" y="166" text-anchor="middle" font-weight="600" fill="var(--ink)">Postgres</text>
+    <text x="588" y="186" text-anchor="middle" fill="var(--muted)">o caderno (índice)</text>
+    <line x1="154" y1="110" x2="246" y2="110" stroke="var(--muted)" marker-end="url(#ar3)"/>
+    <path d="M420 100 L470 100 L470 50 L506 50" fill="none" stroke="var(--muted)" marker-end="url(#ar3)"/>
+    <path d="M420 120 L470 120 L470 170 L506 170" fill="none" stroke="var(--muted)" marker-end="url(#ar3)"/>
+    <text x="440" y="38" fill="var(--muted)" font-size="12">ficheiros</text>
+    <text x="436" y="196" fill="var(--muted)" font-size="12">metadados</text>
+  </g>
+</svg>
+  <div class="legend">Ninguém escreve no SeaweedFS diretamente: passa tudo pelo lakeFS. Uma regra de rede garante-o (lição 12).</div>
+  </div>
+  <p>Os três vivem no namespace <code>data</code> e são geridos pela ficha <code>data</code> da lição 5 (a que <b>nunca apaga sozinha</b>). As próximas três lições mostram um ficheiro de cada.</p>
+  <details class="q"><summary>Pergunta: se o Postgres se perder mas o SeaweedFS ficar, ainda tens os dados?</summary><p>Os bytes sim, mas sem o caderno não sabes que caixa é que livro nem que versão é a de hoje: é por isso que o backup faz as duas coisas (dump do Postgres <b>e</b> cópia dos objetos), e o ensaio diário prova que juntas reconstroem o lake.</p></details>
+  <label class="got"><input type="checkbox" data-done="l10"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l11" data-title="Postgres: o caderno" data-part="2">
+  <div class="kicker">Lição 11</div>
+  <h2>Postgres: o caderno (StatefulSet)</h2>
+  <div class="file">platform/k8s/postgres/postgres.yaml (o StatefulSet)</div>
+  <div class="simple"><b>Em português simples</b>A maior parte das coisas no Kubernetes são <b>descartáveis</b>: se um pod morre, nasce outro igual noutro sítio. Uma base de dados <b>não</b> pode ser assim: precisa de ter sempre o <b>mesmo nome</b> e a <b>mesma gaveta</b> de disco. Um <b>StatefulSet</b> é isso: "este pod chama-se sempre postgres-0 e usa sempre esta gaveta".</div>
+  <div class="codebox" data-code="c-pg" data-notes="n-pg"></div>
+<script type="text/plain" id="c-pg">apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: data
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      priorityClassName: platform-data        # kubelet memory eviction takes it last (it holds the spool and the lakeFS metadata);
+                                              # the kernel OOM killer follows QoS instead, and this pod is Burstable
+      terminationGracePeriodSeconds: 60       # time to checkpoint on shutdown
+      containers:
+        - name: postgres
+          # pinned by digest: "latest-pg17" alone let the two clusters run different builds (TimescaleDB 2.31 vs 2.32)
+          image: timescale/timescaledb:latest-pg17@sha256:6a6b7d7a346d7c6be03a310c240706f3bbc6d7adbdf3fbc07823570b34337f5e
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          envFrom:
+            - secretRef:
+                name: postgres-auth
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 200m
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 20Gi</script>
+<script type="application/json" id="n-pg">[[2, "<b>StatefulSet</b> (e não Deployment): nome estável (<code>postgres-0</code>) e disco que acompanha o pod."], [8, "Uma só cópia. Numa VM de 12 GB não há espaço para réplicas; a proteção é o backup diário + o ensaio de restauro."], [17, "<b>Prioridade máxima</b> entre as nossas cargas. Se a memória livre baixar de 600 MiB, o kubelet despeja pods por ordem: primeiro os que usam mais do que pediram, depois os de prioridade mais baixa (a GC e o ensaio, com <code>platform-batch</code>); o Postgres vai por último. Lição da 9.ª revisão: sem os limites de despejo no k3s, quem decidia era o kernel, que ignora esta prioridade."], [19, "Quando o pod tem de parar, dá-lhe <b>60 segundos</b> para escrever tudo no disco. Foi a falta disto (e do encerramento gracioso do kubelet) que corrompeu o lakeFS no Mac em novembro."], [23, "<b>Fixa por digest</b> (<code>@sha256:…</code>): sem isso, os dois clusters chegaram a correr versões diferentes com a mesma etiqueta."], [33, "A palavra-passe vem do Secret que o \"estafeta\" trouxe do cofre (lição 8)."], [36, "<b>readinessProbe</b>: o Kubernetes só manda tráfego quando o Postgres responde \"pronto\"."], [42, "<b>Requests</b> = o que o agendador reserva; <b>limits</b> = o teto. A memória tem teto (2 Gi); a CPU não, para não ficar lento num pico."], [49, "Scripts que o Postgres corre <b>só na primeira vez</b> (criar a base e o utilizador do lakeFS)."], [55, "<b>A gaveta</b>: um pedido de disco (PVC) criado uma vez e reutilizado sempre pelo <code>postgres-0</code>, mesmo que o pod renasça."], [60, "<code>local-path</code>: o disco é uma pasta no disco da própria VM. Simples e grátis; o preço é que, se a VM morrer, só o backup salva os dados."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Como Deployment, um pod novo podia nascer com um disco vazio e o Postgres "começava do zero": spool e índice do lake perdidos.</div>
+  <details class="q"><summary>Pergunta: porque é que a memória tem limite e a CPU não?</summary><p>Passar o limite de memória mata o processo (OOM); passar o de CPU só o atrasa. Para a base de dados é melhor ser travada pela memória com margem (2 Gi) e nunca ficar lenta por um teto de CPU. Os serviços pesados que podem esperar (OpenMetadata, Prometheus) é que têm teto de CPU.</p></details>
+  <label class="got"><input type="checkbox" data-done="l11"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l12" data-title="SeaweedFS: o armazém" data-part="2">
+  <div class="kicker">Lição 12</div>
+  <h2>SeaweedFS: o armazém (e a porta trancada)</h2>
+  <div class="file">platform/k8s/seaweedfs/seaweedfs.yaml · platform/k8s/seaweedfs/networkpolicy.yaml</div>
+  <div class="simple"><b>Em português simples</b>O SeaweedFS fala a mesma "língua" que o Amazon S3, por isso o lakeFS trata-o como se fosse o S3 da AWS, mas grátis e dentro da VM. Tem duas portas: a <b>porta da frente</b> (S3, com chave) e uma <b>porta das traseiras</b> (o "filer", sem chave nenhuma, que deixa apagar tudo). A regra do jogo: a porta das traseiras <b>nunca</b> é anunciada, e só o lakeFS (e a cópia noturna) pode sequer tocar à campainha.</div>
+  <div class="codebox" data-code="c-sw" data-notes="n-sw"></div>
+<script type="text/plain" id="c-sw">apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs
+  namespace: data
+spec:
+  selector:
+    app: seaweedfs
+  # Only the S3 gateway (used by lakeFS, which has authentication). The filer (8888) has no authentication, so it
+  # is not published on the Service: reach it with kubectl port-forward pod/seaweedfs-0 8888 when needed.
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: 8333</script>
+<script type="application/json" id="n-sw">[[2, "<b>Service</b>: o \"número de telefone\" estável do armazém: <code>seaweedfs.data.svc.cluster.local</code>."], [9, "Só a porta S3 é anunciada. A 8888 (filer, sem autenticação) fica de fora <b>de propósito</b>."], [13, "8333 = a porta S3, a única que os outros conhecem."]]</script>
+  <div class="codebox" data-code="c-sw2" data-notes="n-sw2"></div>
+<script type="text/plain" id="c-sw2">          args:
+            - server
+            - -dir=/data
+            - -master.volumeSizeLimitMB=1024
+            - -volume.max=0
+            - -filer
+            - -s3
+            - -s3.config=/etc/seaweedfs/s3.json</script>
+<script type="application/json" id="n-sw2">[[2, "Um só processo faz de tudo (master, volume, filer, S3): simples para uma VM."], [4, "Os dados ficam em \"volumes\" de 1 GB cada (ficheiros grandes no disco onde cabem muitos objetos)."], [8, "As <b>identidades S3</b> (quem tem que chave e o que pode fazer) vêm de um ficheiro que o estafeta traz do cofre: o lakeFS é administrador; a cópia noturna só tem <code>Read:lake</code> e <code>List:lake</code>."]]</script>
+  <div class="codebox" data-code="c-swnp" data-notes="n-swnp"></div>
+<script type="text/plain" id="c-swnp">apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs-only-from-lakefs
+  namespace: data
+spec:
+  podSelector:
+    matchLabels: {app: seaweedfs}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: lakefs}
+        - podSelector:                      # weekly lakeFS garbage collection (platform/k8s/lakefs/gc.yaml)
+            matchLabels: {app: lakefs-gc}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: backup}}   # nightly copy of the lake objects
+          podSelector: {matchLabels: {app: lake-sync}}
+      ports:
+        - {port: 8333, protocol: TCP}
+</script>
+<script type="application/json" id="n-swnp">[[2, "A <b>campainha</b>: quem pode sequer ligar ao pod do SeaweedFS."], [13, "O lakeFS, claro."], [15, "A garbage collection semanal (Parte 4)."], [17, "E a cópia noturna para a Oracle, vinda do namespace <code>backup</code>, com a chave só de leitura."], [19, "E só para a porta S3. Mais nada nem ninguém."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Qualquer pod do cluster podia ir ao filer (porta 8888) e apagar ficheiros do lake <b>por trás do lakeFS</b>: sem commit, sem gate G2, sem histórico. Foi por isso que o tirámos também do <code>ui.sh</code>.</div>
+  <details class="q"><summary>Pergunta: como vês o que há no armazém numa emergência?</summary><p><code>kubectl -n data exec -it seaweedfs-0 -- weed shell</code> e comandos só de leitura (<code>s3.bucket.list</code>, <code>fs.du /buckets/lake</code>). O <code>kubectl exec</code> não passa pela rede dos pods, por isso a campainha continua fechada a todos os outros.</p></details>
+  <label class="got"><input type="checkbox" data-done="l12"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l13" data-title="lakeFS: o bibliotecário" data-part="2">
+  <div class="kicker">Lição 13</div>
+  <h2>lakeFS: o bibliotecário (o git dos dados)</h2>
+  <div class="file">platform/k8s/lakefs/lakefs.yaml (o Deployment)</div>
+  <div class="simple"><b>Em português simples</b>O lakeFS faz aos <b>dados</b> o que o git faz ao código: ramos (<code>main</code>, <code>etl-…</code>), commits e merges. Ele próprio <b>não guarda nada no seu pod</b>: os ficheiros vão para o armazém (SeaweedFS) e o índice vai para o caderno (Postgres). Por isso é um <b>Deployment</b> normal, descartável: se morrer, nasce outro e continua igual.</div>
+  <div class="codebox" data-code="c-lk" data-notes="n-lk"></div>
+<script type="text/plain" id="c-lk">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lakefs
+  namespace: data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lakefs
+  template:
+    metadata:
+      labels:
+        app: lakefs
+    spec:
+      containers:
+        - name: lakefs
+          image: treeverse/lakefs:1.86.0@sha256:fb7a0d90f77e3f893e8b8c6f3be131c090f6f0160c2d6c7784c4378cf7e66ea1   # pinned by digest, same build on both clusters
+          args: ["run"]
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: postgres-auth, key: LAKEFS_DB_PASSWORD}
+            - name: LAKEFS_DATABASE_TYPE
+              value: postgres
+            - name: LAKEFS_DATABASE_POSTGRES_CONNECTION_STRING
+              value: postgres://lakefs:$(DB_PASSWORD)@postgres:5432/lakefs?sslmode=disable
+            - name: LAKEFS_AUTH_ENCRYPT_SECRET_KEY
+              valueFrom:
+                secretKeyRef: {name: lakefs-auth, key: AUTH_ENCRYPT_SECRET_KEY}
+            - name: LAKEFS_INSTALLATION_USER_NAME
+              value: admin
+            - name: LAKEFS_INSTALLATION_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: {name: lakefs-auth, key: ADMIN_ACCESS_KEY_ID}
+            - name: LAKEFS_INSTALLATION_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: {name: lakefs-auth, key: ADMIN_SECRET_ACCESS_KEY}
+            - name: LAKEFS_BLOCKSTORE_TYPE
+              value: s3
+            - name: LAKEFS_BLOCKSTORE_S3_ENDPOINT
+              value: http://seaweedfs:8333
+            - name: LAKEFS_BLOCKSTORE_S3_FORCE_PATH_STYLE
+              value: "true"
+            - name: LAKEFS_BLOCKSTORE_S3_DISCOVER_BUCKET_REGION
+              value: "false"
+            - name: LAKEFS_BLOCKSTORE_S3_REGION
+              value: us-east-1
+            - name: LAKEFS_BLOCKSTORE_S3_DISABLE_PRE_SIGNED
+              value: "true"
+            - name: LAKEFS_BLOCKSTORE_S3_DISABLE_PRE_SIGNED_UI
+              value: "true"
+            - name: LAKEFS_BLOCKSTORE_S3_CREDENTIALS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: {name: seaweedfs-auth, key: S3_ACCESS_KEY}
+            - name: LAKEFS_BLOCKSTORE_S3_CREDENTIALS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: {name: seaweedfs-auth, key: S3_SECRET_KEY}
+            - name: LAKEFS_EMAIL_SUBSCRIPTION_ENABLED
+              value: "false"
+            - name: LAKEFS_STATS_ENABLED
+              value: "false"</script>
+<script type="application/json" id="n-lk">[[2, "<b>Deployment</b> (e não StatefulSet): o lakeFS não tem estado próprio; tudo vive no Postgres e no SeaweedFS."], [18, "Versão fixa e <b>por digest</b>."], [23, "A palavra-passe da base de dados, do Secret do cofre…"], [28, "…usada aqui: <code>$(DB_PASSWORD)</code> é o Kubernetes a substituir a variável de cima. O endereço <code>postgres:5432</code> é o Service da lição 11."], [30, "A chave que cifra as credenciais guardadas no Postgres. Sem ela, um dump restaurado não abre: por isso o ensaio de restauro precisa dela."], [35, "O administrador (a versão Community só tem um utilizador: todos os serviços usam esta chave)."], [41, "<b>Onde guarda os ficheiros</b>: num \"S3\"…"], [43, "…que é o nosso SeaweedFS (o Service da lição 12)."], [45, "Detalhe do S3 \"caseiro\": endereços no formato <code>servidor/bucket/ficheiro</code> em vez de <code>bucket.servidor/ficheiro</code>."], [51, "Sem links pré-assinados: os clientes nunca falam com o armazém diretamente, só com o lakeFS."], [63, "Sem envio de estatísticas para a empresa do lakeFS."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Escreverias Parquet diretamente para um bucket. Um erro na silver substituía ficheiros bons sem volta atrás, e não havia como só deixar entrar no <code>main</code> o que passou nos gates G1/G2.</div>
+  <details class="q"><summary>Pergunta: porque é que o lakeFS pode reiniciar à vontade e o Postgres não?</summary><p>Porque o lakeFS não guarda nada no pod: ao renascer, lê o índice do Postgres e os ficheiros do SeaweedFS. O Postgres e o SeaweedFS são os que guardam estado, por isso são StatefulSets com disco próprio e prioridade máxima.</p></details>
+  <details class="q"><summary>Pergunta: onde estão as regras que só deixam entrar silver validada?</summary><p>Não estão neste ficheiro: são <b>hooks</b> que vivem dentro do próprio repositório do lakeFS (<code>_lakefs_actions/</code>), instalados pelo projeto modbus. Cada merge para o <code>main</code> corre o hook do G2 antes de acontecer.</p></details>
+  <label class="got"><input type="checkbox" data-done="l13"> Percebi esta lição</label>
+</section>
+
 <section class="lesson" id="lnext" data-title="O que vem na Parte 2">
-  <div class="kicker">Fim da Parte 1</div>
+  <div class="kicker">Fim da Parte 2</div>
   <h2>O que vem a seguir</h2>
-  <p>Já sabes <b>como as coisas chegam</b> ao cluster. A Parte 2 mostra <b>o que lá está</b> de mais importante: o Postgres (o spool e a memória do lake), o SeaweedFS (onde os ficheiros vivem de facto) e o lakeFS (o git dos dados), ficheiro a ficheiro, no mesmo formato.</p>
+  <p>Já sabes <b>como as coisas chegam</b> ao cluster (Parte 1) e <b>quem guarda os dados</b> (Parte 2). A Parte 3 mostra as <b>fechaduras</b>: as regras de admissão (que pods são recusados e porquê), as regras de rede completas e os projetos do Argo CD.</p>
   <p>Quando acabares esta parte, diz-me e eu acrescento a seguinte a esta mesma página.</p>
 </section>
 </main>
@@ -578,8 +814,12 @@ git push origin "$SHA:refs/heads/oracle"</script>
   });
   // nav
   const nav = document.getElementById("navlinks");
+  const parts = {"1": "Parte 1 · Os alicerces", "2": "Parte 2 · Os dados"};
+  let lastPart = null;
   document.querySelectorAll("section.lesson").forEach((s, i) => {
     if (s.id === "lnext") return;
+    const part = s.dataset.part || "1";
+    if (part !== lastPart) { const h = document.createElement("div"); h.className = "part"; h.textContent = parts[part]; nav.append(h); lastPart = part; }
     const a = document.createElement("a"); a.href = "#" + s.id; a.dataset.id = s.id;
     const n = document.createElement("span"); n.className = "n"; n.textContent = i;
     const t = document.createElement("span"); t.textContent = s.dataset.title;
