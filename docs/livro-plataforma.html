@@ -151,7 +151,7 @@ details > div { margin-top: 8px; padding: 10px 14px; background: var(--accent-so
     <li class="part">Parte V · Operação</li>
     <li><a href="#orcamento"><span class="n">11</span>Orçamento de recursos</a></li>
     <li><a href="#incidentes"><span class="n">12</span>Incidentes e lições</a></li>
-    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44 → 82</a></li>
+    <li><a href="#critica"><span class="n">13</span>Revisão crítica: 44 → 84</a></li>
     <li><a href="#melhorias"><span class="n">13b</span>O que mudou depois da crítica</a></li>
     <li><a href="#monitorizacao"><span class="n">13c</span>Monitorização e alarmes</a></li>
     <li><a href="#runbook"><span class="n">14</span>Runbook: cluster do zero</a></li>
@@ -797,10 +797,10 @@ quality/  docs/  tests/
 <!-- ============================================================ 13 -->
 <section class="chapter" id="critica">
   <div class="chapnum">Capítulo 13 · Parte V</div>
-  <h2>Revisão crítica: de 44 para 81,6</h2>
-  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: sete revisões: 44, 56, 66,75, 74, 77,75, 79,6 e 81,6/100.</div>
+  <h2>Revisão crítica: de 44 para 83,9</h2>
+  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: oito revisões: 44, 56, 66,75, 74, 77,75, 79,6, 81,6 e 83,9/100.</div>
 
-  <p><span class="big">81,6</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (44 → 56 → 67 → 74 → 78 → 80 → 82)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
+  <p><span class="big">83,9</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (44 → 56 → 67 → 74 → 78 → 80 → 82 → 84)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
 
   <div class="score" id="scorecard"></div>
 
@@ -903,6 +903,13 @@ quality/  docs/  tests/
     <li><b>A lição:</b> o ensaio de restauro está bem desenhado para o lake de <em>hoje</em> (374 objetos). Mas a escrita junta cerca de 1200 objetos por dia: com um <code>lakectl fs stat</code> por objeto, em semanas passa o prazo de 20 minutos; e guarda duas cópias do lake no disco do único nó. Um teste que falha por crescer é pior do que nenhum, porque ensina a ignorar o alarme. Correção prevista: listar os checksums de uma vez pela API, calcular o MD5 em fluxo (sem descarregar), e pôr limites de disco.</li>
     <li>Outras: objetos multipart passavam sem verificação; os pods com a identidade da VM (backup, ops) ainda correm sem <code>securityContext</code> endurecido; o disco do nó (47 GB) não bate com o Terraform (100 GB).</li>
     <li>A falha da silver no Mac não é da plataforma: a VM do Lima fica em pausa quando o Mac dorme, daí os buracos de 15–29 min. O G2 apanhou-os, como devia.</li>
+    <li>Teto realista: 88–90.</li>
+  </ul>
+  <h3>Oitava ronda (83,9): limpar sem destruir</h3>
+  <ul>
+    <li>Entraram: GC do lakeFS com imagem própria, retenção da bronze (15 dias), poda da cópia, ensaio que escala, pods de backup endurecidos, digests em todos os charts, disco a 100 GB e o teste de arranque do zero no CI.</li>
+    <li><b>A lição:</b> a poda da cópia apagava objetos "que já não estão no lake e foram copiados há mais de 30 dias". Parece certo, mas a <em>data da cópia</em> não diz <em>quando o objeto desapareceu</em>: um ficheiro perdido por avaria (como no Mac em novembro) teria o backup apagado na poda seguinte, exatamente quando mais falta faz. Corrigido: conta-se desde a primeira vez que se viu em falta. <b>Regra geral: numa limpeza, a pergunta não é "é velho?", é "há quanto tempo sei que já não é preciso?".</b></li>
+    <li>O incidente do dia: reiniciar muitos pods pesados de uma vez levou a carga a 14 em 2 CPUs e o k3s caiu (a sua base de dados interna ficou lenta demais). Recuperou sozinho. A causa de fundo ainda só está documentada; a correção é reservar CPU e memória para o sistema (kubelet) e limitar os pesados.</li>
     <li>Teto realista: 88–90.</li>
   </ul>
   <h3>O que não deu para corrigir, e porquê</h3>
@@ -1312,9 +1319,9 @@ nc -z -w 3 github.com 443                       && echo aberto || echo recusado 
 <script>
 (function () {
   var SCORES = [
-    ["Segurança", 8.25, 20, 5], ["Fiabilidade e backups", 8.5, 20, 2], ["Consistência GitOps", 8.75, 10, 5],
-    ["Terraform", 8.5, 10, 6], ["CI/CD e cadeia de fornecimento", 8.5, 10, 6], ["Observabilidade", 7.75, 10, 1],
-    ["Custo e recursos", 7.5, 10, 6], ["Documentação e ADRs", 7.75, 5, 6], ["Simplicidade para uma pessoa", 6.5, 5, 5]
+    ["Segurança", 8.5, 20, 5], ["Fiabilidade e backups", 8.5, 20, 2], ["Consistência GitOps", 9, 10, 5],
+    ["Terraform", 8.75, 10, 6], ["CI/CD e cadeia de fornecimento", 8.75, 10, 6], ["Observabilidade", 8, 10, 1],
+    ["Custo e recursos", 8, 10, 6], ["Documentação e ADRs", 8.25, 5, 6], ["Simplicidade para uma pessoa", 6.5, 5, 5]
   ];
   var sc = document.getElementById("scorecard");
   SCORES.forEach(function (s) {

@@ -515,7 +515,13 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
    - ✅ (2026-11-14) **Retenção da bronze crua: 15 dias** (decisão do Stéphane), aplicada pelo `lake_housekeeping`
      (03:30) nos dois clusters; provada (0 dias a sair, como devia). Primeira remoção real na Oracle a 2026-11-30.
    - ✅ (2026-11-15) GC do lakeFS (semanal, Oracle, só a marcar) e poda mensal da cópia (`lake-backup-prune.sh`).
-   - ⬜ **Ler o relatório da GC de 2026-11-22 e ligar `GC_SWEEP=true` antes de 2026-11-30** (decisão do Stéphane).
+   - ⬜ **Ler o relatório da GC de 2026-11-22 e ligar a remoção antes de 2026-11-30** (decisão do Stéphane). A
+     primeira remoção deve apagar o relatório lido (`do_mark=false`, `mark_id=<id>`), não marcar outra vez.
+17. ⬜ 8.ª revisão (83,9/100), por fazer: reservar CPU/memória ao sistema no kubelet e limites de CPU nos pesados
+   (causa do incidente do k3s); a validade das exceções do Trivy só dispara com um scan agendado; folga de memória
+   da GC (PriorityClass baixa, driver menor); sinal de vida da GC; o teste de arranque também para a Oracle e mais
+   fundo; imagem da GC por digest e sem token de service account; invariante GC (15 d) ≥ vida dos dumps (14 d);
+   disco só de leitura no backup/ops. ✅ Corrigido logo: a poda só apaga o que está em falta há 30 dias.
    - ✅ DAGs novos começam ativos (`dags_are_paused_at_creation: False`): o git decide o que corre.
 15. ✅ (2026-11-15) 7.ª revisão (81,6/100) corrigida: o ensaio de restauro não escala
    (um `stat` por objeto, duas cópias do lake no disco), multipart sem verificação, pods de backup/ops sem
