@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guia do Código da Plataforma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f5f0; --paper:#ffffff; --ink:#1f2328; --muted:#5c6370; --line:#e3ded3;
+  --accent:#1d6b5f; --accent-soft:#e3f1ee; --warn:#8a5a00; --warn-soft:#fbf1dc;
+  --code-bg:#f3f1ec; --hl:#fff3c4; --hl-line:#e9c46a;
+  --font-body:"Source Serif 4", Georgia, serif; --font-ui:"Inter", system-ui, sans-serif; --font-code:"JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#15181c; --paper:#1d2126; --ink:#e6e3dc; --muted:#9aa1ab; --line:#2f353c;
+  --accent:#5cc3b0; --accent-soft:#1d3531; --warn:#e3b25a; --warn-soft:#3a3020;
+  --code-bg:#171a1e; --hl:#3a3420; --hl-line:#c9a84a; } }
+:root[data-theme="dark"]{
+  --bg:#15181c; --paper:#1d2126; --ink:#e6e3dc; --muted:#9aa1ab; --line:#2f353c;
+  --accent:#5cc3b0; --accent-soft:#1d3531; --warn:#e3b25a; --warn-soft:#3a3020;
+  --code-bg:#171a1e; --hl:#3a3420; --hl-line:#c9a84a; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:17px;line-height:1.65}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px;display:grid;grid-template-columns:250px 1fr;gap:32px}
+nav{position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;padding:28px 0;font-family:var(--font-ui);font-size:14px}
+nav h1{font-family:var(--font-body);font-size:20px;line-height:1.25;margin:0 0 4px}
+nav .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+nav a{display:flex;gap:8px;align-items:flex-start;color:var(--ink);text-decoration:none;padding:6px 8px;border-radius:6px}
+nav a:hover{background:var(--accent-soft)}
+nav a .n{font-variant-numeric:tabular-nums;color:var(--muted);min-width:20px}
+nav a.done .n::after{content:" ✓";color:var(--accent)}
+nav .part{margin:16px 0 6px;color:var(--muted);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+nav .soon{color:var(--muted);padding:4px 8px;font-size:13px}
+main{padding:28px 0 80px;min-width:0}
+section.lesson{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:28px 32px;margin-bottom:28px}
+h2{font-size:28px;line-height:1.2;margin:0 0 4px}
+.kicker{font-family:var(--font-ui);font-size:12px;color:var(--accent);letter-spacing:.05em;text-transform:uppercase;font-weight:600}
+.file{font-family:var(--font-code);font-size:13px;color:var(--muted);margin:2px 0 16px}
+h3{font-family:var(--font-ui);font-size:15px;margin:24px 0 6px;font-weight:600}
+.simple{background:var(--accent-soft);border-radius:10px;padding:14px 18px;margin:14px 0}
+.simple b{font-family:var(--font-ui);font-size:13px;color:var(--accent);display:block;margin-bottom:2px}
+.whatif{background:var(--warn-soft);border-radius:10px;padding:14px 18px;margin:14px 0}
+.whatif b{font-family:var(--font-ui);font-size:13px;color:var(--warn);display:block;margin-bottom:2px}
+.codebox{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;margin:12px 0;align-items:start}
+pre.code{margin:0;background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:10px 0;overflow-x:auto;font-family:var(--font-code);font-size:12.5px;line-height:1.6}
+pre.code .ln{display:block;padding:0 12px 0 0;white-space:pre;border-left:3px solid transparent;cursor:default}
+pre.code .ln .no{display:inline-block;width:2.6em;text-align:right;padding-right:10px;color:var(--muted);user-select:none}
+pre.code .ln.has{cursor:pointer}
+pre.code .ln.has .no{color:var(--accent);font-weight:500}
+pre.code .ln.on{background:var(--hl);border-left-color:var(--hl-line)}
+pre.code .c{color:var(--muted);font-style:italic}
+pre.code .k{color:var(--accent)}
+ol.notes{list-style:none;margin:0;padding:0;font-size:15.5px}
+ol.notes li{padding:8px 12px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+ol.notes li:hover{border-color:var(--line)}
+ol.notes li.on{background:var(--hl);border-color:var(--hl-line)}
+ol.notes .tag{font-family:var(--font-code);font-size:12px;color:var(--accent);margin-right:6px}
+details.q{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0}
+details.q summary{cursor:pointer;font-family:var(--font-ui);font-size:14.5px;font-weight:500}
+details.q p{margin:8px 0 0}
+.got{font-family:var(--font-ui);font-size:14px;display:flex;gap:8px;align-items:center;margin-top:18px;color:var(--muted)}
+.got input{width:18px;height:18px;accent-color:var(--accent)}
+svg text{font-family:var(--font-ui)}
+.fig{margin:14px 0 4px}
+.fig svg{width:100%;height:auto}
+.legend{font-family:var(--font-ui);font-size:13px;color:var(--muted);margin-top:4px}
+code{font-family:var(--font-code);font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:4px}
+.toolbar{font-family:var(--font-ui);font-size:13px;margin-bottom:14px;display:flex;gap:10px;align-items:center;color:var(--muted)}
+.toolbar button{font:inherit;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
+table.map{width:100%;border-collapse:collapse;font-size:15px;margin:10px 0}
+table.map td{border-top:1px solid var(--line);padding:8px 6px;vertical-align:top}
+table.map td:first-child{font-family:var(--font-code);font-size:13px;white-space:nowrap;color:var(--accent)}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr;gap:0}
+  nav{position:static;max-height:none;padding:18px 0 0}
+  .codebox{grid-template-columns:1fr}
+  section.lesson{padding:20px 18px}
+  h2{font-size:23px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav id="nav">
+  <h1>Guia do código da plataforma</h1>
+  <div class="sub">Repositório <code>platform</code>, explicado do zero. Parte 1 de 6.</div>
+  <div class="part">Parte 1 · Os alicerces</div>
+  <div id="navlinks"></div>
+  <div class="part">A seguir</div>
+  <div class="soon">Parte 2 · Os dados (Postgres, SeaweedFS, lakeFS)</div>
+  <div class="soon">Parte 3 · As fechaduras (admissão, rede, projetos)</div>
+  <div class="soon">Parte 4 · Backups, ensaios e GC</div>
+  <div class="soon">Parte 5 · Terraform e a Oracle</div>
+  <div class="soon">Parte 6 · CI, imagens e scripts</div>
+</nav>
+
+<main>
+<div class="toolbar"><span>Clica num número verde (no código) ou numa nota (à direita) para ver as duas ligadas.</span><button id="theme">Tema</button></div>
+
+<!-- LIÇÃO 0 -->
+<section class="lesson" id="l0" data-title="Como usar este guia">
+  <div class="kicker">Lição 0</div>
+  <h2>Como usar este guia</h2>
+  <p>Cada lição pega num <b>ficheiro verdadeiro</b> do repositório <code>platform</code> (copiado tal como está hoje) e explica-o em três camadas:</p>
+  <div class="simple"><b>Em português simples</b>A ideia com uma analogia do dia a dia, sem termos técnicos.</div>
+  <p>Depois o <b>código, linha a linha</b>: as linhas com número verde têm uma nota. E no fim:</p>
+  <div class="whatif"><b>E se isto não existisse?</b>O que correria mal, porque é assim que se percebe para que serve uma coisa.</div>
+  <p>Fecha cada lição com as perguntas (a resposta abre-se ao carregar) e marca <i>Percebi</i>: fica guardado neste browser.</p>
+  <p>Ordem recomendada: segue as lições pela ordem. Cada uma usa a anterior.</p>
+</section>
+
+<!-- LIÇÃO 1 -->
+<section class="lesson" id="l1" data-title="O mapa do repositório">
+  <div class="kicker">Lição 1</div>
+  <h2>O mapa do repositório</h2>
+  <div class="simple"><b>Em português simples</b>Pensa na plataforma como <b>uma empresa de cozinhas industriais</b> com duas lojas (o Mac e a Oracle). O repositório é o <b>dossier</b> com tudo escrito: o terreno onde a loja está, os equipamentos comuns a todas as lojas, o que é próprio de cada loja, os clientes que lá cozinham, e a caixa de ferramentas. Ninguém monta nada "à mão": monta-se o que está no dossier.</div>
+  <div class="fig">
+<svg viewBox="0 0 680 300" role="img" aria-label="As pastas do repositório platform">
+  <rect x="10" y="10" width="660" height="280" rx="14" fill="none" stroke="var(--line)"/>
+  <text x="26" y="36" font-size="13" fill="var(--muted)">github.com/elwarrior100/platform</text>
+  <g font-size="13">
+    <rect x="26" y="52" width="200" height="66" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="40" y="76" font-weight="600" fill="var(--ink)">platform/</text>
+    <text x="40" y="98" fill="var(--muted)">o que todas as lojas têm</text>
+    <rect x="240" y="52" width="200" height="66" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="254" y="76" font-weight="600" fill="var(--ink)">envs/local · envs/oracle</text>
+    <text x="254" y="98" fill="var(--muted)">o que é só de cada loja</text>
+    <rect x="454" y="52" width="200" height="66" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="468" y="76" font-weight="600" fill="var(--ink)">projects/</text>
+    <text x="468" y="98" fill="var(--muted)">os clientes (ex.: modbus)</text>
+    <rect x="26" y="138" width="200" height="66" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="40" y="162" font-weight="600" fill="var(--ink)">terraform/oracle/</text>
+    <text x="40" y="184" fill="var(--muted)">o terreno e o edifício</text>
+    <rect x="240" y="138" width="200" height="66" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="254" y="162" font-weight="600" fill="var(--ink)">scripts/</text>
+    <text x="254" y="184" fill="var(--muted)">a caixa de ferramentas</text>
+    <rect x="454" y="138" width="200" height="66" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="468" y="162" font-weight="600" fill="var(--ink)">images/ · .github/</text>
+    <text x="468" y="184" fill="var(--muted)">a oficina e o inspetor</text>
+    <rect x="26" y="224" width="628" height="48" rx="8" fill="none" stroke="var(--line)" stroke-dasharray="4 4"/>
+    <text x="40" y="253" fill="var(--muted)">docs/ · README.md: o manual (runbook = o que fazer quando algo avaria)</text>
+  </g>
+</svg>
+  <div class="legend">Verde: o que o Argo CD aplica no cluster. Amarelo: o que tu (ou o CI) corres.</div>
+  </div>
+  <table class="map">
+    <tr><td>platform/k8s/</td><td>Manifests partilhados: namespaces, bases de dados, lake, regras de rede, segredos.</td></tr>
+    <tr><td>platform/argocd/</td><td>As "fichas" de cada aplicação que o Argo CD instala (<code>apps/</code>) e quem pode instalar o quê (<code>projects/</code>).</td></tr>
+    <tr><td>platform/airflow, monitoring, openmetadata</td><td>As configurações (values) dos charts Helm.</td></tr>
+    <tr><td>envs/&lt;loja&gt;/</td><td>A lista de aplicações de cada cluster, e o que só existe num deles (na Oracle: backups, ops, GC).</td></tr>
+    <tr><td>terraform/oracle/</td><td>A VM, a rede, o cofre, os buckets e os alarmes na Oracle Cloud.</td></tr>
+    <tr><td>scripts/</td><td>Tarefas que um humano corre: promover para a Oracle, ler uma palavra-passe do cofre, testes de restauro.</td></tr>
+  </table>
+  <div class="whatif"><b>E se isto não existisse?</b>A configuração viveria na cabeça de quem a fez e nos comandos que escreveu. Se a VM morresse, ninguém saberia reconstruí-la igual. Com o dossier, reconstruir é "aplicar o que está escrito".</div>
+  <details class="q"><summary>Pergunta: onde procurarias a regra que diz que os backups só podem sair para a Oracle?</summary><p>Em <code>envs/oracle/backup/</code>, porque os backups só existem na loja Oracle. É lá que está a <code>networkpolicy.yaml</code> desse namespace.</p></details>
+  <details class="q"><summary>Pergunta: a pasta terraform é aplicada pelo Argo CD?</summary><p>Não. O Argo CD só aplica coisas <b>dentro</b> do Kubernetes. O Terraform cria o que está <b>fora</b> (a VM onde o Kubernetes corre, os buckets, os alarmes) e corre-se à mão com <code>terraform plan</code> e <code>apply</code>.</p></details>
+  <label class="got"><input type="checkbox" data-done="l1"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 2 -->
+<section class="lesson" id="l2" data-title="Como uma mudança chega ao cluster">
+  <div class="kicker">Lição 2</div>
+  <h2>Como uma mudança chega ao cluster (GitOps)</h2>
+  <div class="simple"><b>Em português simples</b>O <b>Argo CD</b> é um gerente de loja muito obsessivo. De poucos em poucos minutos compara a loja com o dossier (o git). Se alguém mudou uma cadeira de sítio, ele põe-na de volta (<i>selfHeal</i>). Se o dossier diz "há uma mesa nova", ele monta-a. Tu nunca mexes na loja: <b>mexes no dossier</b>, e ele faz o resto.</div>
+  <div class="fig">
+<svg viewBox="0 0 680 250" role="img" aria-label="Fluxo do git até aos dois clusters">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="var(--muted)" stroke-width="1.6"/></marker></defs>
+  <g font-size="13">
+    <rect x="14" y="90" width="120" height="60" rx="8" fill="var(--paper)" stroke="var(--line)"/>
+    <text x="74" y="116" text-anchor="middle" font-weight="600" fill="var(--ink)">Tu</text>
+    <text x="74" y="136" text-anchor="middle" fill="var(--muted)">git push</text>
+    <rect x="186" y="90" width="150" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="261" y="116" text-anchor="middle" font-weight="600" fill="var(--ink)">ramo main</text>
+    <text x="261" y="136" text-anchor="middle" fill="var(--muted)">no GitHub</text>
+    <rect x="404" y="22" width="262" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="535" y="48" text-anchor="middle" font-weight="600" fill="var(--ink)">Cluster no Mac</text>
+    <text x="535" y="68" text-anchor="middle" fill="var(--muted)">o Argo CD de lá lê o main</text>
+    <rect x="186" y="176" width="150" height="60" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="261" y="202" text-anchor="middle" font-weight="600" fill="var(--ink)">ramo oracle</text>
+    <text x="261" y="222" text-anchor="middle" fill="var(--muted)">só avança se testado</text>
+    <rect x="404" y="176" width="262" height="60" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="535" y="202" text-anchor="middle" font-weight="600" fill="var(--ink)">Cluster na Oracle</text>
+    <text x="535" y="222" text-anchor="middle" fill="var(--muted)">o Argo CD de lá lê o oracle</text>
+    <line x1="134" y1="120" x2="182" y2="120" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <path d="M336 110 L370 110 L370 52 L400 52" fill="none" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <line x1="261" y1="150" x2="261" y2="172" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <text x="270" y="166" fill="var(--muted)" font-size="12">promote-oracle.sh</text>
+    <line x1="336" y1="206" x2="400" y2="206" stroke="var(--muted)" marker-end="url(#ar)"/>
+  </g>
+</svg>
+  <div class="legend">Primeiro experimenta-se no Mac. Só quando funciona é que o ramo <code>oracle</code> "anda para a frente" até esse commit.</div>
+  </div>
+  <p>Há só um ficheiro que se aplica à mão, uma vez por cluster: a <b>aplicação raiz</b>. Tudo o resto nasce dela, como uma árvore (é o padrão <i>app-of-apps</i>):</p>
+  <div class="fig">
+<svg viewBox="0 0 680 170" role="img" aria-label="A aplicação raiz cria as outras">
+  <g font-size="13">
+    <rect x="260" y="10" width="160" height="44" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="37" text-anchor="middle" font-weight="600" fill="var(--ink)">root</text>
+    <g fill="var(--paper)" stroke="var(--line)">
+      <rect x="20" y="108" width="110" height="44" rx="8"/><rect x="150" y="108" width="110" height="44" rx="8"/>
+      <rect x="280" y="108" width="110" height="44" rx="8"/><rect x="410" y="108" width="110" height="44" rx="8"/>
+      <rect x="540" y="108" width="120" height="44" rx="8"/>
+    </g>
+    <g text-anchor="middle" fill="var(--ink)">
+      <text x="75" y="135">data</text><text x="205" y="135">airflow</text><text x="335" y="135">monitoring</text>
+      <text x="465" y="135">backup</text><text x="600" y="135">… (mais 12)</text>
+    </g>
+    <g stroke="var(--muted)" fill="none">
+      <path d="M340 54 L340 80 L75 80 L75 106"/><path d="M340 80 L205 80 L205 106"/><path d="M340 80 L340 106"/>
+      <path d="M340 80 L465 80 L465 106"/><path d="M340 80 L600 80 L600 106"/>
+    </g>
+  </g>
+</svg>
+  </div>
+  <div class="whatif"><b>E se isto não existisse?</b>Cada instalação seria um comando teu (<code>helm install</code>, <code>kubectl apply</code>). Uma semana depois, os dois clusters já seriam diferentes e ninguém saberia porquê. É exatamente isso que o GitOps impede.</div>
+  <details class="q"><summary>Pergunta: mudaste uma réplica à mão com kubectl. O que acontece?</summary><p>Daqui a pouco o Argo CD vê que a loja não bate com o dossier e volta a pôr como está no git (<i>selfHeal</i>). A forma certa é mudar no git.</p></details>
+  <details class="q"><summary>Pergunta: porque é que a Oracle não lê o main diretamente?</summary><p>Para que nada chegue à Oracle sem ter corrido primeiro no Mac. O main é o "rascunho testado em casa"; o oracle só avança para commits que já lá funcionaram.</p></details>
+  <label class="got"><input type="checkbox" data-done="l2"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 3 -->
+<section class="lesson" id="l3" data-title="A aplicação raiz">
+  <div class="kicker">Lição 3 · primeiro ficheiro</div>
+  <h2>A aplicação raiz</h2>
+  <div class="file">envs/oracle/root-app.yaml</div>
+  <div class="simple"><b>Em português simples</b>É a <b>primeira página do dossier</b>: diz ao gerente (Argo CD) "a lista do que esta loja tem está na pasta <code>envs/oracle/apps</code> do ramo <code>oracle</code>; mantém a loja igual a essa lista".</div>
+  <div class="codebox" data-code="c-root" data-notes="n-root"></div>
+<script type="text/plain" id="c-root"># Root application (app-of-apps) for the oracle cluster. envs/oracle/apps is a Kustomization: the shared
+# applications (platform/argocd/apps) plus this environment's own. Apply once per cluster:
+#   kubectl apply -f envs/oracle/root-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: bootstrap      # platform/argocd/projects/bootstrap.yaml
+  source:
+    repoURL: https://github.com/elwarrior100/platform.git
+    targetRevision: oracle
+    path: envs/oracle/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true</script>
+<script type="application/json" id="n-root">[
+ [3,"O único comando manual: aplica-se uma vez quando o cluster nasce. Depois disto, o Argo CD gere tudo, até esta própria aplicação."],
+ [4,"<b>apiVersion + kind</b>: todo o ficheiro Kubernetes começa por dizer <i>que tipo de coisa</i> é. Aqui: uma <code>Application</code>, um tipo que o Argo CD acrescentou ao Kubernetes."],
+ [7,"O nome. É o que vês na lista do Argo CD (http://argocd…)."],
+ [10,"<b>project</b>: a \"caixa de permissões\" onde esta aplicação vive. <code>bootstrap</code> só deixa criar outras aplicações, nada mais. Assim, mesmo que alguém estrague esta lista, a raiz não consegue instalar uma base de dados ou abrir uma porta."],
+ [12,"<b>De onde</b> vem a receita: o repositório platform no GitHub."],
+ [13,"<b>Que versão</b> da receita: o ramo <code>oracle</code> (no Mac, o ficheiro gémeo diz <code>main</code>)."],
+ [14,"<b>Que pasta</b>: a lista de aplicações desta loja (lição 4)."],
+ [16,"<b>Para onde</b>: \"este mesmo cluster\" (é o endereço interno do Kubernetes)."],
+ [20,"<b>prune</b>: se uma aplicação sair da lista no git, é retirada do cluster."],
+ [21,"<b>selfHeal</b>: se alguém mexer à mão, o Argo CD repõe o que está no git."]
+]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Terias de aplicar à mão cada uma das 17 aplicações, por ordem, em cada cluster. E na primeira vez que te esquecesses de uma, os clusters ficariam diferentes.</div>
+  <details class="q"><summary>Pergunta: o que muda no ficheiro gémeo do Mac (envs/local/root-app.yaml)?</summary><p>Duas coisas: <code>targetRevision: main</code> e <code>path: envs/local/apps</code>. O resto é igual. É isso que faz o Mac seguir o rascunho e a Oracle seguir o que foi promovido.</p></details>
+  <details class="q"><summary>Pergunta (lição da 6.ª revisão): porque é que um cluster novo recusava esta aplicação?</summary><p>Porque ela vive no projeto <code>bootstrap</code>, e quem cria esse projeto é… ela própria. Num cluster vazio, o projeto ainda não existe e o Argo CD recusa. A correção: o <code>install-argocd.sh</code> cria o projeto <b>antes</b>, e o CI confirma essa ordem.</p></details>
+  <label class="got"><input type="checkbox" data-done="l3"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 4 -->
+<section class="lesson" id="l4" data-title="A lista de aplicações (Kustomize)">
+  <div class="kicker">Lição 4</div>
+  <h2>A lista de aplicações de uma loja</h2>
+  <div class="file">envs/oracle/apps/kustomization.yaml</div>
+  <div class="simple"><b>Em português simples</b>É uma <b>lista de compras com correções</b>: "leva tudo o que está na lista comum, mais estes cinco artigos que só esta loja tem; e em tudo o que diz <i>main</i>, risca e escreve <i>oracle</i>". O <b>Kustomize</b> é a pessoa que faz essas correções antes de entregar a lista ao Argo CD.</div>
+  <div class="codebox" data-code="c-kust" data-notes="n-kust"></div>
+<script type="text/plain" id="c-kust"># Oracle cluster: the shared applications plus its own (secret store with instance principal, backups).
+# It follows the "oracle" branch instead of main: a change is tried on the local cluster first and reaches Oracle
+# only when promoted (scripts/promote-oracle.sh fast-forwards the oracle branch to a tested commit).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../platform/argocd/apps
+  - secret-store.yaml
+  - ingress.yaml
+  - backup.yaml
+  - ops.yaml
+  - lakefs-gc.yaml
+patches:
+  - target: {kind: Application, labelSelector: "platform/git-source=true"}
+    patch: |-
+      - {op: replace, path: /spec/source/targetRevision, value: oracle}
+  - target: {kind: ApplicationSet, name: projects}
+    patch: |-
+      - {op: replace, path: /spec/generators/0/git/revision, value: oracle}
+      - {op: replace, path: /spec/template/spec/source/targetRevision, value: oracle}</script>
+<script type="application/json" id="n-kust">[
+ [5,"<b>Kustomization</b>: não é um objeto do cluster; é uma \"receita de montagem\" que o Argo CD processa antes de aplicar."],
+ [6,"<b>resources</b>: os ingredientes. A lista final é a soma de todos."],
+ [7,"A lista <b>comum</b> às duas lojas (Postgres, lakeFS, Airflow, monitorização…). Os <code>../</code> sobem três pastas até à raiz do repositório."],
+ [8,"Daqui para baixo: o que <b>só a Oracle</b> tem. O cofre lido com a identidade da VM, o acesso pelo browser, os backups, o ops e a GC."],
+ [13,"<b>patches</b>: as correções. Em vez de copiar 15 ficheiros só para mudar uma palavra, muda-se a palavra aqui."],
+ [14,"<b>A quem</b> se aplica: às aplicações com a etiqueta <code>platform/git-source=true</code>, ou seja, as que leem este repositório (as de charts Helm externos não precisam)."],
+ [16,"<b>O quê</b>: substitui o ramo (<code>targetRevision</code>) por <code>oracle</code>. É assim que a mesma ficha serve para as duas lojas."],
+ [17,"O mesmo para o <b>ApplicationSet</b> dos projetos: a \"fotocopiadora\" que cria uma aplicação por cada pasta em <code>projects/*/k8s/*</code>."]
+]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Terias duas cópias de cada ficha de aplicação, uma por loja, que só diferem numa palavra. Mais cedo ou mais tarde corrigias uma e esquecias a outra.</div>
+  <details class="q"><summary>Pergunta: queres uma aplicação nova só na Oracle. Onde a acrescentas?</summary><p>Crias <code>envs/oracle/apps/&lt;nome&gt;.yaml</code> e juntas uma linha em <code>resources</code> deste ficheiro. Foi exatamente o que fiz com a GC (<code>lakefs-gc.yaml</code>).</p></details>
+  <details class="q"><summary>Pergunta: porque é que a GC é só da Oracle?</summary><p>Porque o lake do Mac perdeu metadados de alguns commits nos incidentes de novembro (ADR-008). A GC tem de ler a história toda, por isso lá nunca conseguiria acabar.</p></details>
+  <label class="got"><input type="checkbox" data-done="l4"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 5 -->
+<section class="lesson" id="l5" data-title="Uma aplicação: os dados">
+  <div class="kicker">Lição 5</div>
+  <h2>Uma ficha de aplicação: os dados</h2>
+  <div class="file">platform/argocd/apps/data.yaml</div>
+  <div class="simple"><b>Em português simples</b>Cada aplicação é uma <b>ficha</b>: "vai buscar estes ficheiros, monta-os nesta divisão da loja, e mantém-nos assim". Esta é a ficha da divisão mais valiosa, <b>os dados</b>, e por isso tem uma regra especial: <b>nunca deitar fora sozinho</b>.</div>
+  <div class="codebox" data-code="c-data" data-notes="n-data"></div>
+<script type="text/plain" id="c-data">apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: data
+  namespace: argocd
+  labels:
+    platform/git-source: "true"     # reads this repository: each environment sets which branch
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/elwarrior100/platform.git
+    targetRevision: main
+    path: platform/k8s
+    directory:
+      recurse: true
+      include: "{postgres/*.yaml,seaweedfs/*.yaml,lakefs/*.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: data
+  syncPolicy:
+    automated:
+      prune: false          # data: a manifest deleted from git must not delete the database
+      selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates   # fields filled in by Kubernetes (volumeMode, status)</script>
+<script type="application/json" id="n-data">[
+ [7,"A etiqueta que a lição 4 procura: é por ela que o Kustomize troca <code>main</code> por <code>oracle</code> na Oracle."],
+ [9,"<b>sync-wave</b>: a ordem de chegada. Onda 1 vem depois da onda 0 (namespaces, regras). Primeiro constrói-se a divisão, depois mete-se a mobília."],
+ [11,"<b>project: platform</b>: a caixa de permissões da plataforma, que lista exatamente que namespaces e que tipos de objetos pode tocar."],
+ [14,"<code>main</code> aqui, mas na Oracle o patch da lição 4 muda para <code>oracle</code>."],
+ [15,"A pasta de onde lê: <code>platform/k8s</code>…"],
+ [18,"…mas <b>só</b> as subpastas postgres, seaweedfs e lakefs. As outras pastas de <code>platform/k8s</code> pertencem a outras fichas."],
+ [21,"Tudo isto vai para o namespace (a \"divisão\") <code>data</code>."],
+ [24,"<b>A regra mais importante desta ficha.</b> Se um ficheiro sair do git por engano, o Argo CD <b>não</b> apaga a base de dados. Prefere ficar \"fora de sincronia\" e esperar que um humano decida. (Ontem vimos isto: o CronJob da GC ficou órfão no Mac até eu o mandar podar à mão.)"],
+ [25,"Mas mexidas à mão continuam a ser desfeitas."],
+ [28,"<b>ignoreDifferences</b>: o Kubernetes acrescenta sozinho alguns campos aos volumes. Sem isto, o Argo CD julgaria que alguém os mudou e ficava eternamente \"OutOfSync\"."]
+]</script>
+  <div class="whatif"><b>E se isto não existisse?</b> Sem o <code>prune: false</code>, um <code>git mv</code> mal feito ou uma pasta apagada por engano faria o Argo CD apagar o Postgres (com o spool e a história do lake) em segundos, "porque o git mandou".</div>
+  <details class="q"><summary>Pergunta: porque é que a aplicação raiz tem prune: true e esta tem false?</summary><p>A raiz só gere fichas de aplicações: apagar uma ficha não destrói dados. Esta gere bases de dados: apagar por engano é irreversível. Quanto mais caro o erro, mais o sistema deve pedir confirmação humana.</p></details>
+  <label class="got"><input type="checkbox" data-done="l5"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 6 -->
+<section class="lesson" id="l6" data-title="Namespaces e etiquetas">
+  <div class="kicker">Lição 6</div>
+  <h2>As divisões da loja: namespaces</h2>
+  <div class="file">platform/k8s/00-namespaces.yaml (o primeiro dos 9)</div>
+  <div class="simple"><b>Em português simples</b>Um <b>namespace</b> é uma <b>divisão</b> com porta própria: a cozinha (<code>data</code>), a sala das máquinas (<code>ingest</code>), o escritório (<code>airflow</code>)… Na porta de cada divisão há <b>autocolantes</b> (etiquetas) com as regras dela: "aqui não entram fogões a gás" ou "a canalização desta sala foi verificada".</div>
+  <div class="codebox" data-code="c-ns" data-notes="n-ns"></div>
+<script type="text/plain" id="c-ns"># Every namespace of the platform, with Pod Security Standards: "baseline" is enforced (no privileged pods, host
+# namespaces, host ports, added capabilities...) and "restricted" is shown as warnings. monitoring is the only exception
+# (node-exporter reads the host's /proc and /sys through hostPath): privileged enforced, baseline warnings.
+# platform/network-reviewed: someone decided this namespace's network policies (which, in the comment). The admission
+# rule network-reviewed-namespaces refuses pods in any namespace without it (platform/k8s/admission).
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    platform/network-reviewed: "true"   # egress-allowlist + ingress rules (platform/k8s/network-policies)
+    pod-security.kubernetes.io/warn: restricted</script>
+<script type="application/json" id="n-ns">[
+ [6,"<code>---</code> separa documentos num mesmo ficheiro: este ficheiro tem 9 namespaces, um depois do outro."],
+ [7,"<code>apiVersion: v1</code> e <code>kind: Namespace</code>: um tipo que vem com o próprio Kubernetes (por isso não tem prefixo de empresa, como o <code>argoproj.io</code> da lição 3)."],
+ [10,"O nome da divisão."],
+ [12,"<b>Autocolante 1 (obrigatório):</b> o Kubernetes recusa pods \"perigosos\" (que pedem para ver o disco do servidor, correr como superutilizador do sistema, etc.). <i>baseline</i> é o nível \"bom senso\"."],
+ [13,"<b>Autocolante 2 (nosso):</b> \"alguém pensou na canalização (rede) desta divisão\". Desde ontem, sem este autocolante <b>nenhum pod arranca</b> aqui: uma regra de admissão verifica-o. Assim, uma divisão nova não fica com as portas todas abertas por esquecimento."],
+ [14,"<b>Autocolante 3 (aviso):</b> o nível mais exigente, <i>restricted</i>, só avisa (não bloqueia). Serve para veres o que falta endurecer."]
+]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um pod novo num namespace novo podia chegar ao endereço especial da Oracle (169.254.169.254) que dá as credenciais da VM, e com elas ler o cofre inteiro. A etiqueta obriga a pensar nisso antes.</div>
+  <details class="q"><summary>Pergunta: criaste o namespace "teste" sem etiquetas e o pod não arranca. Porquê, e qual é o caminho certo?</summary><p>A regra de admissão <code>network-reviewed-namespaces</code> recusa-o. O caminho certo: escrever primeiro as regras de rede (pelo menos a <code>deny-cloud-metadata</code>, lição 7) e só depois pôr o namespace no ficheiro com a etiqueta e um comentário a dizer qual regra se aplica (está no runbook).</p></details>
+  <label class="got"><input type="checkbox" data-done="l6"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 7 -->
+<section class="lesson" id="l7" data-title="Uma regra de rede">
+  <div class="kicker">Lição 7</div>
+  <h2>Uma regra de rede: fechar a porta perigosa</h2>
+  <div class="file">platform/k8s/network-policies/deny-cloud-metadata.yaml (o primeiro bloco)</div>
+  <div class="simple"><b>Em português simples</b>Na Oracle existe uma <b>porta especial</b> (o endereço 169.254.169.254) onde qualquer programa dentro da VM pode pedir "dá-me as chaves desta VM". Esta regra é um <b>segurança à porta da divisão</b> do Airflow: "podem sair para onde quiserem, <b>menos</b> para essa porta".</div>
+  <div class="fig">
+<svg viewBox="0 0 680 150" role="img" aria-label="Um pod do Airflow pode sair para todo o lado exceto o endereço de metadados">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="var(--muted)" stroke-width="1.6"/></marker></defs>
+  <g font-size="13">
+    <rect x="14" y="44" width="150" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="89" y="70" text-anchor="middle" font-weight="600" fill="var(--ink)">pod do Airflow</text>
+    <text x="89" y="90" text-anchor="middle" fill="var(--muted)">namespace airflow</text>
+    <rect x="470" y="8" width="196" height="40" rx="8" fill="var(--paper)" stroke="var(--line)"/>
+    <text x="568" y="33" text-anchor="middle" fill="var(--ink)">GitHub, Postgres… ✓</text>
+    <rect x="470" y="98" width="196" height="40" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="568" y="123" text-anchor="middle" fill="var(--ink)">169.254.169.254 ✗</text>
+    <path d="M164 64 L300 28 L466 28" fill="none" stroke="var(--muted)" marker-end="url(#ar2)"/>
+    <path d="M164 86 L300 118 L420 118" fill="none" stroke="var(--warn)" stroke-dasharray="5 4"/>
+    <line x1="430" y1="108" x2="450" y2="128" stroke="var(--warn)" stroke-width="2.5"/><line x1="450" y1="108" x2="430" y2="128" stroke="var(--warn)" stroke-width="2.5"/>
+  </g>
+</svg>
+  </div>
+  <div class="codebox" data-code="c-np" data-notes="n-np"></div>
+<script type="text/plain" id="c-np"># Namespaces that need the internet (airflow: the DAG bundle from GitHub; argocd: GitHub and Helm repositories;
+# monitoring: scrapes everything) keep open egress EXCEPT the cloud metadata endpoint (169.254.169.254), which on
+# Oracle hands out instance-principal credentials that can read the whole vault. The namespaces that need no internet
+# have a strict allow-list instead (egress-allowlists.yaml). Not listed anywhere, on purpose: external-secrets and
+# backup (they use the instance principal) and kube-system. A new workload namespace must get one or the other.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-cloud-metadata
+  namespace: airflow
+spec:
+  podSelector: {}                                   # every pod in this namespace, no exceptions
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {}          # any pod in the cluster (DNS, Postgres, lakeFS...)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [169.254.169.254/32]</script>
+<script type="application/json" id="n-np">[
+ [1,"Os comentários explicam a <b>política</b>: há dois tipos de divisão. As que precisam de internet ficam abertas menos esta porta; as que não precisam têm uma lista curta do que é permitido (é o caso do backup: só a Oracle, lição da 5.ª revisão)."],
+ [8,"<b>NetworkPolicy</b>: uma regra de \"quem pode falar com quem\". Quem a faz cumprir no k3s é o <i>kube-router</i>."],
+ [11,"Vale só para a divisão <code>airflow</code>. O mesmo ficheiro tem blocos iguais para argocd, monitoring e default."],
+ [13,"<code>podSelector: {}</code> = \"todos os pods desta divisão\". Chavetas vazias significam \"sem filtro\"."],
+ [14,"<b>Egress</b> = o que <b>sai</b>. (Ingress seria o que entra.)"],
+ [16,"<b>Primeira saída permitida:</b> qualquer pod do próprio cluster."],
+ [18,"<b>Segunda saída permitida:</b> qualquer endereço da internet (<code>0.0.0.0/0</code> quer dizer \"todos\")…"],
+ [21,"…<b>exceto</b> a porta perigosa. O <code>/32</code> quer dizer \"exatamente este endereço, só um\"."]
+]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Uma tarefa do Airflow com um bug (ou uma biblioteca maliciosa) podia pedir as credenciais da VM e ler <b>todas</b> as palavras-passe do cofre. Com a regra, o pedido nem chega lá.</div>
+  <details class="q"><summary>Pergunta: e o namespace backup, que PRECISA de falar com essa porta?</summary><p>Não está nesta lista de propósito. Tem a sua própria regra, mais apertada: pode chegar à porta de metadados (para se identificar como a VM) e às 7 faixas de endereços dos serviços da Oracle, e mais nada.</p></details>
+  <details class="q"><summary>Pergunta: porque é que um pod novo às vezes falha os primeiros segundos?</summary><p>O kube-router demora uns segundos a pôr um pod novo na lista do que é permitido. Por isso os jobs têm um "espera até conseguires ligar" no início (o <code>sleep 10</code> e os ciclos de tentativa que verás na Parte 4).</p></details>
+  <label class="got"><input type="checkbox" data-done="l7"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 8 -->
+<section class="lesson" id="l8" data-title="Segredos que vêm do cofre">
+  <div class="kicker">Lição 8</div>
+  <h2>Segredos que vêm do cofre</h2>
+  <div class="file">platform/k8s/secrets/data.yaml (o primeiro) · envs/oracle/secret-store/cluster-secret-store.yaml</div>
+  <div class="simple"><b>Em português simples</b>As palavras-passe vivem num <b>cofre do banco</b> (o OCI Vault), não no dossier, porque o dossier é público. Em cada loja há um <b>estafeta</b> (o External Secrets Operator) com uma <b>autorização</b> para ir ao banco. No dossier só está escrito "pede ao estafeta a palavra-passe com este nome", nunca a palavra-passe.</div>
+  <div class="codebox" data-code="c-es" data-notes="n-es"></div>
+<script type="text/plain" id="c-es"># Secrets for the data namespace, read from the OCI Vault by the External Secrets Operator (ADR-011).
+# The vault secret <namespace>-<secret> holds every key of the Kubernetes Secret as JSON.
+# creationPolicy: Orphan: the Secret has no owner, so deleting this ExternalSecret (or the operator) does NOT delete
+# the Secret, which holds live database passwords. deletionPolicy: Retain: if the value disappears from the vault,
+# the last known value is kept in the cluster.
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: postgres-auth
+  namespace: data
+spec:
+  refreshInterval: 1h
+  secretStoreRef: {kind: ClusterSecretStore, name: oci-vault}
+  target: {name: postgres-auth, creationPolicy: Orphan, deletionPolicy: Retain}
+  dataFrom:
+    - extract: {key: data-postgres-auth}</script>
+<script type="application/json" id="n-es">[
+ [2,"A convenção de nomes: no cofre chama-se <code>&lt;namespace&gt;-&lt;segredo&gt;</code>. Uma regra de admissão obriga cada namespace a só pedir segredos com o <b>seu</b> prefixo."],
+ [8,"<b>ExternalSecret</b>: o \"pedido ao estafeta\". Não contém a palavra-passe, só diz qual."],
+ [13,"De hora a hora o estafeta volta ao banco. Se mudares a palavra-passe no cofre, chega ao cluster dentro de uma hora."],
+ [14,"<b>A que banco</b>: o <code>oci-vault</code> (ver o segundo ficheiro, abaixo)."],
+ [15,"<b>O que cria</b>: um Secret do Kubernetes chamado <code>postgres-auth</code>. <i>Orphan</i> e <i>Retain</i> são cintos de segurança: mesmo que o estafeta desapareça ou o valor saia do cofre, a base de dados não fica sem palavra-passe de repente."],
+ [17,"<b>extract</b>: \"traz todas as chaves que estão dentro de <code>data-postgres-auth</code>\" (no cofre, cada segredo é um pequeno JSON com várias chaves)."]
+]</script>
+  <div class="codebox" data-code="c-store" data-notes="n-store"></div>
+<script type="text/plain" id="c-store"># The OCI Vault as a source of secrets on the Oracle VM: the VM itself is authorised by the platform-instances
+# dynamic group (instance principal), so no key is stored in this cluster.
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: oci-vault
+spec:
+  conditions:
+    # Only these namespaces may read secrets from the vault through this store (a new project's namespace must be
+    # added on purpose, so it cannot read the platform's database passwords by accident).
+    - namespaces: [data, ingest, airflow, openmetadata, backup, monitoring, ops]
+  provider:
+    oracle:
+      vault: ocid1.vault.oc1.eu-madrid-1.ifvpquesaago4.abwwcljrp7u2lr7vvs67dve2oqfs3qe5cu5br2n6kwva3mabshammoowrawa
+      region: eu-madrid-1
+      principalType: InstancePrincipal</script>
+<script type="application/json" id="n-store">[
+ [4,"<b>ClusterSecretStore</b>: a \"autorização do estafeta para ir a este banco\", válida para o cluster inteiro."],
+ [11,"Mas só estas divisões podem usar o estafeta. Um projeto novo tem de ser acrescentado de propósito."],
+ [14,"O endereço do cofre. <b>Não é segredo</b>: saber onde fica o banco não abre o cofre."],
+ [16,"<b>Instance principal</b>: na Oracle, a própria VM identifica-se ao banco (é o que a porta especial da lição 7 dá). Não há nenhuma chave guardada no cluster. No Mac não há VM da Oracle, por isso lá o estafeta usa uma chave de leitura (o único \"segredo zero\")."]
+]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>As palavras-passe teriam de estar no git (e o repositório é público: qualquer pessoa as leria), ou ser criadas à mão em cada cluster (e na reconstrução ninguém se lembraria delas).</div>
+  <details class="q"><summary>Pergunta: como é que lês a palavra-passe do Grafana da Oracle sem a ver no ecrã?</summary><p><code>./scripts/vault-get.sh monitoring-grafana-admin-oracle password | pbcopy</code>. O script recusa-se a escrever para o ecrã: só funciona com um "tubo" (<code>|</code>) para outro programa.</p></details>
+  <label class="got"><input type="checkbox" data-done="l8"> Percebi esta lição</label>
+</section>
+
+<!-- LIÇÃO 9 -->
+<section class="lesson" id="l9" data-title="Promover para a Oracle">
+  <div class="kicker">Lição 9 · o primeiro script</div>
+  <h2>Promover para a Oracle</h2>
+  <div class="file">scripts/promote-oracle.sh</div>
+  <div class="simple"><b>Em português simples</b>É o <b>carimbo de aprovado</b>. Quando uma mudança já funcionou no Mac, este script move o marcador <code>oracle</code> até ela. E tem uma regra de ferro: o marcador <b>só anda para a frente</b>, nunca salta para o lado nem para trás.</div>
+  <div class="codebox" data-code="c-prom" data-notes="n-prom"></div>
+<script type="text/plain" id="c-prom">#!/usr/bin/env bash
+# Promotes a tested commit to the Oracle cluster: fast-forwards the "oracle" branch to it (default: main).
+# Argo CD on Oracle follows that branch (envs/oracle/apps). Refuses anything that is not a fast-forward, so the
+# Oracle history only ever moves forward through commits that already ran on the local cluster.
+# Usage: ./scripts/promote-oracle.sh [commit]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+REF="${1:-main}"
+git fetch -q origin
+SHA="$(git rev-parse "origin/$REF" 2>/dev/null || git rev-parse "$REF")"
+git merge-base --is-ancestor origin/oracle "$SHA" || { echo "refused: $SHA is not ahead of oracle (not a fast-forward)" >&2; exit 1; }
+echo "oracle: $(git rev-parse --short origin/oracle) -> $(git rev-parse --short "$SHA")"
+git log --oneline "origin/oracle..$SHA"
+git push origin "$SHA:refs/heads/oracle"</script>
+<script type="application/json" id="n-prom">[
+ [1,"A primeira linha de qualquer script: \"corre isto com o bash\"."],
+ [6,"<b>O cinto de segurança de todos os nossos scripts.</b> <code>-e</code>: pára ao primeiro erro. <code>-u</code>: pára se usares uma variável que não existe (um erro de escrita não apaga \"tudo\"). <code>pipefail</code>: um erro no meio de um <code>a | b</code> também conta."],
+ [7,"Vai para a raiz do repositório, venhas de onde vieres."],
+ [8,"Se não disseres que commit, usa o <code>main</code>. (<code>${1:-main}</code> = \"o primeiro argumento, ou main se não houver\".)"],
+ [9,"Atualiza o que sabe do GitHub, para comparar com a versão verdadeira e não com uma cópia velha."],
+ [11,"<b>A regra de ferro.</b> \"O oracle atual é antepassado deste commit?\" Se não for (alguém tentou saltar para um ramo ao lado), recusa e explica porquê."],
+ [12,"Mostra de onde para onde vai…"],
+ [13,"…e a lista de commits que entram. É o momento de ler antes de carregar."],
+ [14,"Move o marcador no GitHub. A partir daqui, o Argo CD da Oracle vê a mudança sozinho."]
+]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Para levar uma mudança à Oracle farias um <code>git push --force</code> no ramo oracle. Um dia empurravas um ramo errado, e a Oracle recuava ou recebia algo que nunca correu no Mac.</div>
+  <details class="q"><summary>Pergunta: ontem uma promoção fez a Oracle reiniciar o k3s. O script tinha um bug?</summary><p>Não: o script fez o que devia. O problema foi o <b>tamanho</b> da mudança: reiniciou de uma vez o OpenSearch, o OpenMetadata, o Prometheus e o Argo CD numa VM de 2 CPUs. A lição ficou no runbook: mudanças pesadas promovem-se aos poucos.</p></details>
+  <label class="got"><input type="checkbox" data-done="l9"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="lnext" data-title="O que vem na Parte 2">
+  <div class="kicker">Fim da Parte 1</div>
+  <h2>O que vem a seguir</h2>
+  <p>Já sabes <b>como as coisas chegam</b> ao cluster. A Parte 2 mostra <b>o que lá está</b> de mais importante: o Postgres (o spool e a memória do lake), o SeaweedFS (onde os ficheiros vivem de facto) e o lakeFS (o git dos dados), ficheiro a ficheiro, no mesmo formato.</p>
+  <p>Quando acabares esta parte, diz-me e eu acrescento a seguinte a esta mesma página.</p>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+  const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+  // theme toggle
+  const root = document.documentElement, saved = store.get("guia-theme");
+  if (saved) root.setAttribute("data-theme", saved);
+  document.getElementById("theme").addEventListener("click", () => {
+    const dark = root.getAttribute("data-theme") ? root.getAttribute("data-theme") === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark"; root.setAttribute("data-theme", next); store.set("guia-theme", next);
+  });
+  // nav
+  const nav = document.getElementById("navlinks");
+  document.querySelectorAll("section.lesson").forEach((s, i) => {
+    if (s.id === "lnext") return;
+    const a = document.createElement("a"); a.href = "#" + s.id; a.dataset.id = s.id;
+    const n = document.createElement("span"); n.className = "n"; n.textContent = i;
+    const t = document.createElement("span"); t.textContent = s.dataset.title;
+    a.append(n, t); nav.append(a);
+  });
+  const mark = () => document.querySelectorAll("#navlinks a").forEach(a => a.classList.toggle("done", store.get("guia-done-" + a.dataset.id) === "1"));
+  document.querySelectorAll("input[data-done]").forEach(cb => {
+    cb.checked = store.get("guia-done-" + cb.dataset.done) === "1";
+    cb.addEventListener("change", () => { store.set("guia-done-" + cb.dataset.done, cb.checked ? "1" : "0"); mark(); });
+  });
+  mark();
+  // code blocks with linked notes
+  document.querySelectorAll(".codebox").forEach(box => {
+    const code = document.getElementById(box.dataset.code).textContent.replace(/^\n/, "");
+    const notes = JSON.parse(document.getElementById(box.dataset.notes).textContent);
+    const byLine = new Map(notes.map(([l, t]) => [l, t]));
+    const pre = document.createElement("pre"); pre.className = "code";
+    const ol = document.createElement("ol"); ol.className = "notes";
+    const lines = code.split("\n"), lnEls = [];
+    lines.forEach((text, i) => {
+      const no = i + 1, el = document.createElement("span"); el.className = "ln";
+      const num = document.createElement("span"); num.className = "no"; num.textContent = no;
+      const body = document.createElement("span");
+      const hash = text.indexOf("#");
+      if (/^\s*#/.test(text)) { body.className = "c"; body.textContent = text; }
+      else if (hash > 0 && /\s#\s/.test(text) && !text.includes("${")) {
+        const idx = text.search(/\s#\s/); body.textContent = text.slice(0, idx);
+        const c = document.createElement("span"); c.className = "c"; c.textContent = text.slice(idx); el.append(num, body, c); lnEls.push(el); pre.append(el, "\n");
+        if (byLine.has(no)) el.classList.add("has"); return;
+      } else { body.textContent = text; }
+      el.append(num, body); if (byLine.has(no)) el.classList.add("has"); lnEls.push(el); pre.append(el, "\n");
+    });
+    const noteEls = new Map();
+    notes.forEach(([l, t]) => {
+      const li = document.createElement("li"); li.dataset.line = l;
+      const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "linha " + l;
+      const span = document.createElement("span"); span.innerHTML = t;   // notes are written in this page, not user input
+      li.append(tag, span); ol.append(li); noteEls.set(l, li);
+    });
+    const select = l => {
+      lnEls.forEach((e, i) => e.classList.toggle("on", i + 1 === l));
+      noteEls.forEach((li, k) => li.classList.toggle("on", k === l));
+    };
+    lnEls.forEach((e, i) => { if (byLine.has(i + 1)) e.addEventListener("click", () => { select(i + 1); noteEls.get(i + 1).scrollIntoView({block: "nearest", behavior: "smooth"}); }); });
+    noteEls.forEach((li, l) => li.addEventListener("click", () => { select(l); lnEls[l - 1].scrollIntoView({block: "nearest", behavior: "smooth"}); }));
+    box.append(pre, ol);
+  });
+})();
+</script>
+</body>
+</html>
