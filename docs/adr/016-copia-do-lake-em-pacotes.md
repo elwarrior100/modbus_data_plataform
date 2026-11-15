@@ -35,6 +35,21 @@ Ao ritmo normal seriam mais de 500 mil pedidos por mês, e a crescer com o lake.
 - **Incremental minutos depois:** 14 objetos, 400 KB.
 - **Ensaio a partir de 2 pacotes:** 13 153 objetos restaurados; os 1890 objetos do `main` têm todos o MD5 certo.
 
+## Limites de capacidade (10.ª revisão)
+- **A cópia guarda cerca de 2 a 3 vezes o tamanho do lake:** os dois últimos ciclos mensais, mais a cópia antiga até
+  dezembro.
+- **O lake-sync** precisa de 2 vezes o lake no volume temporário (12 Gi). **O ensaio** precisa de 1 vez em cada um
+  dos seus dois volumes (20 Gi cada).
+- **Para tudo continuar grátis e caber nestes volumes, o lake deve ficar abaixo de cerca de 5 GB.** Hoje tem cerca de
+  0,3 GB. A retenção de 15 dias e a GC (ADR-015) é que o mantêm assim. O alarme dos 12 GB no bucket é o último aviso.
+- **Um restauro real** usa o primeiro catálogo escrito **depois** do dump que se restaura (o ensaio usa o mais
+  recente, que é sempre posterior ao dump das 02:30).
+- **Robustez:**
+  - um erro a listar a cópia faz a noite falhar, em vez de criar um pacote completo às escondidas;
+  - se o dia 1 falhar, o pacote completo faz-se quando o anterior tiver mais de 31 dias;
+  - os envios a meio são abortados pelo Object Storage ao fim de 2 dias;
+  - a poda nunca apaga um pacote que o catálogo mais recente use.
+
 ## Alternativas
 - **Ensaio semanal em vez de diário:** um alarme de ausência da OCI espera no máximo 3 dias, por isso o ensaio
   ficaria sem alarme. E a cópia noturna continuaria a passar o limite sozinha.
