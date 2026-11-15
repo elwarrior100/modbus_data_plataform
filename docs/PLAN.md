@@ -597,8 +597,8 @@ código e explica-o; ver CLAUDE.md.)*
    (1890/1890 MD5); alarme se um dia passar de 1 500 pedidos. Também: disco só de leitura no backup/ops, teste de
    arranque da árvore toda no commit, poda/GC com lista à vista, scan semanal de todas as imagens (apanhou o modelo
    das tarefas do Airflow em 3.2.2), política do Tailscale no git, `new-project.sh`.
-   - ⬜ **Início de dezembro:** `./scripts/lake-backup-prune.sh --apply` para retirar a cópia antiga objeto a objeto
-     (~12 900 pedidos, cabem no orçamento novo).
+   - ✅ A cópia antiga objeto a objeto (~12 900) é apagada sozinha a 2–3 de dezembro por uma regra de ciclo de vida
+     do Object Storage (orçamento de pedidos novo). ⬜ Depois disso, retirar a regra do `backups.tf`.
 22. ✅ (2026-11-15) 10.ª revisão: **88,4/100**. Corrigido logo: sinal de vida da GC ignora corridas manuais (com período
    de graça), lake-sync falha num erro de listagem e repõe o completo se o dia 1 falhar, `pipefail`, poda guiada pelos
    catálogos, envios a meio abortados em 2 dias, despejo por memória com 60 s, orçamento que avisa ao primeiro cêntimo.

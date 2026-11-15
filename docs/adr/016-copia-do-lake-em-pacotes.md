@@ -58,8 +58,10 @@ Ao ritmo normal seriam mais de 500 mil pedidos por mês, e a crescer com o lake.
 - **Pagar os pedidos:** cerca de €0,15–0,30 por mês e a crescer. Contra o requisito de custo zero.
 
 ## Consequências
-- A cópia antiga, objeto a objeto (cerca de 12 900 objetos), fica até ser podada. Apagá-la gasta cerca de 13 mil
-  pedidos, por isso faz-se no início de um mês (dezembro).
+- A cópia antiga, objeto a objeto (cerca de 12 900 objetos), é apagada **pelo próprio Object Storage**, com uma regra
+  de ciclo de vida (`delete-legacy-object-copy-after-18-days`, só nas pastas `_lakefs/`, `data/` e `_prune/`), entre
+  2 e 3 de dezembro, já com o orçamento de pedidos novo. Não é a VM que apaga, por isso a cópia continua protegida
+  contra uma VM comprometida. A regra sai do Terraform depois disso.
 - Um restauro real usa a mesma lógica do ensaio: o catálogo mais recente, os pacotes dele, e depois o dump do lakeFS.
 - Um pacote completo tem o tamanho do lake. A retenção de 15 dias e a GC (ADR-015) mantêm-no limitado, e o alarme dos
   12 GB avisa se crescer demais.
