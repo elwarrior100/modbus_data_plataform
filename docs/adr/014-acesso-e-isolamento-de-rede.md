@@ -35,10 +35,18 @@ A 5.ª e a 6.ª revisões críticas (77,75 e 79,6/100) apontaram quatro coisas:
 
    É diário e não semanal porque um alarme de ausência da OCI espera no máximo 3 dias.
 
+7. **HTTPS com nomes `*.ts.net` (2026-11-15), por Tailscale Services na VM** e não pelo operador Kubernetes:
+   - `https://<serviço>.taila669aa.ts.net`, um Tailscale Service por interface, com certificado Let's Encrypt;
+   - o Tailscale da VM (etiquetada `tag:platform`) entrega ao Traefik em 127.0.0.1:80 e mantém o nome do site, por
+     isso os Ingress também respondem a estes nomes;
+   - configurado por `envs/oracle/tailscale-services.sh`; os nomes `sslip.io` ficam de reserva;
+   - grátis no plano Personal; 0 MB no cluster.
+
 ## Alternativas
-- **HTTPS com nomes `*.ts.net` (operador do Tailscale):** melhor que o HTTP sobre `sslip.io`. Com HTTP, quem
-  controlasse o DNS do `sslip.io` poderia receber as palavras-passe em claro, e nenhum certificado avisaria. É o passo
-  seguinte; precisa de um OAuth client do Tailscale. Até lá, o WireGuard cifra o caminho.
+- **Operador Kubernetes do Tailscale:** recusado. Desde a versão 1.78 os seus proxies correm como contentores
+  privilegiados (precisam de criar `/dev/net/tun`), o que obrigaria a abrir uma exceção à regra "sem pods
+  privilegiados" para pods expostos à tailnet. O modo sem privilégios (`TS_USERSPACE`) não é suportado. Custaria
+  também 100–200 MB num nó apertado. Troca: os Services vivem na VM, fora do GitOps (o script é a fonte de verdade).
 - **`/etc/hosts` no Mac:** dispensa o DNS de terceiros, mas só serve num computador.
 - **Bloquear o 169.254.169.254 no iptables do nó:** apanha tudo, incluindo os jobs que precisam da identidade.
 - **Projetos do Argo CD aplicados só por script:** a `root` não poderia alargar o próprio projeto, mas o GitOps

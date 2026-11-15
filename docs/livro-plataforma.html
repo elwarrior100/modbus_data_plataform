@@ -548,6 +548,7 @@ quality/  docs/  tests/
     <li>Na Oracle, o Ingress só deve escutar na rede do Tailscale, nunca na pública.</li>
   </ul>
   <h3>Como usar: abrir os serviços no browser</h3>
+  <p><b>Desde 2026-11-15, na Oracle, com HTTPS e certificado válido:</b> <code>https://airflow.taila669aa.ts.net</code>, <code>https://grafana.taila669aa.ts.net</code>, <code>https://argocd.taila669aa.ts.net</code>, <code>https://lakefs.taila669aa.ts.net</code> e <code>https://openmetadata.taila669aa.ts.net</code>. São <em>Tailscale Services</em> servidos pela própria VM (e não pelo operador Kubernetes, cujos proxies precisam de correr privilegiados). Os endereços abaixo ficam de reserva.</p>
   <div class="tablewrap"><table>
     <tr><th>Serviço</th><th>No Mac (VM local)</th><th>Na Oracle (com o Tailscale ligado)</th></tr>
     <tr><td>Airflow</td><td><code>http://airflow.localhost</code></td><td><code>http://airflow.100.108.9.15.sslip.io</code></td></tr>
