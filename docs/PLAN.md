@@ -517,7 +517,7 @@ segredos num **cofre (OCI Vault) lidos pelo External Secrets Operator** desde j�
    - ✅ (2026-11-15) GC do lakeFS (semanal, Oracle, só a marcar) e poda mensal da cópia (`lake-backup-prune.sh`).
    - ⬜ **Ler o relatório da GC de 2026-11-22 e ligar a remoção antes de 2026-11-30** (decisão do Stéphane). A
      primeira remoção deve apagar o relatório lido (`do_mark=false`, `mark_id=<id>`), não marcar outra vez.
-17. ⬜ 8.ª revisão (83,9/100), por fazer: reservar CPU/memória ao sistema no kubelet e limites de CPU nos pesados
+17. ✅ (2026-11-15) 8.ª revisão (83,9/100), tratado (resta o disco só de leitura no backup/ops): reservar CPU/memória ao sistema no kubelet e limites de CPU nos pesados
    (causa do incidente do k3s); a validade das exceções do Trivy só dispara com um scan agendado; folga de memória
    da GC (PriorityClass baixa, driver menor); sinal de vida da GC; o teste de arranque também para a Oracle e mais
    fundo; imagem da GC por digest e sem token de service account; invariante GC (15 d) ≥ vida dos dumps (14 d);
@@ -581,3 +581,9 @@ que for de k3s.
 ### O que eu faço enquanto fazes isto
 *(Texto histórico da Fase 0, de quando a regra era o Stéphane escrever o código. Desde 2026-10-24 o Claude escreve o
 código e explica-o; ver CLAUDE.md.)*
+18. ✅ (2026-11-15) HTTPS `https://<serviço>.taila669aa.ts.net` por Tailscale Services na VM (sem operador: proxies
+   privilegiados); proteção de ramos no GitHub (`main`, `oracle`); CPU/memória reservadas ao k3s (causa do incidente);
+   OpenMetadata e OpenSearch emagrecidos (~800 MB livres); teste de arranque do zero nos dois ambientes (apanhou os
+   projetos do Argo CD criados depois das aplicações: corrigido com sync-wave -1).
+19. ⬜ Ideia: `scripts/new-project.sh <nome>` (namespace, rede, AppProject, segredos, pasta de manifests) e um token
+   do GitHub para o CI do projeto atualizar sozinho a imagem/DAG bundle na plataforma.
