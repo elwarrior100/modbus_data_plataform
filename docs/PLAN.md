@@ -599,3 +599,6 @@ código e explica-o; ver CLAUDE.md.)*
    das tarefas do Airflow em 3.2.2), política do Tailscale no git, `new-project.sh`.
    - ⬜ **Início de dezembro:** `./scripts/lake-backup-prune.sh --apply` para retirar a cópia antiga objeto a objeto
      (~12 900 pedidos, cabem no orçamento novo).
+22. ✅ (2026-11-15) 10.ª revisão: **88,4/100**. Corrigido logo: sinal de vida da GC ignora corridas manuais (com período
+   de graça), lake-sync falha num erro de listagem e repõe o completo se o dia 1 falhar, `pipefail`, poda guiada pelos
+   catálogos, envios a meio abortados em 2 dias, despejo por memória com 60 s, orçamento que avisa ao primeiro cêntimo.

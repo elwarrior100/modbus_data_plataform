@@ -584,6 +584,7 @@ git push origin "$SHA:refs/heads/oracle"</script>
   </div>
   <p>Os três vivem no namespace <code>data</code> e são geridos pela ficha <code>data</code> da lição 5 (a que <b>nunca apaga sozinha</b>). As próximas três lições mostram um ficheiro de cada.</p>
   <details class="q"><summary>Pergunta: se o Postgres se perder mas o SeaweedFS ficar, ainda tens os dados?</summary><p>Os bytes sim, mas sem o caderno não sabes que caixa é que livro nem que versão é a de hoje: é por isso que o backup faz as duas coisas (dump do Postgres <b>e</b> cópia dos objetos), e o ensaio diário prova que juntas reconstroem o lake.</p></details>
+  <details class="q"><summary>Pergunta (lição de custo de 15-11): copiar o armazém para a Oracle custa dinheiro?</summary><p>Pode custar, e custou cêntimos: a Oracle dá 50 000 <b>pedidos</b> por mês de graça, e copiar o lake ficheiro a ficheiro (milhares de ficheiros pequenos por dia) gastava isso em dois dias. Agora a cópia junta os ficheiros novos num pacote <code>.tar.gz</code> por noite, com um catálogo do que já foi copiado: cerca de 4 pedidos por noite (ADR-016). Moral: na cloud, conta-se o <b>número de operações</b>, não só os gigabytes.</p></details>
   <label class="got"><input type="checkbox" data-done="l10"> Percebi esta lição</label>
 </section>
 
