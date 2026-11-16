@@ -597,8 +597,8 @@ código e explica-o; ver CLAUDE.md.)*
    (1890/1890 MD5); alarme se um dia passar de 1 500 pedidos. Também: disco só de leitura no backup/ops, teste de
    arranque da árvore toda no commit, poda/GC com lista à vista, scan semanal de todas as imagens (apanhou o modelo
    das tarefas do Airflow em 3.2.2), política do Tailscale no git, `new-project.sh`.
-   - ✅ A cópia antiga objeto a objeto (~12 900) é apagada pela regra de ciclo de vida do Object Storage, antecipada a
-     pedido do Stéphane (2026-11-16, regra a 1 dia). ⬜ Confirmar que o bucket só tem bundles/ e catalog/ e retirar a regra.
+   - ✅ (2026-11-16) Cópia antiga objeto a objeto apagada (12 913 objetos) a pedido do Stéphane; bucket só com
+     bundles/ e catalog/; regra de ciclo de vida temporária retirada.
 22. ✅ (2026-11-15) 10.ª revisão: **88,4/100**. Corrigido logo: sinal de vida da GC ignora corridas manuais (com período
    de graça), lake-sync falha num erro de listagem e repõe o completo se o dia 1 falhar, `pipefail`, poda guiada pelos
    catálogos, envios a meio abortados em 2 dias, despejo por memória com 60 s, orçamento que avisa ao primeiro cêntimo.
