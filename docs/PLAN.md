@@ -602,3 +602,8 @@ código e explica-o; ver CLAUDE.md.)*
 22. ✅ (2026-11-15) 10.ª revisão: **88,4/100**. Corrigido logo: sinal de vida da GC ignora corridas manuais (com período
    de graça), lake-sync falha num erro de listagem e repõe o completo se o dia 1 falhar, `pipefail`, poda guiada pelos
    catálogos, envios a meio abortados em 2 dias, despejo por memória com 60 s, orçamento que avisa ao primeiro cêntimo.
+23. ✅ (2026-11-16) Auditoria de custos (conta PAYG): retenção da spool (7 dias exportados / 30 rejeitados), cópia do
+   lake com completo semanal e remoção automática aos 9 dias, alarme do total de Object Storage > 15 GB, ABORT de
+   multipart nos dumps, alarmes de "sinal em falta" corrigidos ([1d]/[3h].absent()).
+   - ⬜ **Quotas da conta (aguarda o "sim" do Stéphane):** terraform/oracle/quotas.tf ainda por criar/aplicar.
+   - ⬜ Ligar a remoção da GC após o relatório de 22-11; atualizar ADR-016 (semanal + 9 dias) e o livro.
