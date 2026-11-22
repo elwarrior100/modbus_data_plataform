@@ -811,3 +811,14 @@ código e explica-o; ver CLAUDE.md.)*
    - ⬜ **Depois de reveres e fazeres commit:** imagens no CI; na plataforma, `PLAN=builtin` e `TRIP_RATE_PER_DAY=1` no
      `ot-edge` (primeiro local, depois a Oracle); medir o volume real (+~20% previsto) e uma hora de silver com G2 limpo.
    - ⬜ **Depois:** o gold (ADR-019): T1 na silver, gold K3, G3 + hooks, releases + rollback, OpenMetadata.
+36. 🟡 (2026-11-22) **Crescimento do lake e metadados do lakeFS** (ADR-020). Medido: 80% do lake são metadados do lakeFS
+   (1,02 GB de 1,31 GB na Oracle), que nunca se apagam e crescem com os commits; a silver cresce ~36 MB/dia e também não se
+   apaga. Sem mudanças, os 20 GB grátis do Object Storage acabariam em meados de 2027.
+   - **Fase 6a implantada no cluster local** (plataforma `1e5edd6` + `912b886`): 52 578 amostras/h (+18,6%), 0 lotes
+     recusados pelo G1, memória igual.
+   - **No disco, por rever:** writer com lotes de 15 min (`BATCH_AGE_S=900`, `BATCH_ROWS=20000`, plataforma) e a silver
+     às :25 (projeto). 3× menos commits. Testes todos verdes, incluindo contra o PostgreSQL e o lakeFS reais do cluster
+     local (ingest 36, pipelines 62).
+   - ✅ **Retenção da silver: 3 meses** (Stéphane, 22-11). ⬜ Implementar no `lake_housekeeping` junto com o gold: um dia só
+     sai se o gold dele estiver numa release.
+   - ⬜ Medir os metadados por dia uma semana depois de implantar.
