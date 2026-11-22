@@ -21,7 +21,7 @@ Duas camadas, de propósito:
 | Regra | Verifica | `warn` | `blocker` |
 |---|---|---|---|
 | G2-01 completude | minutos da hora (por `ingest_ts`) em que o ativo teve pelo menos uma leitura GOOD, em 60 | < 98 % | **< 80 %** (a calibrar) |
-| G2-02 unicidade | `bronze_event_id` únicos; `(asset, tag, ts_utc)` repetido com valores diferentes | qualquer par | `bronze_event_id` repetido |
+| G2-02 unicidade | `bronze_event_id` únicos; `(asset, tag, ts_utc, server_ts)` repetido com valores diferentes (ADR-018: o `ts_utc` tem a precisão de 1 s do equipamento) | qualquer par | `bronze_event_id` repetido |
 | G2-03 validade | % de linhas com a flag `out_of_range` | **> 0** | > 5 % |
 | G2-04 qualidade | % de linhas com `quality != GOOD` | > 1 % | > 20 % |
 | G2-05 frescura | a última linha do ativo está a menos de 5 min do fim da hora | atraso > 5 min | — |

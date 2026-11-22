@@ -163,3 +163,19 @@ async def test_samples_are_kept_in_memory_and_retried_while_the_spool_is_down(ri
     await until(lambda: falhas["restam"] == 0 and collector.queue.waiting == 0, timeout=15)
     values = {r[1] for r in rows(spool) if r[0].endswith("outlet_pressure")}
     assert {f"{7.0 + s / 100}" for s in range(1, 6)} <= values        # as 5 chegaram, apesar das 3 falhas
+
+
+def test_queue_has_a_ceiling_and_keeps_what_it_holds():
+    """Com o spool em baixo, a fila não cresce sem fim: descarta as amostras novas e guarda as que já tinha."""
+    from ingest.collector import _Queue
+
+    class DownSpool:
+        def add(self, batch):
+            raise ConnectionError("postgres em baixo")
+
+    q = _Queue(DownSpool(), max_waiting=3)
+    for i in range(5):
+        q.put(f"evento-{i}")
+    assert q.waiting == 3
+    assert q.dropped == 2
+    assert q._items == ["evento-0", "evento-1", "evento-2"]

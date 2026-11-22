@@ -617,6 +617,11 @@ spec:
         - name: postgres
           # pinned by digest: "latest-pg17" alone let the two clusters run different builds (TimescaleDB 2.31 vs 2.32)
           image: timescale/timescaledb:latest-pg17@sha256:6a6b7d7a346d7c6be03a310c240706f3bbc6d7adbdf3fbc07823570b34337f5e
+          # WAL (2026-11-16, performance review): ~16 GB of WAL in 47 h for a few MB of data, ~95% of it full-page images
+          # (each event is inserted, then updated with its batch_id; random UUID index pages). lz4 compresses those
+          # images and a 15 min checkpoint writes each hot page less often. Crash recovery replays a bit more WAL
+          # (seconds). The nightly pg_dump is unaffected.
+          args: ["-c", "wal_compression=lz4", "-c", "checkpoint_timeout=15min", "-c", "max_wal_size=2GB"]
           ports:
             - containerPort: 5432
           env:
@@ -657,7 +662,7 @@ spec:
         resources:
           requests:
             storage: 20Gi</script>
-<script type="application/json" id="n-pg">[[2, "<b>StatefulSet</b> (e não Deployment): nome estável (<code>postgres-0</code>) e disco que acompanha o pod."], [8, "Uma só cópia. Numa VM de 12 GB não há espaço para réplicas; a proteção é o backup diário + o ensaio de restauro."], [17, "<b>Prioridade máxima</b> entre as nossas cargas. Se a memória livre baixar de 600 MiB, o kubelet despeja pods por ordem: primeiro os que usam mais do que pediram, depois os de prioridade mais baixa (a GC e o ensaio, com <code>platform-batch</code>); o Postgres vai por último. Lição da 9.ª revisão: sem os limites de despejo no k3s, quem decidia era o kernel, que ignora esta prioridade."], [19, "Quando o pod tem de parar, dá-lhe <b>60 segundos</b> para escrever tudo no disco. Foi a falta disto (e do encerramento gracioso do kubelet) que corrompeu o lakeFS no Mac em novembro."], [23, "<b>Fixa por digest</b> (<code>@sha256:…</code>): sem isso, os dois clusters chegaram a correr versões diferentes com a mesma etiqueta."], [33, "A palavra-passe vem do Secret que o \"estafeta\" trouxe do cofre (lição 8)."], [36, "<b>readinessProbe</b>: o Kubernetes só manda tráfego quando o Postgres responde \"pronto\"."], [42, "<b>Requests</b> = o que o agendador reserva; <b>limits</b> = o teto. A memória tem teto (2 Gi); a CPU não, para não ficar lento num pico."], [49, "Scripts que o Postgres corre <b>só na primeira vez</b> (criar a base e o utilizador do lakeFS)."], [55, "<b>A gaveta</b>: um pedido de disco (PVC) criado uma vez e reutilizado sempre pelo <code>postgres-0</code>, mesmo que o pod renasça."], [60, "<code>local-path</code>: o disco é uma pasta no disco da própria VM. Simples e grátis; o preço é que, se a VM morrer, só o backup salva os dados."]]</script>
+<script type="application/json" id="n-pg">[[2, "<b>StatefulSet</b> (e não Deployment): nome estável (<code>postgres-0</code>) e disco que acompanha o pod."], [8, "Uma só cópia. Numa VM de 12 GB não há espaço para réplicas; a proteção é o backup diário + o ensaio de restauro."], [17, "<b>Prioridade máxima</b> entre as nossas cargas. Se a memória livre baixar de 600 MiB, o kubelet despeja pods por ordem: primeiro os que usam mais do que pediram, depois os de prioridade mais baixa (a GC e o ensaio, com <code>platform-batch</code>); o Postgres vai por último. Lição da 9.ª revisão: sem os limites de despejo no k3s, quem decidia era o kernel, que ignora esta prioridade."], [19, "Quando o pod tem de parar, dá-lhe <b>60 segundos</b> para escrever tudo no disco. Foi a falta disto (e do encerramento gracioso do kubelet) que corrompeu o lakeFS no Mac em novembro."], [23, "<b>Fixa por digest</b> (<code>@sha256:…</code>): sem isso, os dois clusters chegaram a correr versões diferentes com a mesma etiqueta."], [24, "Definições do registo de escrita (WAL), acrescentadas na afinação de performance: ver a lição 17."], [38, "A palavra-passe vem do Secret que o \"estafeta\" trouxe do cofre (lição 8)."], [41, "<b>readinessProbe</b>: o Kubernetes só manda tráfego quando o Postgres responde \"pronto\"."], [47, "<b>Requests</b> = o que o agendador reserva; <b>limits</b> = o teto. A memória tem teto (2 Gi); a CPU não, para não ficar lento num pico."], [54, "Scripts que o Postgres corre <b>só na primeira vez</b> (criar a base e o utilizador do lakeFS)."], [60, "<b>A gaveta</b>: um pedido de disco (PVC) criado uma vez e reutilizado sempre pelo <code>postgres-0</code>, mesmo que o pod renasça."], [65, "<code>local-path</code>: o disco é uma pasta no disco da própria VM. Simples e grátis; o preço é que, se a VM morrer, só o backup salva os dados."]]</script>
   <div class="whatif"><b>E se isto não existisse?</b>Como Deployment, um pod novo podia nascer com um disco vazio e o Postgres "começava do zero": spool e índice do lake perdidos.</div>
   <details class="q"><summary>Pergunta: porque é que a memória tem limite e a CPU não?</summary><p>Passar o limite de memória mata o processo (OOM); passar o de CPU só o atrasa. Para a base de dados é melhor ser travada pela memória com margem (2 Gi) e nunca ficar lenta por um teto de CPU. Os serviços pesados que podem esperar (OpenMetadata, Prometheus) é que têm teto de CPU.</p></details>
   <label class="got"><input type="checkbox" data-done="l11"> Percebi esta lição</label>
@@ -798,11 +803,1675 @@ spec:
   <label class="got"><input type="checkbox" data-done="l13"> Percebi esta lição</label>
 </section>
 
-<section class="lesson" id="lnext" data-title="O que vem na Parte 2">
-  <div class="kicker">Fim da Parte 2</div>
-  <h2>O que vem a seguir</h2>
-  <p>Já sabes <b>como as coisas chegam</b> ao cluster (Parte 1) e <b>quem guarda os dados</b> (Parte 2). A Parte 3 mostra as <b>fechaduras</b>: as regras de admissão (que pods são recusados e porquê), as regras de rede completas e os projetos do Argo CD.</p>
-  <p>Quando acabares esta parte, diz-me e eu acrescento a seguinte a esta mesma página.</p>
+
+<section class="lesson" id="l14" data-title="O corta-custos" data-part="3">
+  <div class="kicker">Lição 14</div>
+  <h2>O corta-custos: parar sozinho, nunca apagar</h2>
+  <div class="file">envs/oracle/ops/cost-guard.yaml (o coração do CronJob, de hora a hora)</div>
+  <div class="simple"><b>Em português simples</b>A conta da Oracle é como um cartão sem limite: se gastares, ela cobra. Este job é um <b>disjuntor</b>. De hora a hora vê quanto se gastou no mês e, se chegar a <b>€1</b>, "desliga o quadro": tranca a conta para nada novo se poder comprar e desliga a VM. <b>Não deita nada fora</b>: quando voltares a ligar, está tudo lá.</div>
+  <div class="codebox" data-code="c-cg" data-notes="n-c-cg"></div>
+<script type="text/plain" id="c-cg">MD=$(python3 -c 'import json,urllib.request; d=json.load(urllib.request.urlopen(urllib.request.Request("http://169.254.169.254/opc/v2/instance/", headers={"Authorization": "Bearer Oracle"}))); print(d["compartmentId"], d["canonicalRegionName"], d["id"], d.get("freeformTags", {}).get("cost-guard-ack", "-"))')
+set -- $MD; COMP=$1; REGION=$2; INSTANCE=$3; ACK=$4   # the VM lives in the root compartment: COMP is the tenancy
+# ACK is "<YYYY-MM>:<spend when resumed>" (scripts/cost-guard-resume.sh), or "-"
+MONTH=$(date -u +%Y-%m)
+# the highest actual spend of the budgets on the tenancy (one: "Alertmax"); a failed read fails the run
+BUDGET=$(oci budgets budget budget list --compartment-id "$COMP" --all \
+  --query 'max_by(data, &"actual-spend").["actual-spend","time-spend-computed"]' --output json)
+SPEND=$(echo "$BUDGET" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0])')
+# when Oracle last computed it: right after the 1st, the budget can still hold LAST month's spend
+COMPUTED=$(echo "$BUDGET" | python3 -c 'import json,sys; print(json.load(sys.stdin)[1] or "")')
+# any number Python reads (a tiny spend can print as 3.4e-07); anything else fails the run (and the
+# "cost guard not running" alarm fires)
+SPEND=$(python3 -c 'import sys; print("%.6f" % float(sys.argv[1]))' "$SPEND") || { echo "no budget spend read: '$SPEND'" >&2; exit 1; }
+# the heartbeat must never keep the guard from deciding: a failed post only logs
+oci monitoring metric-data post --endpoint "https://telemetry-ingestion.$REGION.oraclecloud.com" \
+  --metric-data "[{\"namespace\":\"platform_node\",\"compartmentId\":\"$COMP\",\"name\":\"cost_guard_spend\",\"dimensions\":{\"cluster\":\"oracle\"},\"datapoints\":[{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"value\":$SPEND}]}]" >/dev/null \
+  || echo "WARNING: could not post cost_guard_spend (deciding anyway)" >&2
+echo "spend this month: EUR $SPEND (limit $THRESHOLD; acknowledged month: $ACK)"
+# the limit is THRESHOLD; in a month a person resumed, it is the spend at that moment + THRESHOLD
+# (so a resumed month still has a ceiling)
+LIMIT=$(python3 -c 'import sys
+spend, thr, ack, month = float(sys.argv[1]), float(sys.argv[2]), sys.argv[3], sys.argv[4]
+m, _, base = ack.partition(":")
+print("%.2f" % ((float(base or 0) if m == month else 0) + thr))' "$SPEND" "$THRESHOLD" "$ACK" "$MONTH")
+[ "$LIMIT" = "$THRESHOLD" ] || echo "month resumed by a person: limit raised to EUR $LIMIT (spend at resume + $THRESHOLD)"
+if ! python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= float(sys.argv[2]) else 1)' "$SPEND" "$LIMIT"; then
+  echo "below the limit: nothing to do"; exit 0
+fi
+# month rollover: a spend computed before this month began is last month's, and must not stop the VM
+case "$COMPUTED" in
+  "$MONTH"*) ;;
+  *) echo "over the limit, but the spend was computed at '$COMPUTED' (before $MONTH): last month's, not acting"; exit 0 ;;
+esac
+STATEMENTS=$(python3 -c 'import json,sys; print(json.dumps(["zero %s quotas in tenancy" % f for f in sys.argv[1:]]))' $FAMILIES)
+if [ "$DRY_RUN" = true ]; then
+  echo "DRY RUN: would create quota cost-guard-zero ($(echo $FAMILIES | wc -w) families) and SOFTSTOP $INSTANCE"; exit 0
+fi
+echo "OVER THE LIMIT: zeroing quotas and stopping the VM (no data is deleted)"
+EXISTING=$(oci limits quota list --compartment-id "$COMP" --name cost-guard-zero --query 'data[0].id' --raw-output 2>/dev/null || true)
+if [ -z "$EXISTING" ] || [ "$EXISTING" = null ]; then
+  # a quota failure must not save the VM from stopping: log it and go on
+  oci limits quota create --compartment-id "$COMP" --name cost-guard-zero \
+    --description "Cost kill-switch (ADR-017): spend reached EUR $THRESHOLD in $MONTH. Remove with scripts/cost-guard-resume.sh" \
+    --statements "$STATEMENTS" >/dev/null && echo "quota cost-guard-zero created" || echo "QUOTA CREATE FAILED (stopping the VM anyway)" >&2
+else
+  echo "quota cost-guard-zero already present"
+fi
+oci compute instance action --instance-id "$INSTANCE" --action SOFTSTOP >/dev/null
+echo "SOFTSTOP requested for this VM"</script>
+<script type="application/json" id="n-c-cg">[[1, "Pergunta à própria VM (o \"serviço de metadados\") quem ela é: o compartimento, a região, o seu ID e a etiqueta <code>cost-guard-ack</code>. Assim nenhum identificador da conta fica no repositório público."], [6, "Lê o <b>gasto real do mês</b> no orçamento da conta, mais <b>quando</b> a Oracle o calculou. Ler orçamentos é grátis."], [13, "Converte o número com o Python, que aceita formatos como <code>3.4e-07</code>. Se não vier número nenhum, o job falha e o alarme \"cost guard not running\" avisa: <b>um guarda avariado tem de fazer barulho</b>."], [17, "Publicar a métrica é o \"sinal de vida\". Se falhar, só regista um aviso: o guarda <b>decide na mesma</b>. Antes, uma falha aqui parava tudo antes da decisão."], [21, "O limite é €1,00. Num mês em que uma pessoa já retomou a VM, é o gasto nesse momento + €1,00, para o mês retomado continuar a ter teto."], [27, "O caso normal, todas as horas: abaixo do limite, não faz nada."], [30, "<b>Viragem do mês:</b> no dia 1, o orçamento ainda pode mostrar o gasto do mês anterior. Se foi calculado antes deste mês, não age."], [34, "Constrói as 48 regras \"zero &lt;família&gt; quotas in tenancy\" (compute, block-storage, object-storage...). Validadas na Oracle num compartimento vazio de teste."], [35, "<b>Modo de ensaio:</b> diz o que faria e sai. Foi assim que se testou sem desligar nada."], [42, "Cria a quota que <b>trava a conta</b>: nada pago se pode criar. O que já existe continua. Se falhar, regista e continua: desligar a VM é o mais importante."], [48, "<b>Desliga a própria VM</b> com um encerramento ordenado: o k3s dá tempo ao Postgres e ao SeaweedFS para gravarem. Com a VM parada não há jobs, logo não há pedidos ao Object Storage. <b>Nada é apagado.</b>"]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Só havia emails de aviso. Se um job avariasse de noite a fazer milhões de pedidos, o gasto continuava até alguém ler o email. Com o disjuntor, o pior caso fica limitado a pouco mais de €1, com o atraso de 6 a 24 h que a faturação tem.</div>
+  <details class="q"><summary>Pergunta: porque é que o guarda pode criar a quota mas não apagá-la?</summary><p>Criar uma quota só trava gastos; apagá-la solta-os. Se alguém tomasse conta da VM e pudesse apagar, levantava a trava. Por isso quem retoma é uma pessoa, com a sua identidade, a partir do Mac (<code>scripts/cost-guard-resume.sh</code>).</p></details>
+  <details class="q"><summary>Pergunta: o que foi testado a sério, e como?</summary><p>Com o limite a €0,001 e o modo de ensaio desligado: a quota foi criada e a VM ficou parada em ~1,5 min. O script de retoma religou-a e as 19 aplicações voltaram em ~10 min. O teste encontrou um defeito: o script desarmava o guarda até ao fim do mês. Corrigido.</p></details>
+  <label class="got"><input type="checkbox" data-done="l14"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l15" data-title="O porteiro da promoção" data-part="3">
+  <div class="kicker">Lição 15</div>
+  <h2>O porteiro da promoção: sem CI verde, não passa</h2>
+  <div class="file">scripts/promote-oracle.sh</div>
+  <div class="simple"><b>Em português simples</b>A Oracle é a "loja aberta ao público"; o Mac é o "armazém de testes". Este script é a <b>porta</b> entre os dois. Antes de deixar passar uma mudança, confirma três coisas: que é só um passo em frente, que já foi testada no Mac, e que o <b>inspetor automático (CI)</b> a aprovou.</div>
+  <div class="codebox" data-code="c-pr" data-notes="n-c-pr"></div>
+<script type="text/plain" id="c-pr">#!/usr/bin/env bash
+# Promotes a tested commit to the Oracle cluster: fast-forwards the "oracle" branch to it (default: main).
+# Argo CD on Oracle follows that branch (envs/oracle/apps). Refuses anything that is not a fast-forward, so the
+# Oracle history only ever moves forward through commits that already ran on the local cluster.
+# Usage: ./scripts/promote-oracle.sh [commit]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+REF="${1:-main}"
+git fetch -q origin
+# a branch name resolves on origin; a commit SHA resolves as itself (--verify: no output when it does not resolve)
+SHA="$(git rev-parse -q --verify "origin/$REF^{commit}" || git rev-parse --verify "$REF^{commit}")"
+git merge-base --is-ancestor origin/oracle "$SHA" || { echo "refused: $SHA is not ahead of oracle (not a fast-forward)" >&2; exit 1; }
+# only commits that are on main, i.e. that the local cluster (which follows main) has already run
+git merge-base --is-ancestor "$SHA" origin/main || { echo "refused: $SHA is not on main (it never ran on the local cluster)" >&2; exit 1; }
+# only commits whose CI (validate.yml) passed: 15 commits once reached Oracle with CI red and every later check skipped.
+# Public repository: the GitHub API needs no token. Break glass (CI itself broken, fix urgent): PROMOTE_SKIP_CI=1.
+if [ "${PROMOTE_SKIP_CI:-0}" = 1 ]; then
+  echo "WARNING: PROMOTE_SKIP_CI=1, promoting without a green CI" >&2
+else
+  CI="$(curl -fsS "https://api.github.com/repos/elwarrior100/platform/actions/workflows/validate.yml/runs?head_sha=$SHA" \
+    | python3 -c 'import json,sys; r=json.load(sys.stdin)["workflow_runs"]
+done=[x for x in r if x["status"]=="completed"]
+print("success" if any(x["conclusion"]=="success" for x in done) else ("running" if len(done) < len(r) else (done[0]["conclusion"] if done else "none")))')" \
+    || { echo "refused: could not read the CI status of $SHA from GitHub" >&2; exit 1; }
+  [ "$CI" = success ] || { echo "refused: CI (validate.yml) for $SHA is '$CI', not success (wait for it, or fix it)" >&2; exit 1; }
+  echo "CI green for $(git rev-parse --short "$SHA")"
+fi
+echo "oracle: $(git rev-parse --short origin/oracle) -> $(git rev-parse --short "$SHA")"
+git log --oneline "origin/oracle..$SHA"
+git push origin "$SHA:refs/heads/oracle"</script>
+<script type="application/json" id="n-c-pr">[[12, "Só aceita <b>avançar</b> (fast-forward): a história da Oracle nunca é reescrita."], [14, "Só aceita commits que já estão no <code>main</code>, ou seja, que o cluster local já correu."], [16, "A <b>saída de emergência</b>, explícita e com aviso: para quando o próprio CI está avariado e a correção é urgente."], [20, "Pergunta ao GitHub (repositório público, sem token) como correu o CI (<code>validate.yml</code>) <b>deste</b> commit."], [25, "<b>O portão:</b> sem CI verde, recusa. Nasceu da 11.ª revisão: durante 15 commits o CI esteve vermelho e as mudanças chegaram à Oracle na mesma."], [30, "Só aqui é que a Oracle muda: o Argo CD de lá segue este branch e aplica a mudança."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Aconteceu: durante 15 commits o CI esteve vermelho por causa de uma verificação mal escrita. Todos os outros testes (segredos, Terraform, segurança) ficaram por correr, e as mudanças chegaram à Oracle na mesma. Ninguém viu, porque nada obrigava a olhar.</div>
+  <details class="q"><summary>Pergunta: porque é que a saída de emergência existe, e porque é que avisa?</summary><p>Porque o próprio CI pode avariar quando é preciso uma correção urgente. Mas tem de ser uma decisão consciente: a variável tem de ser escrita à mão e o script escreve um aviso. Uma porta sem chave de emergência acaba por ser arrombada; uma porta com chave fica registada.</p></details>
+  <label class="got"><input type="checkbox" data-done="l15"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l16" data-title="Os alertas que ninguém ouvia" data-part="3">
+  <div class="kicker">Lição 16</div>
+  <h2>Os alertas que ninguém ouvia</h2>
+  <div class="file">envs/oracle/ops/node-health.yaml (o Python que pergunta ao Prometheus)</div>
+  <div class="simple"><b>Em português simples</b>O Prometheus tinha 220 "alarmes de fumo" instalados. Mas não estavam ligados a nenhuma campainha: a peça que toca, o Alertmanager, nunca foi instalada. Este job é um <b>vizinho</b> que passa de 30 em 30 minutos, conta os alarmes que estão a apitar e telefona à Oracle. Se forem mais que zero, a Oracle manda-te um email.</div>
+  <div class="codebox" data-code="c-nh" data-notes="n-c-nh"></div>
+<script type="text/plain" id="c-nh">BASE = "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/"
+def get(path):
+    for attempt in range(30):   # network policies reach a new pod a few seconds after it starts
+        try:
+            return json.load(urllib.request.urlopen(BASE + path, timeout=10))["data"]
+        except OSError:
+            time.sleep(2)
+    raise SystemExit("Prometheus unreachable")
+q = '100*(1-node_filesystem_avail_bytes{mountpoint="/"}/node_filesystem_size_bytes{mountpoint="/"})'
+pct = round(max(float(x["value"][1]) for x in get("query?" + urllib.parse.urlencode({"query": q}))["result"]), 1)
+# Prometheus alert rules (220, kube-prometheus) have no Alertmanager here: count the firing warning and
+# critical ones, so an OCI alarm reaches the inbox (a failed Job, a crash loop, a full PVC...). Left out:
+# Watchdog (always firing by design) and the two about the absent Alertmanager.
+ignore = {"Watchdog", "InfoInhibitor", "PrometheusNotConnectedToAlertmanagers", "PrometheusErrorSendingAlertsToAnyAlertmanager"}
+firing = [a["labels"] for a in get("alerts")["alerts"] if a["state"] == "firing"
+          and a["labels"].get("severity") in ("warning", "critical") and a["labels"]["alertname"] not in ignore]
+for l in firing:
+    print("firing:", l["alertname"], l.get("namespace", ""), l.get("pod", "") or l.get("job_name", ""), file=sys.stderr)
+print(pct, len(firing))</script>
+<script type="application/json" id="n-c-nh">[[1, "O endereço do Prometheus dentro do cluster. Uma regra de rede própria deixa este job falar só com ele e com a Oracle."], [3, "Tenta várias vezes: as regras de rede só chegam a um pod novo uns segundos depois de ele arrancar."], [9, "A pergunta do disco: que percentagem do \"/\" está usada."], [14, "Alertas que ficam de fora: o <b>Watchdog</b> dispara sempre de propósito (prova que o Prometheus está vivo) e os dois sobre a falta de Alertmanager são esperados."], [15, "Conta os alertas <b>warning</b> e <b>critical</b> a disparar. As 220 regras do Prometheus existiam, mas sem Alertmanager ninguém as ouvia."], [18, "Escreve no log quais são, para quem receber o email saber onde olhar."], [19, "Devolve os dois números. O resto do job envia-os à Oracle, e um alarme de lá manda email quando os alertas são mais que 0."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um Job falhado (por exemplo, a limpeza da spool) ou um pod em ciclo de reinícios só seriam vistos se alguém abrisse o Grafana.</div>
+  <details class="q"><summary>Pergunta: porque não instalar simplesmente o Alertmanager?</summary><p>Porque precisaria de uma conta de email ou de outro canal para enviar, e de mais um serviço na VM. A Oracle já manda emails de graça para os alarmes de fora da VM; contar os alertas e enviar um número reaproveita esse caminho.</p></details>
+  <label class="got"><input type="checkbox" data-done="l16"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l17" data-title="Afinar sem cortar" data-part="3">
+  <div class="kicker">Lição 17</div>
+  <h2>Afinar sem cortar: performance e memória</h2>
+  <div class="simple"><b>Em português simples</b>Não se desligou nada. Afinaram-se três "torneiras" que pingavam: um teste de saúde caro que corria a cada minuto, o Postgres que escrevia o diário em duplicado, e o k3s que deixava a memória acumular antes de arrumar. <b>Primeiro mediu-se, depois mudou-se, depois voltou a medir-se.</b></div>
+  <div class="file">platform/k8s/postgres/postgres.yaml (o registo de escrita)</div>
+  <div class="codebox" data-code="c-pgw" data-notes="n-c-pgw"></div>
+<script type="text/plain" id="c-pgw"># WAL (2026-11-16, performance review): ~16 GB of WAL in 47 h for a few MB of data, ~95% of it full-page images
+# (each event is inserted, then updated with its batch_id; random UUID index pages). lz4 compresses those
+# images and a 15 min checkpoint writes each hot page less often. Crash recovery replays a bit more WAL
+# (seconds). The nightly pg_dump is unaffected.
+args: ["-c", "wal_compression=lz4", "-c", "checkpoint_timeout=15min", "-c", "max_wal_size=2GB"]</script>
+<script type="application/json" id="n-c-pgw">[[1, "O Postgres escrevia ~16 GB de WAL em 2 dias para poucos MB de dados: cada evento é inserido e depois atualizado com o lote, e cada página tocada pela primeira vez depois de um checkpoint vai inteira para o WAL."], [5, "<b>lz4</b> comprime essas páginas inteiras; <b>15 min</b> entre checkpoints faz cada página \"quente\" ir menos vezes inteira. O preço: depois de uma falha, a recuperação lê mais uns segundos de WAL."]]</script>
+  <div class="file">platform/airflow/values.yaml (a verificação de saúde)</div>
+  <div class="codebox" data-code="c-afp" data-notes="n-c-afp"></div>
+<script type="text/plain" id="c-afp"># Liveness probes (2026-11-16, performance review): `airflow jobs check` costs ~3.4 s of CPU per run; every 60 s on two
+# pods it was ~22% of all container CPU, around the clock. Every 300 s, 3 failures: a hung scheduler is restarted
+# after ~15 min instead of ~5 (silver_fresh alarms after 3 h either way).
+scheduler:
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {memory: 1Gi}
+  livenessProbe: {initialDelaySeconds: 10, timeoutSeconds: 30, failureThreshold: 3, periodSeconds: 300}
+dagProcessor:
+  resources:
+    requests: {cpu: 50m, memory: 384Mi}
+    limits: {memory: 768Mi}
+  livenessProbe: {initialDelaySeconds: 10, timeoutSeconds: 30, failureThreshold: 3, periodSeconds: 300}</script>
+<script type="application/json" id="n-c-afp">[[1, "A verificação de saúde (<code>airflow jobs check</code>) gasta 3,4 s de CPU de cada vez. A cada minuto, em dois pods, era ~22% de toda a CPU dos contentores."], [8, "De 5 em 5 minutos, 3 falhas seguidas: um scheduler pendurado é reiniciado ao fim de ~15 min em vez de ~5. O alarme da silver continua de guarda."]]</script>
+  <div class="file">envs/oracle/bootstrap-vm.sh (o k3s na VM)</div>
+  <div class="codebox" data-code="c-k3m" data-notes="n-c-k3m"></div>
+<script type="text/plain" id="c-k3m"># Memory (2026-11-16): k3s is one Go process (API server, kubelet, controllers, kine). Without a target, Go lets its heap
+# grow to twice the live set before collecting (measured: 547 MB live, GC goal 1.12 GB, RSS 1.4 GB). GOMEMLIMIT is a
+# soft target: near it Go collects more often, it never kills. 900MiB: ~200 MB less today, and the live heap can still
+# grow ~60% (more projects) before GC works noticeably harder. Watch go_gc_heap_live_bytes on the k3s /metrics.
+sudo sed -i '/^GOMEMLIMIT=/d' /etc/systemd/system/k3s.service.env
+echo 'GOMEMLIMIT=900MiB' | sudo tee -a /etc/systemd/system/k3s.service.env >/dev/null</script>
+<script type="application/json" id="n-c-k3m">[[1, "O k3s é um só programa em Go. Sem limite, o Go deixa a memória crescer até ao <b>dobro</b> do que está vivo antes de limpar."], [6, "<b>Limite suave:</b> perto dele o Go limpa mais vezes, mas nunca mata o processo. Medido antes: 547 MB vivos e limpeza aos 1,12 GB. Resultado: 1,48 → 1,04 GB."]]</script>
+  <div class="whatif"><b>E se tivéssemos confiado só na sugestão?</b>O agente sugeriu 1100 MiB para o k3s. Medido, isso ficava acima do ponto onde ele já limpava (1,12 GB): não mudaria nada. Ficou 900 MiB. <b>Medir antes de acreditar.</b></div>
+  <details class="q"><summary>Pergunta: baixar as ligações do OpenMetadata ao Postgres (de 100 para 20) poupa memória. Que outro ganho dá?</summary><p>Fiabilidade: o Postgres aceita 100 ligações no total e é partilhado. Com 100 permitidas, um pico do OpenMetadata podia ocupá-las todas e deixar a ingestão e o lakeFS sem ligação.</p></details>
+  <label class="got"><input type="checkbox" data-done="l17"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l18" data-title="Quando o lake cresce" data-part="3">
+  <div class="kicker">Lição 18</div>
+  <h2>Quando o lake cresce: o que funciona pequeno parte grande</h2>
+  <div class="simple"><b>Em português simples</b>A 17-11 chegaram três emails. Nada tinha mudado no código: o lake é que <b>cresceu</b> e passou três limites que ninguém tinha medido. O carteiro só levava encomendas até 256 MB (o resto ia em várias caixas, e a VM não tem licença para isso). A garagem do ensaio só tinha 20 prateleiras pequenas. E o "índice do livro" do lakeFS era reescrito inteiro a cada minuto. A lição: <b>cada limite compara-se com a velocidade a que o dado cresce</b>.</div>
+  <div class="file">envs/oracle/backup/lake-sync.yaml (a cópia do lake)</div>
+  <div class="codebox" data-code="c-ls1" data-notes="n-c-ls1"></div>
+<script type="text/plain" id="c-ls1"># target: OCI Object Storage with the VM's instance principal (no key).
+# ONE request per file, never multipart: a multipart upload needs OBJECT_OVERWRITE, which the VM does
+# not have on purpose (the copy stays tamper-proof). 2026-11-17: a 9,440-object bundle went over the
+# old 256Mi cutoff and failed with "404 BucketNotFound" (OCI's answer to a missing permission). A single
+# PUT takes up to 5 GiB here (the lake must stay well under that anyway, ADR-016), and costs 1 request.
+- {name: RCLONE_CONFIG_OCI_TYPE, value: oracleobjectstorage}
+- {name: RCLONE_CONFIG_OCI_PROVIDER, value: instance_principal_auth}
+- {name: RCLONE_OOS_UPLOAD_CUTOFF, value: 5Gi}
+- {name: RCLONE_MULTI_THREAD_STREAMS, value: "0"}     # no "multi-thread copy" (it is multipart too)</script>
+<script type="application/json" id="n-c-ls1">[[2, "<b>Um ficheiro, um pedido.</b> Um envio em várias partes (multipart) exige a permissão <code>OBJECT_OVERWRITE</code>, que a VM não tem de propósito: assim não consegue estragar a cópia."], [4, "A Oracle responde \"não encontrado\" quando falta uma permissão: não revela o que existe. Foi esta a mensagem que enganou."], [8, "Até 5 GiB vai num só pedido (o máximo do rclone). O lake tem de ficar bem abaixo disso, por isso os índices do lakeFS foram corrigidos."], [9, "A \"cópia em várias threads\" do rclone também é multipart por baixo. Desligada."]]</script>
+  <div class="file">envs/oracle/backup/pg-backup.yaml (o backup do Postgres)</div>
+  <div class="codebox" data-code="c-pgb" data-notes="n-c-pgb"></div>
+<script type="text/plain" id="c-pgb"># --no-multipart: a multipart upload needs OBJECT_OVERWRITE, which the VM does not have on purpose (it may
+# not overwrite backups). The CLI switches to multipart above 128 MiB; ingest.dump was 107 MB on 2026-11-17
+# and growing. One PUT takes up to 50 GiB.
+oci os object bulk-upload -ns "$NS" -bn platform-backups --src-dir /dump --object-prefix "$PREFIX/" --no-multipart</script>
+<script type="application/json" id="n-c-pgb">[[1, "O mesmo problema no backup do Postgres: o <code>oci</code> passa a multipart acima de 128 MiB. O dump da spool já ia em 107 MB."], [4, "<code>--no-multipart</code> no fim: sempre um só pedido (até 50 GiB na Oracle)."]]</script>
+  <div class="file">platform/k8s/lakefs/lakefs.yaml (os índices do lakeFS)</div>
+  <div class="codebox" data-code="c-lkr" data-notes="n-c-lkr"></div>
+<script type="text/plain" id="c-lkr"># Metadata growth (2026-11-17): each commit rewrites the "ranges" (index pieces) that changed. With the default
+# 50,000 entries per range, the whole lake fit in ONE range (~0.5 MB) and every commit (2 a minute: the
+# batch commit and its merge) rewrote it: _lakefs/ was 82% of the lake (821 MB in 3 days) and commits are
+# never garbage-collected. ~1,000 entries per range: a commit rewrites only the last small piece.
+- name: LAKEFS_COMMITTED_PERMANENT_RANGE_RAGGEDNESS_ENTRIES
+  value: "1000"</script>
+<script type="application/json" id="n-c-lkr">[[1, "O lakeFS é o git dos dados: cada commit guarda a lista de todos os ficheiros, partida em pedaços (<b>ranges</b>). Pedaços que não mudam são partilhados entre commits."], [2, "Com 50 000 ficheiros por pedaço, o lake inteiro era <b>um só</b> pedaço: cada commit (2 por minuto) reescrevia ~0,5 MB. 82% do lake eram estes índices."], [5, "~1000 ficheiros por pedaço: cada commit reescreve só o último pedacinho. Os pedaços antigos ficam, porque os commits antigos precisam deles."]]</script>
+  <div class="file">envs/oracle/ops/lake-restore-drill.yaml (a garagem do ensaio)</div>
+  <div class="codebox" data-code="c-drs" data-notes="n-c-drs"></div>
+<script type="text/plain" id="c-drs"># volumes of 256 MB, as many as the disk allows (-volume.max=0, like production); the emptyDir sizeLimit of</script>
+<script type="application/json" id="n-c-drs">[[1, "O SeaweedFS temporário do ensaio tinha 20 volumes de 64 MB: ficou sem espaço quando o lake passou 1 GB."], [1, "<code>-volume.max=0</code>: tantos volumes quanto o disco permitir. O teto é o <code>sizeLimit</code> do volume temporário."]]</script>
+  <div class="whatif"><b>E se não se tivesse corrigido a causa de fundo?</b>Os índices cresciam centenas de MB por dia. Em ~2 semanas o pacote completo semanal passaria os 5 GiB de um só envio, e a cópia voltaria a falhar. Em ~1–2 meses o Object Storage aproximava-se dos 20 GB grátis.</div>
+  <details class="q"><summary>Pergunta: porque não dar simplesmente à VM a permissão OBJECT_OVERWRITE?</summary><p>Porque é ela que permite estragar a cópia. Uma VM comprometida podia reescrever os pacotes com lixo, e o backup deixava de servir no dia em que fosse preciso. Mais vale enviar num só pedido e manter a cópia impossível de adulterar.</p></details>
+  <label class="got"><input type="checkbox" data-done="l18"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l48" data-title="Alarmes que não custam" data-part="3">
+  <div class="kicker">Lição 48</div>
+  <h2>Alarmes que não custam: as idades dos jobs</h2>
+  <div class="simple"><b>Em português simples</b>Um alarme da Oracle é avaliado <b>a cada minuto</b> e lê os dados da sua janela. "Não houve sinal no último <b>dia</b>" relê o dia inteiro, todos os minutos. Três alarmes destes gastavam ~110 milhões de leituras por dia, e o grátis são 1 000 milhões por mês. A solução: um vigia diz de 30 em 30 minutos <b>há quantas horas</b> cada job correu bem, e o alarme só olha para a última hora: "mais de 26 horas?".</div>
+  <div class="file">envs/oracle/ops/job-freshness.yaml (o vigia)</div>
+  <div class="codebox" data-code="c-jf" data-notes="n-c-jf"></div>
+<script type="text/plain" id="c-jf">python3 - > /tmp/metrics.json <<'PY'
+import datetime, json, os, ssl, sys, time, urllib.request
+sa = "/var/run/secrets/kubernetes.io/serviceaccount"
+ctx = ssl.create_default_context(cafile=sa + "/ca.crt")
+def get(path):
+    req = urllib.request.Request("https://kubernetes.default.svc" + path,
+                                 headers={"Authorization": "Bearer " + open(sa + "/token").read()})
+    for attempt in range(30):   # network policies reach a new pod a few seconds after it starts
+        try:
+            return json.load(urllib.request.urlopen(req, context=ctx, timeout=10))
+        except urllib.error.HTTPError:
+            raise
+        except OSError:
+            time.sleep(2)
+    raise SystemExit("Kubernetes API unreachable")
+now = datetime.datetime.now(datetime.timezone.utc)
+when = lambda t: datetime.datetime.fromisoformat(t.replace("Z", "+00:00"))
+md = json.load(urllib.request.urlopen(urllib.request.Request("http://169.254.169.254/opc/v2/instance/", headers={"Authorization": "Bearer Oracle"})))
+stamp, points = now.strftime("%Y-%m-%dT%H:%M:%SZ"), []
+for ns, name in [("backup", "pg-backup"), ("backup", "lake-sync"), ("ops", "lake-restore-drill"),
+                 ("ops", "gc-freshness"), ("data", "lakefs-gc")]:
+    cj = get(f"/apis/batch/v1/namespaces/{ns}/cronjobs/{name}")
+    # never succeeded yet (a new CronJob): its age counts from its creation, not as an alarm
+    last = cj["status"].get("lastSuccessfulTime") or cj["metadata"]["creationTimestamp"]
+    age = round((now - when(last)).total_seconds() / 3600, 2)
+    print(f"{name}: last success {last}, {age} h ago", file=sys.stderr)
+    points.append({"namespace": "platform_backup", "compartmentId": md["compartmentId"],
+                   "name": "job_age_hours", "dimensions": {"cluster": "oracle", "job": name},
+                   "datapoints": [{"timestamp": stamp, "value": age}]})
+print(json.dumps(points))
+PY
+REGION=$(python3 -c 'import json,urllib.request; print(json.load(urllib.request.urlopen(urllib.request.Request("http://169.254.169.254/opc/v2/instance/", headers={"Authorization": "Bearer Oracle"})))["canonicalRegionName"])')
+oci monitoring metric-data post --endpoint "https://telemetry-ingestion.$REGION.oraclecloud.com" \
+  --metric-data "file:///tmp/metrics.json" >/dev/null
+echo "posted job_age_hours for 5 jobs"</script>
+<script type="application/json" id="n-c-jf">[[1, "O Python escreve as métricas num ficheiro; o <code>oci</code> envia-as no fim."], [3, "Usa a identidade do próprio pod para ler a API do Kubernetes (só pode LER CronJobs)."], [20, "Os 5 jobs vigiados: backup, cópia do lake, ensaio, verificação da GC e a GC."], [24, "O Kubernetes guarda no CronJob a hora do último sucesso, mesmo depois de o Job antigo ser apagado."], [24, "Um CronJob novo que ainda não correu conta desde que foi criado: não dispara alarme no primeiro dia."], [25, "As horas desde o último sucesso."], [28, "Uma métrica, com o nome do job como dimensão."], [33, "Envia as 5 idades à Oracle num só pedido."]]</script>
+  <div class="file">terraform/oracle/alarms.tf (um dos alarmes)</div>
+  <div class="codebox" data-code="c-ja" data-notes="n-c-ja"></div>
+<script type="text/plain" id="c-ja">resource "oci_monitoring_alarm" "backup_missing" {
+  compartment_id               = var.compartment_id
+  metric_compartment_id        = var.compartment_id
+  display_name                 = "platform: no successful backup in 24 h"
+  namespace                    = "platform_backup"
+  query                        = "job_age_hours[1h]{job = \"pg-backup\"}.max() > 26"
+  severity                     = "CRITICAL"
+  pending_duration             = "PT1H"
+  is_enabled                   = true
+  destinations                 = [oci_ons_notification_topic.alerts.id]
+  body                         = "The nightly database backup has not succeeded in the last 24 hours. Check: kubectl -n backup get jobs; logs of the latest pg-backup job."
+  repeat_notification_duration = "PT12H"</script>
+<script type="application/json" id="n-c-ja">[[4, "O título do email."], [5, "As métricas da plataforma."], [6, "<b>A janela de 1 hora</b> ([1h]) e a pergunta \"a idade passou 26 horas?\". Lê ~1/24 do que lia a janela de um dia."], [8, "Tem de estar acima durante 1 hora antes de mandar email."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Os alarmes estariam a custar ~€3 por mês, numa conta que tem de custar zero, e o corta-custos nem ajudava: os alarmes correm na Oracle, não na VM.</div>
+  <details class="q"><summary>Pergunta: porque é que "mais de 26 horas" e não "mais de 24"?</summary><p>Porque o job é diário e demora alguns minutos; um dia em que corre um pouco mais tarde não deve dar alarme. 2 horas de folga chegam.</p></details>
+  <label class="got"><input type="checkbox" data-done="l48"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l19" data-title="Pods só com rede revista" data-part="4">
+  <div class="kicker">Lição 19</div>
+  <h2>Pods só em namespaces com a rede revista</h2>
+  <div class="simple"><b>Em português simples</b>Uma divisão nova da casa (namespace) nasce <b>sem fechaduras</b>: os pods lá dentro chegam a todo o lado, incluindo ao "cofre da VM" (o serviço de metadados). Esta regra é o porteiro: <b>nenhum pod entra numa divisão que não tenha o selo</b> <code>platform/network-reviewed</code>, que quer dizer "alguém já pôs as fechaduras aqui".</div>
+  <div class="file">platform/k8s/admission/network-reviewed-namespaces.yaml</div>
+  <div class="codebox" data-code="c-nrn" data-notes="n-c-nrn"></div>
+<script type="text/plain" id="c-nrn"># A new namespace has no NetworkPolicy, so its pods can reach everything, including the cloud metadata endpoint (the
+# VM's instance principal). So no pod may start in a namespace unless that namespace carries the label
+# platform/network-reviewed, which says someone wrote (or deliberately skipped) its network policies; see
+# platform/k8s/00-namespaces.yaml. Kubernetes' own namespaces are exempt.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: network-reviewed-namespaces
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE]
+        resources: [pods]
+  validations:
+    - expression: "has(namespaceObject.metadata.labels) && 'platform/network-reviewed' in namespaceObject.metadata.labels"
+      messageExpression: "'namespace ' + namespaceObject.metadata.name + ' has no platform/network-reviewed label: write its NetworkPolicies first (platform/k8s/00-namespaces.yaml)'"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: network-reviewed-namespaces
+spec:
+  policyName: network-reviewed-namespaces
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - {key: kubernetes.io/metadata.name, operator: NotIn, values: [kube-system, kube-public, kube-node-lease]}</script>
+<script type="application/json" id="n-c-nrn">[[1, "O problema: um namespace novo não tem nenhuma NetworkPolicy, por isso tudo lhe é permitido."], [6, "Uma <b>regra de admissão</b>: o próprio Kubernetes verifica cada pedido antes de o aceitar. Não precisa de nenhum programa extra."], [15, "Verifica quando se <b>cria</b> um pod."], [18, "A condição, em CEL (uma linguagem pequena de expressões): o namespace do pod tem de ter o selo."], [19, "A mensagem de erro diz exatamente o que fazer, em vez de só \"recusado\"."], [27, "<b>Deny</b>: recusa mesmo. (Há também modo de só avisar, útil para testar uma regra nova.)"], [31, "Os namespaces do próprio Kubernetes ficam de fora."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um projeto novo podia arrancar pods antes de alguém escrever as suas regras de rede, e esses pods podiam ler o cofre pela identidade da VM.</div>
+  <details class="q"><summary>Pergunta: porque é que o selo é uma etiqueta no namespace e não no pod?</summary><p>Porque quem escreve um pod (um projeto, uma DAG) pode pôr-lhe as etiquetas que quiser. O namespace é criado pela plataforma, e os projetos do Argo CD não deixam um projeto mexer em namespaces.</p></details>
+  <label class="got"><input type="checkbox" data-done="l19"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l20" data-title="Nada de pods que saltam para a VM" data-part="4">
+  <div class="kicker">Lição 20</div>
+  <h2>Nada de pods que saltam para a VM</h2>
+  <div class="simple"><b>Em português simples</b>Alguns pods conseguem "saltar o muro" do contentor e ficar com a VM nas mãos: os <b>privilegiados</b>, os que partilham os processos da VM (<code>hostPID</code>), os que montam pastas da VM (<code>hostPath</code>) e os que pedem poderes extra do Linux (<b>capabilities</b>). Esta regra recusa-os todos, também nos contentores de depuração (<code>kubectl debug</code>).</div>
+  <div class="file">platform/k8s/admission/no-privileged-pods.yaml</div>
+  <div class="codebox" data-code="c-npp" data-notes="n-c-npp"></div>
+<script type="text/plain" id="c-npp"># A privileged pod, or one sharing the host's PID/IPC namespaces or mounting host paths, can step out of its
+# container onto the node, and from there reach the cloud metadata endpoint (and so the whole vault). No such pods
+# outside kube-system; node-exporter in monitoring may mount host paths (read-only /proc, /sys, /) and nothing else.
+# 2026-11-17 audit: ephemeral containers (`kubectl debug`) are checked too, added Linux capabilities are refused, and
+# the monitoring exception is only for the node-exporter pods.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: no-privileged-pods
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+  variables:
+    - name: containers
+      expression: >-
+        object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : []) +
+        (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : [])
+  validations:
+    - expression: "variables.containers.all(c, !has(c.securityContext) || !has(c.securityContext.privileged) || c.securityContext.privileged == false)"
+      message: "privileged containers are not allowed outside kube-system"
+    - expression: >-
+        variables.containers.all(c, !has(c.securityContext) || !has(c.securityContext.capabilities) ||
+        !has(c.securityContext.capabilities.add) || size(c.securityContext.capabilities.add) == 0)
+      message: "adding Linux capabilities is not allowed outside kube-system"
+    - expression: "(!has(object.spec.hostPID) || object.spec.hostPID == false) && (!has(object.spec.hostIPC) || object.spec.hostIPC == false)"
+      message: "hostPID / hostIPC are not allowed outside kube-system"
+    - expression: >-
+        (namespaceObject.metadata.name == 'monitoring' && has(object.metadata.labels) &&
+         object.metadata.labels.exists(k, k == 'app.kubernetes.io/name') &&
+         object.metadata.labels['app.kubernetes.io/name'] == 'prometheus-node-exporter') ||
+        !has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.hostPath))
+      message: "hostPath volumes are not allowed outside kube-system (and monitoring, for node-exporter)"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: no-privileged-pods
+spec:
+  policyName: no-privileged-pods
+  validationActions: [Deny]</script>
+<script type="application/json" id="n-c-npp">[[17, "Verifica os pods e também os <b>contentores efémeros</b> que o <code>kubectl debug</code> acrescenta a um pod já em execução (auditoria de 17-11)."], [21, "Junta todos os contentores do pod (normais, de arranque e efémeros), para nenhum escapar."], [24, "Nada de <b>privileged</b>: um contentor privilegiado é, na prática, a própria VM."], [28, "Nada de <b>capabilities</b> extra (por exemplo SYS_ADMIN, SYS_PTRACE)."], [30, "Nada de ver os processos da VM nem a sua memória partilhada."], [35, "A única exceção a <code>hostPath</code>: o node-exporter, que lê /proc e /sys para medir a VM."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um pod comprometido podia tornar-se "root" na VM e, a partir daí, ler todos os segredos do cluster e do cofre.</div>
+  <details class="q"><summary>Pergunta: se o PodSecurity "baseline" já recusa pods privilegiados, porquê esta regra também?</summary><p>Defesa em profundidade: são duas fechaduras independentes. A regra cobre também o namespace monitoring (onde o node-exporter precisa de uma exceção que o PodSecurity não sabe dar de forma tão estreita).</p></details>
+  <label class="got"><input type="checkbox" data-done="l20"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l21" data-title="Cada um só lê os seus segredos" data-part="4">
+  <div class="kicker">Lição 21</div>
+  <h2>Cada namespace só lê os seus segredos do cofre</h2>
+  <div class="simple"><b>Em português simples</b>O cofre da Oracle é um só, e o "estafeta" (External Secrets) tem a chave de tudo. Então quem decide <b>que segredos</b> cada divisão pode pedir? Esta regra: um pedido de segredo no namespace <code>ingest</code> só pode ler segredos chamados <code>ingest-…</code>. As poucas exceções estão escritas, uma a uma, com o motivo.</div>
+  <div class="file">platform/k8s/admission/externalsecret-own-prefix.yaml</div>
+  <div class="codebox" data-code="c-esp" data-notes="n-c-esp"></div>
+<script type="text/plain" id="c-esp"># The secret store is shared (one instance principal can read the whole vault), so it cannot limit WHICH secrets a
+# namespace reads. This rule does: an ExternalSecret may only read vault secrets named after its own namespace
+# ("<namespace>-..."). The only exceptions are the derived credentials that already exist on purpose:
+#   airflow, ingest -> data-lakefs-auth (lakefs-credentials)
+#   backup          -> data-postgres-auth (dump); the lake copy has its own read-only key, backup-seaweedfs-reader
+#   ops             -> data-lakefs-auth (silver freshness check)
+# dataFrom.find (regex/tags) and generators (sourceRef) are refused: they would read keys this rule cannot see.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: externalsecret-own-prefix
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [external-secrets.io]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [externalsecrets]
+  variables:
+    - name: ns
+      expression: "object.metadata.namespace"
+    - name: allowed
+      expression: >-
+        {"airflow": ["data-lakefs-auth"], "ingest": ["data-lakefs-auth"], "backup": ["data-postgres-auth"], "ops": ["data-lakefs-auth"]}
+    - name: keys
+      expression: >-
+        (has(object.spec.data) ? object.spec.data.map(d, d.remoteRef.key) : []) +
+        (has(object.spec.dataFrom) ? object.spec.dataFrom.filter(d, has(d.extract)).map(d, d.extract.key) : [])
+  validations:
+    - expression: >-
+        (!has(object.spec.dataFrom) || object.spec.dataFrom.all(d, has(d.extract) && !has(d.find) && !has(d.sourceRef))) &&
+        (!has(object.spec.data) || object.spec.data.all(d, !has(d.sourceRef)))
+      message: "only dataFrom.extract and data.remoteRef are allowed (no find, no generators)"
+    - expression: >-
+        variables.keys.all(k, k.startsWith(variables.ns + "-") ||
+          (variables.ns in variables.allowed && k in variables.allowed[variables.ns]))
+      messageExpression: "'namespace ' + variables.ns + ' may only read vault secrets named ' + variables.ns + '-...'"</script>
+<script type="application/json" id="n-c-esp">[[1, "O problema: o cofre não sabe distinguir quem pede, porque é sempre o mesmo estafeta."], [4, "As exceções, com o motivo: quem precisa da chave do lakeFS ou do Postgres para o seu trabalho."], [19, "Verifica cada <b>ExternalSecret</b> (o pedido de um segredo) quando é criado ou mudado."], [25, "A lista de exceções, em código: namespace → segredos de outros que pode ler."], [32, "Recusa as formas \"procura por nome\" e \"geradores\": com elas não se sabia que segredo ia ser lido."], [36, "A regra principal: cada chave pedida começa pelo nome do namespace, ou está na lista de exceções."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um projeto podia pedir a palavra-passe de administrador do Postgres só escrevendo o nome dela num ficheiro.</div>
+  <details class="q"><summary>Pergunta: porque é que "procurar por nome" (dataFrom.find) foi proibido?</summary><p>Porque com uma procura (por exemplo "todos os segredos que começam por data-") a regra não consegue ver, no pedido, que segredos vão ser lidos. Só nomes explícitos podem ser verificados.</p></details>
+  <label class="got"><input type="checkbox" data-done="l21"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l22" data-title="Saídas só para o que é preciso" data-part="4">
+  <div class="kicker">Lição 22</div>
+  <h2>As saídas de rede: só para onde é preciso</h2>
+  <div class="simple"><b>Em português simples</b>Cada divisão tem uma <b>lista de saídas permitidas</b>. O <code>data</code> (Postgres, SeaweedFS, lakeFS) só fala consigo próprio e com o DNS; o <code>ingest</code> só com o OPC UA, o Postgres e o lakeFS. Não chegam à internet, nem ao cofre da VM. Tudo o que não está na lista é recusado.</div>
+  <div class="file">platform/k8s/network-policies/egress-allowlists.yaml</div>
+  <div class="codebox" data-code="c-egr" data-notes="n-c-egr"></div>
+<script type="text/plain" id="c-egr"># Default-deny egress with an allow-list, for the namespaces that never need the internet. Anything not listed is
+# refused, including the cloud metadata endpoint. Each rule says why it exists.
+---
+# data: Postgres, SeaweedFS and lakeFS only talk to each other
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-allowlist
+  namespace: data
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:   # DNS (CoreDNS)
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to:   # pods of this namespace
+        - podSelector: {}
+---
+# ingest: collector -> OPC UA gateway; collector/writer -> spool (Postgres) and lakeFS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-allowlist
+  namespace: ingest
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:   # DNS (CoreDNS)
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to:   # OPC UA gateway
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ot}}
+      ports: [{port: 4840, protocol: TCP}]
+    - to:   # Postgres (spool) and lakeFS
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: data}}
+      ports: [{port: 5432, protocol: TCP}, {port: 8000, protocol: TCP}]</script>
+<script type="application/json" id="n-c-egr">[[1, "A ideia: <b>proibido por omissão</b>, permitido só o que está escrito, cada regra com o seu porquê."], [12, "Esta política trata das <b>saídas</b> (para onde os pods podem ligar)."], [16, "Todos precisam do DNS para traduzir nomes como <code>postgres.data.svc…</code>."], [19, "No <code>data</code>: os pods do próprio namespace (lakeFS ↔ Postgres ↔ SeaweedFS)."], [35, "No <code>ingest</code>: o collector chega ao gateway OPC UA, só na porta 4840."], [40, "E o Postgres (a spool) e o lakeFS, só nessas duas portas."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um pod comprometido no ingest podia enviar os dados para fora, ou descarregar ferramentas da internet para atacar o resto.</div>
+  <details class="q"><summary>Pergunta: se não há regra de saída para a internet, como é que o pod puxa a sua imagem?</summary><p>Quem puxa a imagem é o k3s na VM, não o pod. As regras de rede só se aplicam ao tráfego dos pods.</p></details>
+  <label class="got"><input type="checkbox" data-done="l22"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l23" data-title="Quem pode ligar ao Postgres" data-part="4">
+  <div class="kicker">Lição 23</div>
+  <h2>As entradas: quem pode ligar ao Postgres e ao lakeFS</h2>
+  <div class="simple"><b>Em português simples</b>As saídas dizem "para onde vou"; as <b>entradas</b> dizem "quem me pode visitar". O Postgres só aceita visitas das divisões que o usam (lakeFS, ingest, Airflow, OpenMetadata e o backup). As duas listas confirmam-se uma à outra.</div>
+  <div class="file">platform/k8s/network-policies/data-ingress.yaml</div>
+  <div class="codebox" data-code="c-din" data-notes="n-c-din"></div>
+<script type="text/plain" id="c-din"># Who may connect to the data services. Postgres and lakeFS only accept the namespaces that use them (kubectl
+# port-forward and exec are not affected: they do not go through the pod network). SeaweedFS has its own policy in
+# platform/k8s/seaweedfs/networkpolicy.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-clients
+  namespace: data
+spec:
+  podSelector: {matchLabels: {app: postgres}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: lakefs}}                                   # lakeFS metadata
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingest}}     # the spool
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: airflow}}    # Airflow metadata
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: openmetadata}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: backup}}     # nightly pg_dump
+      ports: [{port: 5432, protocol: TCP}]</script>
+<script type="application/json" id="n-c-din">[[1, "Os <code>port-forward</code> e <code>exec</code> não são afetados: não passam pela rede dos pods."], [10, "A política aplica-se ao pod do Postgres."], [11, "Trata das <b>entradas</b>."], [14, "O lakeFS guarda no Postgres a sua história (commits, branches)."], [15, "A spool da ingestão."], [18, "O backup noturno, que faz o <code>pg_dump</code>."], [19, "E só na porta do Postgres."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Qualquer pod de qualquer namespace (por exemplo, uma tarefa do Airflow comprometida) podia tentar palavras-passe contra o Postgres.</div>
+  <details class="q"><summary>Pergunta: porque ter regras de entrada se já há regras de saída?</summary><p>Porque um namespace novo, sem regras de saída, chegaria a tudo. A regra de entrada protege o Postgres mesmo de quem ainda não tem fechaduras.</p></details>
+  <label class="got"><input type="checkbox" data-done="l23"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l24" data-title="Os projetos do Argo CD" data-part="4">
+  <div class="kicker">Lição 24</div>
+  <h2>Os projetos do Argo CD: cada um no seu quintal</h2>
+  <div class="simple"><b>Em português simples</b>O Argo CD aplica o que está no git. Mas um <b>projeto</b> (como o modbus) não deve poder instalar coisas na plataforma. O <b>AppProject</b> é o contrato: de que repositório pode ler, para que namespaces pode escrever e que tipos de coisas pode criar.</div>
+  <div class="file">platform/argocd/projects/modbus.yaml</div>
+  <div class="codebox" data-code="c-apm" data-notes="n-c-apm"></div>
+<script type="text/plain" id="c-apm"># Argo CD project for the modbus project: what its applications may deploy, and where. The ApplicationSet puts every
+# app under projects/<project>/k8s/* into the AppProject named after <project>, so a project can only touch its own
+# namespaces and only from this repository, never the platform namespaces (data, argocd, external-secrets...).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: modbus
+  namespace: argocd
+spec:
+  description: Modbus RS-232 -> OPC UA -> lakeFS pipeline (github.com/elwarrior100/modbus_data_plataform)
+  sourceRepos:
+    - https://github.com/elwarrior100/platform.git
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: ingest}
+    - {server: https://kubernetes.default.svc, namespace: ot}
+  clusterResourceWhitelist: []          # no cluster-wide resources (no namespaces, CRDs, ClusterRoles)
+  namespaceResourceWhitelist:
+    - {group: "", kind: "*"}
+    - {group: apps, kind: "*"}
+    - {group: batch, kind: "*"}
+    - {group: external-secrets.io, kind: ExternalSecret}</script>
+<script type="application/json" id="n-c-apm">[[1, "O modbus só toca nos seus namespaces e só a partir deste repositório."], [11, "De onde pode ler: só o repositório da plataforma (onde vivem os manifests do projeto)."], [14, "Para onde pode escrever: <code>ingest</code> e <code>ot</code>, e mais nenhum."], [16, "Nada \"do cluster inteiro\": nem namespaces, nem CRDs, nem ClusterRoles."], [21, "Pode pedir segredos, mas a regra da lição 21 decide quais."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um erro (ou um ataque) no projeto podia apagar o lakeFS ou mudar o Argo CD, porque o Argo CD aplica tudo o que está no git.</div>
+  <details class="q"><summary>Pergunta: o projeto platform também tem a lista de namespaces ingest e ot. Porquê?</summary><p>Porque é a plataforma que escreve as regras de rede e os segredos desses namespaces. O projeto modbus só escreve as suas aplicações lá dentro.</p></details>
+  <label class="got"><input type="checkbox" data-done="l24"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l25" data-title="A firewall sem portas" data-part="5">
+  <div class="kicker">Lição 25</div>
+  <h2>A firewall da Oracle: nenhuma porta aberta</h2>
+  <div class="simple"><b>Em português simples</b>A VM está na internet, mas <b>nenhuma porta está aberta</b> para entrar: nem a do SSH. Como é que lá chegas? Pelo Tailscale, que só precisa de <b>sair</b> (a VM liga-se à rede privada, ninguém lhe bate à porta). É a forma mais simples de não ser atacado: não ter porta.</div>
+  <div class="file">terraform/oracle/network.tf</div>
+  <div class="codebox" data-code="c-net" data-notes="n-c-net"></div>
+<script type="text/plain" id="c-net"># Firewall of the public subnet (the VCN's default security list, created in the console and adopted here).
+#
+# No inbound port is open to the internet: SSH and every web UI are reached through Tailscale, which only
+# needs OUTBOUND traffic. If Tailscale ever fails on the VM, the OCI console's serial console still works
+# (it does not use port 22). Kept from the console defaults: the ICMP rules that path-MTU discovery needs.
+import {
+  to = oci_core_security_list.public
+  id = var.security_list_ocid
+}
+
+resource "oci_core_security_list" "public" {
+  compartment_id = var.compartment_id
+  vcn_id         = var.vcn_id
+  display_name   = "Default Security List for data-plataform"
+
+  # removed on purpose: TCP 22 from 0.0.0.0/0 (SSH now goes through Tailscale: ssh ubuntu@platform-oracle)
+
+  ingress_security_rules {
+    description = "ICMP fragmentation-needed from anywhere (path MTU discovery)"
+    protocol    = "1"
+    source      = "0.0.0.0/0"
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
+
+  ingress_security_rules {
+    description = "ICMP destination-unreachable from inside the VCN"
+    protocol    = "1"
+    source      = "10.0.0.0/16"
+    icmp_options {
+      type = 3
+    }
+  }
+
+  egress_security_rules {
+    description = "All outbound traffic (apt, container images, OCI APIs, Tailscale)"
+    protocol    = "all"
+    destination = "0.0.0.0/0"
+  }
+}</script>
+<script type="application/json" id="n-c-net">[[3, "Nenhuma porta de entrada. Se o Tailscale falhar, ainda há a consola série da Oracle (não usa a porta 22)."], [6, "<b>import</b>: a lista de segurança foi criada na consola e \"adotada\" pelo Terraform, sem a recriar."], [16, "A regra que existia por omissão (SSH aberto ao mundo) foi retirada de propósito."], [19, "Só fica o ICMP que a rede precisa para funcionar bem (descobrir o tamanho máximo dos pacotes)."], [37, "Saídas livres: atualizações, imagens, APIs da Oracle e o próprio Tailscale."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>O SSH ficava exposto a milhares de tentativas por dia de robôs da internet, e qualquer falha no sshd era uma porta para a VM.</div>
+  <details class="q"><summary>Pergunta: se a firewall deixa sair tudo, isso não é perigoso?</summary><p>As saídas dos pods são controladas pelas regras de rede (lição 22). Esta firewall é a da VM; restringir as saídas aqui partiria as atualizações e o Tailscale, sem grande ganho.</p></details>
+  <label class="got"><input type="checkbox" data-done="l25"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l26" data-title="O cofre grátis" data-part="5">
+  <div class="kicker">Lição 26</div>
+  <h2>O cofre: grátis por escolha</h2>
+  <div class="simple"><b>Em português simples</b>O cofre da Oracle guarda as palavras-passe. Há dois tipos: um pago (com hardware dedicado) e um grátis (com chaves em software). Escolhemos o grátis <b>no próprio código</b>, com um comentário a dizer porquê, para ninguém o trocar por engano. E os <b>valores</b> dos segredos nunca entram no Terraform.</div>
+  <div class="file">terraform/oracle/vault.tf</div>
+  <div class="codebox" data-code="c-vlt" data-notes="n-c-vlt"></div>
+<script type="text/plain" id="c-vlt"># Secrets vault (OCI Vault) read by the External Secrets Operator. See modbus_data_plataform docs/adr/011.
+#
+# What lives here: the compartment, the vault, the master key and WHO may read secrets.
+# What does NOT live here: secret values. Creating them with Terraform would store them in plain text in
+# terraform.tfstate, so they are created by scripts/vault-seed.sh with the OCI CLI instead.
+#
+# Cost: a DEFAULT vault with software-protected keys is part of Always Free (150 secrets per tenancy).
+# A VIRTUAL_PRIVATE vault is billed, so the vault type is fixed below.
+
+resource "oci_identity_compartment" "secrets" {
+  compartment_id = var.compartment_id
+  name           = "platform-secrets"
+  description    = "Vault and secrets for the data platform (read by the External Secrets Operator)"
+  enable_delete  = false # a terraform destroy must not delete the compartment that holds the secrets
+}
+
+resource "oci_kms_vault" "platform" {
+  compartment_id = oci_identity_compartment.secrets.id
+  display_name   = "platform"
+  vault_type     = "DEFAULT" # NOT "VIRTUAL_PRIVATE": that one is billed
+}
+
+resource "oci_kms_key" "platform" {
+  compartment_id      = oci_identity_compartment.secrets.id
+  display_name        = "platform-master-key"
+  management_endpoint = oci_kms_vault.platform.management_endpoint
+  protection_mode     = "SOFTWARE" # free; HSM keys only have 20 free key versions
+
+  key_shape {
+    algorithm = "AES"
+    length    = 32</script>
+<script type="application/json" id="n-c-vlt">[[4, "Os valores dos segredos não estão aqui: o Terraform guardá-los-ia em texto simples no seu ficheiro de estado. São criados por <code>scripts/vault-seed.sh</code>."], [14, "Um <code>terraform destroy</code> não apaga o compartimento dos segredos."], [20, "<b>DEFAULT</b>, não VIRTUAL_PRIVATE: o segundo é pago."], [27, "Chave em software: grátis."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Bastava alguém escrever VIRTUAL_PRIVATE para começar a pagar; e com os segredos no Terraform, o ficheiro de estado seria uma lista de palavras-passe.</div>
+  <details class="q"><summary>Pergunta: porque é que o compartimento dos segredos tem enable_delete = false?</summary><p>Porque apagá-lo apagaria todos os segredos, e sem o <code>AUTH_ENCRYPT_SECRET_KEY</code> do lakeFS a base de dados restaurada deixava de se poder ler.</p></details>
+  <label class="got"><input type="checkbox" data-done="l26"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l27" data-title="Buckets que a VM não pode estragar" data-part="5">
+  <div class="kicker">Lição 27</div>
+  <h2>Os buckets: a VM escreve, mas não apaga</h2>
+  <div class="simple"><b>Em português simples</b>Os backups vão para o Object Storage. A VM pode <b>criar e ler</b>, mas não <b>apagar nem reescrever</b>. Quem apaga o que é velho é o próprio Object Storage, com regras de ciclo de vida. Assim, mesmo que alguém tome conta da VM, não consegue destruir os backups.</div>
+  <div class="file">terraform/oracle/backups.tf (a cópia do lake)</div>
+  <div class="codebox" data-code="c-bkt" data-notes="n-c-bkt"></div>
+<script type="text/plain" id="c-bkt"># Copy of the lake objects (SeaweedFS bucket "lake": bronze, silver, lakeFS metadata ranges), synced nightly so a
+# restore of the lakeFS database never points at objects that only lived on the VM disk. lakeFS objects never change,
+# so the VM may create and read here but neither overwrite nor delete: a compromised VM cannot tamper with the copy.
+resource "oci_objectstorage_bucket" "lake" {
+  compartment_id = oci_identity_compartment.backups.id
+  namespace      = data.oci_objectstorage_namespace.this.namespace
+  name           = "platform-lake-backup"
+  access_type    = "NoPublicAccess"
+  versioning     = "Disabled"
+}
+
+# Bundles go up in ONE request since 2026-11-17 (multipart needs OBJECT_OVERWRITE, which the VM lacks on purpose), so
+# no unfinished multipart upload is expected; this rule stays as a safety net: Object Storage aborts any after 2 days.
+resource "oci_objectstorage_object_lifecycle_policy" "lake" {
+  namespace = data.oci_objectstorage_namespace.this.namespace
+  bucket    = oci_objectstorage_bucket.lake.name
+  rules {
+    name        = "abort-unfinished-uploads-after-2-days"
+    action      = "ABORT"
+    is_enabled  = true
+    time_amount = 2
+    time_unit   = "DAYS"
+    target      = "multipart-uploads"
+  }
+  # The copy keeps ~9 days (ADR-016): a full bundle every week, so the newest full and every incremental after it are
+  # always younger than 9 days. Deleted by Object Storage itself (the VM still cannot delete), no manual prune needed.
+  rules {
+    name        = "delete-bundles-after-9-days"
+    action      = "DELETE"
+    is_enabled  = true
+    time_amount = 9
+    time_unit   = "DAYS"
+    target      = "objects"
+    object_name_filter {
+      inclusion_prefixes = ["bundles/", "catalog/"]
+    }
+  }
+  depends_on = [oci_identity_policy.backups]</script>
+<script type="application/json" id="n-c-bkt">[[3, "O princípio: os objetos do lakeFS nunca mudam, por isso a VM só precisa de criar e ler."], [8, "Nunca público."], [18, "Envios a meio que falharam ocupam espaço invisível: são abortados ao fim de 2 dias."], [28, "A limpeza: pacotes e catálogos com mais de 9 dias. Com um pacote completo por semana, o restauro tem sempre tudo o que precisa."], [35, "Só nestas duas pastas."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>A limpeza teria de ser feita pela VM (com permissão de apagar), e uma VM comprometida podia apagar todos os backups antes de atacar.</div>
+  <details class="q"><summary>Pergunta: porque é que a regra apaga aos 9 dias e não aos 7?</summary><p>Porque o pacote completo é semanal: ao dia 7 vem o novo, mas o restauro ainda pode precisar do anterior até o novo estar escrito. 2 dias de folga cobrem uma noite falhada.</p></details>
+  <label class="got"><input type="checkbox" data-done="l27"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l28" data-title="Alarmes fora da VM" data-part="5">
+  <div class="kicker">Lição 28</div>
+  <h2>Os alarmes: fora da VM, para avisarem quando ela morre</h2>
+  <div class="simple"><b>Em português simples</b>Um alarme dentro da VM morre com ela. Por isso os alarmes importantes vivem na <b>Oracle</b>, fora da VM, e mandam email. Dois tipos: "passou um limite" (CPU a 90%) e "<b>deixou de chegar o sinal</b>" (o backup não disse nada em 24 h). O segundo apanha até o job que nem chegou a correr.</div>
+  <div class="file">terraform/oracle/alarms.tf</div>
+  <div class="codebox" data-code="c-alm" data-notes="n-c-alm"></div>
+<script type="text/plain" id="c-alm">resource "oci_monitoring_alarm" "vm_down" {
+  compartment_id               = var.compartment_id
+  metric_compartment_id        = var.compartment_id
+  display_name                 = "platform: VM not reporting (down?)"
+  namespace                    = "oci_computeagent"
+  query                        = "CpuUtilization[1m]{${local.vm}}.absent()"
+  severity                     = "CRITICAL"
+  pending_duration             = "PT10M"
+  is_enabled                   = true
+  destinations                 = [oci_ons_notification_topic.alerts.id]
+  body                         = "The platform VM sent no metrics for 10 minutes: it is probably down. Try ssh ubuntu@platform-oracle, else the OCI console."
+  repeat_notification_duration = "PT4H"</script>
+<script type="application/json" id="n-c-alm">[[4, "O título que aparece no email."], [5, "Métricas que o agente da Oracle recolhe da VM, sem nada nosso."], [6, "<b>absent()</b>: dispara quando os dados deixam de chegar. Se a VM cair, a CPU deixa de ser medida."], [7, "CRITICAL: o mais urgente."], [10, "Para o tópico de notificações, que manda o email."], [11, "O texto do email diz logo o que verificar primeiro."], [12, "Repete de 4 em 4 horas enquanto não for resolvido."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Se a VM caísse de noite, ninguém sabia até abrir o Grafana, que também estaria em baixo.</div>
+  <details class="q"><summary>Pergunta: porque é que os sinais de vida usam [1d].absent() e não [1h].absent(26h)?</summary><p>Porque a segunda forma disparava uma hora depois de cada sinal (foram os emails falsos de novembro). A janela tem de ser maior que o intervalo entre sinais.</p></details>
+  <label class="got"><input type="checkbox" data-done="l28"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l29" data-title="O orçamento que avisa" data-part="5">
+  <div class="kicker">Lição 29</div>
+  <h2>O orçamento: avisar ao primeiro cêntimo</h2>
+  <div class="simple"><b>Em português simples</b>Um orçamento na Oracle é de graça e manda email quando o gasto passa um valor. Pusemo-lo no mais baixo possível: <b>1 cêntimo gasto</b>, ou <b>5 cêntimos previstos</b> no mês. É o aviso antes do disjuntor da lição 14.</div>
+  <div class="file">terraform/oracle/budget.tf</div>
+  <div class="codebox" data-code="c-bud" data-notes="n-c-bud"></div>
+<script type="text/plain" id="c-bud">import {
+  to = oci_budget_budget.zero_cost
+  id = var.budget_ocid
+}
+
+resource "oci_budget_budget" "zero_cost" {
+  compartment_id = var.compartment_id
+  display_name   = "Alertmax"
+  description    = "Atingiste o limite"
+  amount         = 1
+  reset_period   = "MONTHLY"
+  target_type    = "COMPARTMENT"
+  targets        = [var.compartment_id]
+}
+
+resource "oci_budget_alert_rule" "any_charge" {
+  budget_id      = oci_budget_budget.zero_cost.id
+  display_name   = "any-charge"
+  type           = "ACTUAL"
+  threshold      = 0.01
+  threshold_type = "ABSOLUTE"
+  recipients     = var.alert_email
+  message        = "The Oracle tenancy has been charged this month (zero-cost requirement). Check Cost Analysis by service; likely suspects: Object Storage requests (50k free/month), storage over 20 GB, a resource outside Always Free."
+}
+
+resource "oci_budget_alert_rule" "forecast_charge" {
+  budget_id      = oci_budget_budget.zero_cost.id
+  display_name   = "forecast-charge"
+  type           = "FORECAST"
+  threshold      = 0.05
+  threshold_type = "ABSOLUTE"
+  recipients     = var.alert_email
+  message        = "Oracle forecasts a charge this month (zero-cost requirement). Check Cost Analysis by service before it happens."
+}</script>
+<script type="application/json" id="n-c-bud">[[1, "O orçamento foi criado na consola e adotado pelo Terraform (cada compartimento só pode ter um)."], [3, "O identificador vem do <code>terraform.tfvars</code>, que não está no git (repositório público)."], [19, "<b>ACTUAL</b>: o que já foi cobrado."], [20, "Um cêntimo."], [29, "<b>FORECAST</b>: a previsão da Oracle para o fim do mês."], [30, "Cinco cêntimos previstos."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>O primeiro sinal de custo seria a fatura do cartão no mês seguinte.</div>
+  <details class="q"><summary>Pergunta: se há este aviso, porque é que precisamos do corta-custos?</summary><p>Porque um aviso depende de alguém ler o email a tempo. O corta-custos age sozinho ao chegar a €1.</p></details>
+  <label class="got"><input type="checkbox" data-done="l29"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l30" data-title="A VM em código" data-part="5">
+  <div class="kicker">Lição 30</div>
+  <h2>A própria VM em código</h2>
+  <div class="simple"><b>Em português simples</b>A VM também é Terraform: forma, memória, disco e imagem. Se a VM morrer, um <code>terraform apply</code> cria outra igual. Dois cuidados: a imagem do Ubuntu fica "congelada" (uma imagem nova não pode recriar a VM e apagar o disco), e o IP privado está fixo porque uma regra de rede depende dele.</div>
+  <div class="file">terraform/oracle/main.tf</div>
+  <div class="codebox" data-code="c-vm" data-notes="n-c-vm"></div>
+<script type="text/plain" id="c-vm">resource "oci_core_instance" "platform" {
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  compartment_id      = var.compartment_id
+  display_name        = var.instance_name
+  shape               = "VM.Standard.A1.Flex"
+
+  shape_config {
+    ocpus         = var.ocpus
+    memory_in_gbs = var.memory_in_gbs
+  }
+
+  source_details {
+    source_type             = "image"
+    source_id               = data.oci_core_images.ubuntu_arm.images[0].id
+    boot_volume_size_in_gbs = var.boot_volume_size_in_gbs
+  }
+
+  create_vnic_details {
+    subnet_id        = var.subnet_id
+    assign_public_ip = true
+    # pinned: the ops/gc-freshness network policy allows the Kubernetes API at exactly this address
+    private_ip = "10.0.0.43"
+  }
+
+  metadata = {
+    ssh_authorized_keys = file(pathexpand(var.ssh_public_key_path))
+  }
+
+  lifecycle {
+    # a newer Ubuntu image must not force the VM to be recreated (and its data lost)
+    # cost-guard-ack is set by scripts/cost-guard-resume.sh (ADR-017), not by Terraform
+    ignore_changes = [source_details[0].source_id, freeform_tags["cost-guard-ack"]]</script>
+<script type="application/json" id="n-c-vm">[[5, "A1.Flex (ARM): a forma grátis, até 4 OCPU e 24 GB no total da conta."], [8, "2 OCPU e 12 GB (no ficheiro de variáveis)."], [15, "100 GB de disco, dos 200 grátis."], [22, "IP fixo: a regra de rede do gc-freshness deixa chegar à API do Kubernetes exatamente neste endereço."], [26, "A chave pública para o primeiro acesso."], [32, "Uma imagem do Ubuntu mais recente <b>não</b> recria a VM; a etiqueta da retoma do corta-custos também é ignorada."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Uma VM perdida seria reconstruída à mão, de memória, e uma atualização da imagem podia apagar o disco com todos os dados.</div>
+  <details class="q"><summary>Pergunta: porque é que mudar a imagem recriaria a VM?</summary><p>Porque a imagem é a origem do disco de arranque: a Oracle não a troca numa VM existente, por isso o Terraform apagaria e criaria outra. O ignore_changes impede isso.</p></details>
+  <label class="got"><input type="checkbox" data-done="l30"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l31" data-title="O backup do Postgres" data-part="6">
+  <div class="kicker">Lição 31</div>
+  <h2>O backup noturno do Postgres</h2>
+  <div class="simple"><b>Em português simples</b>Todas as noites às 02:30, um job tira uma <b>fotografia</b> de cada base de dados (spool, lakeFS, Airflow, OpenMetadata) e envia-a para o Object Storage. É feito em dois passos, por dois contentores diferentes: um que sabe falar com o Postgres e outro que sabe falar com a Oracle. Nenhum dos dois tem a chave do outro.</div>
+  <div class="file">envs/oracle/backup/pg-backup.yaml</div>
+  <div class="codebox" data-code="c-pgd" data-notes="n-c-pgd"></div>
+<script type="text/plain" id="c-pgd"># Runs in its own namespace "backup": the only namespace allowed to reach the cloud metadata endpoint (the VM's
+# instance principal), with only the Postgres superuser password delivered to it.
+#
+# Nightly logical backup of every platform database (ingest spool, lakeFS metadata, Airflow, OpenMetadata) plus
+# the roles, uploaded to the platform-backups bucket (terraform/oracle/backups.tf). Oracle deletes dumps after
+# 7 days; the VM may create and read objects there but not delete them.
+#
+# 1. init container (postgres image): pg_dumpall --globals-only + pg_dump -Fc of each database into an emptyDir
+# 2. main container (OCI CLI): uploads them with the VM's instance principal (no key anywhere)
+# Restore: scripts/pg-restore-test.sh restores the latest dump into scratch databases and compares row counts.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pg-backup
+  namespace: backup
+spec:
+  schedule: "30 2 * * *"            # 02:30 UTC, away from the hourly silver run at :10
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: pg-backup                       # the backup namespace is the only one allowed to reach the
+                                                 # metadata endpoint (instance principal): see network-policies
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false   # it never talks to the Kubernetes API
+          volumes:
+            - {name: dump, emptyDir: {}}
+            - {name: tmp, emptyDir: {sizeLimit: 512Mi}}
+          initContainers:
+            - name: dump
+              image: timescale/timescaledb:latest-pg17@sha256:6a6b7d7a346d7c6be03a310c240706f3bbc6d7adbdf3fbc07823570b34337f5e
+              env:
+                - name: PGPASSWORD
+                  valueFrom: {secretKeyRef: {name: postgres-auth, key: POSTGRES_PASSWORD}}
+              command:
+                - sh
+                - -ec
+                - |
+                  H=postgres.data.svc.cluster.local
+                  # a new pod is only added to the network-policy allow-lists a few seconds after it starts (kube-router):
+                  # wait for Postgres instead of failing on the first connection
+                  for i in $(seq 1 30); do pg_isready -q -h $H -p 5432 && break; sleep 2; done
+                  pg_dumpall -h $H -U postgres --globals-only > /dump/globals.sql
+                  for db in $(psql -h $H -U postgres -At -c "select datname from pg_database where not datistemplate and datname <> 'postgres'"); do
+                    pg_dump -h $H -U postgres -Fc -f /dump/$db.dump $db
+                  done
+                  ls -l /dump
+              volumeMounts: [{name: dump, mountPath: /dump}, {name: tmp, mountPath: /tmp}]
+              resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
+              securityContext: {runAsUser: 70, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true}
+          containers:
+            - name: upload
+              image: ghcr.io/oracle/oci-cli:latest@sha256:2127c2f50ee1353fa78cbf538ab91ffaccc0d02b6d0b4144530cef6ee69709f5
+              env:
+                - {name: OCI_CLI_AUTH, value: instance_principal}
+                - {name: HOME, value: /tmp}
+              command:
+                - sh
+                - -ec
+                - |
+                  NS=$(oci os ns get --query data --raw-output)
+                  PREFIX=$(date -u +%Y-%m-%d/%H%M%S)      # one prefix per run: a retry never overwrites (the VM may not)
+                  # --no-multipart: a multipart upload needs OBJECT_OVERWRITE, which the VM does not have on purpose (it may
+                  # not overwrite backups). The CLI switches to multipart above 128 MiB; ingest.dump was 107 MB on 2026-11-17
+                  # and growing. One PUT takes up to 50 GiB.
+                  oci os object bulk-upload -ns "$NS" -bn platform-backups --src-dir /dump --object-prefix "$PREFIX/" --no-multipart
+                  # written LAST: a run without it is incomplete, and the restore test ignores it
+                  date -u +%FT%TZ > /tmp/_COMPLETE && oci os object put -ns "$NS" -bn platform-backups --file /tmp/_COMPLETE --name "$PREFIX/_COMPLETE" >/dev/null
+                  echo "uploaded to platform-backups/$PREFIX/ (complete)"</script>
+<script type="application/json" id="n-c-pgd">[[1, "O namespace <code>backup</code> é dos poucos que podem falar com o serviço de metadados (a identidade da VM)."], [17, "02:30, longe do silver (que corre à hora e 10) e depois da limpeza da spool (02:00)."], [18, "Nunca dois backups ao mesmo tempo."], [32, "Não fala com o Kubernetes, por isso não leva token."], [37, "Passo 1 (contentor do Postgres): tira os dumps para uma pasta temporária."], [49, "Espera que a rede o deixe passar: as regras chegam a um pod novo uns segundos depois de ele arrancar."], [8, "Primeiro os <b>utilizadores e permissões</b> (globals.sql), depois cada base."], [52, "Cada base num ficheiro comprimido (-Fc), que o <code>pg_restore</code> sabe ler."], [59, "Passo 2 (contentor da Oracle): envia com a identidade da VM, sem nenhuma chave guardada."], [69, "Uma pasta por corrida (data/hora): uma repetição nunca reescreve a anterior."], [70, "Sempre num só pedido: o envio em partes precisa de uma permissão que a VM não tem (lição 18)."], [75, "Escrito <b>no fim</b>: uma corrida sem ele está incompleta e o restauro ignora-a."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um disco avariado era o fim da spool, da história do lakeFS e de todas as configurações do Airflow.</div>
+  <details class="q"><summary>Pergunta: porque é que o _COMPLETE é escrito por último?</summary><p>Porque se o job morrer a meio, fica uma pasta com metade dos dumps. Sem o _COMPLETE, quem restaura sabe que não a deve usar e escolhe a anterior.</p></details>
+  <label class="got"><input type="checkbox" data-done="l31"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l32" data-title="A cópia do lake em pacotes" data-part="6">
+  <div class="kicker">Lição 32</div>
+  <h2>A cópia do lake em pacotes (em partes)</h2>
+  <div class="simple"><b>Em português simples</b>O lake tem dezenas de milhares de ficheiros pequenos. Copiá-los um a um gastava os pedidos grátis da Oracle em dois dias. Então, todas as noites, junta-se só o que é <b>novo</b> em pacotes <code>.tar.gz</code>, e um <b>catálogo</b> diz em que pacote está cada ficheiro. Uma vez por semana faz-se um pacote completo. Desde 21-11 cada pacote divide-se em <b>partes de até 3 GiB</b>: um só envio aceita no máximo 5 GiB, e o lake cresce.</div>
+  <div class="file">envs/oracle/backup/lake-sync.yaml (o coração)</div>
+  <div class="codebox" data-code="c-lsy" data-notes="n-c-lsy"></div>
+<script type="text/plain" id="c-lsy">set -o pipefail                       # a failed rclone in a pipe fails the run
+. /cfg/oci.env
+B=oci:platform-lake-backup
+NOW=$(date -u +%Y%m%dT%H%M%S)
+cd /work
+# the lake with sizes, "path<TAB>bytes" (in the cluster: free)
+rclone lsf -R --files-only --format ps --separator "$(printf '\t')" lake:lake | sort > lakesz.txt
+cut -f1 lakesz.txt > lake.txt
+# 1 request; an error fails the run. The VM's identity token can fail to renew for a moment (401, seen
+# 2026-11-21): the FIRST call is retried before giving up
+for i in 1 2 3 4 5; do rclone lsf "$B/catalog/" > catalogs.txt && break; echo "OCI call failed (attempt $i), retry in 30 s" >&2; [ "$i" -lt 5 ] || exit 1; sleep 30; done
+LATEST=$(sort catalogs.txt | tail -1)
+: > catalog.txt
+[ -z "$LATEST" ] || rclone cat "$B/catalog/$LATEST" | gunzip > catalog.txt   # 1 request
+# The newest full is read from the CATALOG (the source of truth), not from the bundle listing: a full
+# that failed half-way leaves bundles no catalog refers to, and must not count as this week's full
+# (else the real one could expire after 9 days while still needed).
+NEWEST_FULL=$(cut -f2 catalog.txt | grep -- '-full' | sort | tail -1 | cut -c1-8)   # YYYYMMDD
+WEEK_AGO=$(date -u -d "@$(( $(date +%s) - 7 * 86400 ))" +%Y%m%d)
+# a full every week (when the newest full is 7 days old or more), or the very first time. Object
+# Storage deletes bundles and catalogs after 9 days, so a restore (newest full + the incrementals
+# after it) always finds everything it needs
+if [ -z "$NEWEST_FULL" ] || ! [ "$NEWEST_FULL" \> "$WEEK_AGO" ]; then
+  MODE=full; : > catalog.txt
+else
+  MODE=incr
+fi
+cut -f1 catalog.txt | sort > have.txt
+comm -23 lake.txt have.txt > new.txt
+N=$(wc -l < new.txt | tr -d ' ')
+echo "lake: $(wc -l < lake.txt | tr -d ' ') objects; already bundled: $(wc -l < have.txt | tr -d ' '); new: $N ($MODE)"
+if [ "$N" -gt 0 ]; then
+  # In PARTS of at most PART_BYTES of objects (2026-11-21): one upload takes at most 5 GiB without
+  # multipart (which needs OBJECT_OVERWRITE, deliberately not granted), and the lake grows. Each part
+  # is its own bundle "<time>-<mode>-NNN.tar.gz", one request each; the catalog maps every object to
+  # its part, so the restore drill needs no change. Parts go one at a time: at most one part on disk.
+  awk -F'\t' -v max="$PART_BYTES" 'NR==FNR {want[$1]=1; next}
+    ($1 in want) { if (sum + $2 > max && sum > 0) { part++; sum = 0 }
+                   sum += $2; print $1 > (sprintf("part-%03d.txt", part + 1)) }' new.txt lakesz.txt
+  : > newcat.txt
+  for P in part-*.txt; do
+    NUM=${P#part-}; NUM=${NUM%.txt}
+    BUNDLE="$NOW-$MODE-$NUM.tar.gz"
+    rclone copy lake:lake files --files-from "$P" --transfers 4 -q       # in the cluster: free
+    tar -C files -czf bundle.tar.gz .
+    rclone copyto bundle.tar.gz "$B/bundles/$BUNDLE"                        # 1 request
+    awk -v b="$BUNDLE" '{print $0 "\t" b}' "$P" >> newcat.txt
+    echo "uploaded bundles/$BUNDLE ($(wc -l < "$P" | tr -d ' ') objects, $(du -h bundle.tar.gz | cut -f1))"
+    rm -rf files bundle.tar.gz
+  done
+  # written LAST: a catalog only ever lists parts that were all uploaded
+  { cat catalog.txt; cat newcat.txt; } | gzip > catalog.new.gz
+  rclone copyto catalog.new.gz "$B/catalog/$NOW.txt.gz"                     # 1 request
+  echo "uploaded catalog/$NOW.txt.gz"
+else
+  echo "nothing new: no upload"</script>
+<script type="application/json" id="n-c-lsy">[[1, "Se um passo de um \"tubo\" falhar, a noite falha (em vez de continuar com dados errados)."], [7, "Lista o lake inteiro <b>com os tamanhos</b> (grátis: está dentro do cluster). Os tamanhos servem para dividir em partes."], [11, "O primeiro pedido à Oracle tenta até 5 vezes: a identidade da VM falha por momentos (erro 401 visto a 21-11)."], [18, "O completo mais recente lê-se do <b>catálogo</b>, não da lista de pacotes: um completo que falhou a meio não conta."], [24, "<b>Completo</b>: na primeira vez, ou quando o completo do catálogo tem 7 dias ou mais."], [29, "\"O que está no lake e ainda não está no catálogo\" = os ficheiros novos."], [37, "Divide os ficheiros novos em partes de até PART_BYTES (3 GiB)."], [43, "Cada parte tem o seu nome, por exemplo <code>…-full-001.tar.gz</code>."], [46, "Envia a parte: 1 pedido, sem multipart (a VM não tem permissão para reescrever)."], [51, "O catálogo é escrito no fim: só lista partes que chegaram todas."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Ou se pagavam centenas de milhares de pedidos por mês, ou não havia cópia do lake fora da VM. E sem as partes, o pacote completo deixava de caber num envio por volta do fim de dezembro.</div>
+  <details class="q"><summary>Pergunta: como é que o restauro sabe que pacotes descarregar?</summary><p>Lê o catálogo mais recente: a segunda coluna diz o pacote (ou a parte) de cada ficheiro. Descarrega só esses e desembrulha-os. Por isso a mudança para partes não obrigou a mexer no ensaio.</p></details>
+  <label class="got"><input type="checkbox" data-done="l32"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l33" data-title="O ensaio diário de restauro" data-part="6">
+  <div class="kicker">Lição 33</div>
+  <h2>O ensaio diário: provar que os backups servem</h2>
+  <div class="simple"><b>Em português simples</b>Um backup que nunca foi restaurado é só uma esperança. Todos os dias às 04:15, um pod constrói um <b>lake de mentira</b>, ao lado do verdadeiro: um Postgres, um SeaweedFS e um lakeFS temporários. Restaura lá os backups e compara a assinatura (MD5) de cada ficheiro do <code>main</code>. Nada do lake verdadeiro é tocado.</div>
+  <div class="file">envs/oracle/ops/lake-restore-drill.yaml</div>
+  <div class="codebox" data-code="c-drl" data-notes="n-c-drl"></div>
+<script type="text/plain" id="c-drl"># Daily lake restore drill: proves that the backups ALONE rebuild the lake, without touching anything live.
+# Every day 04:15 UTC (after pg-backup 02:30 and lake-sync 03:00; daily because an OCI absence alarm can wait 3 days
+# at most). One pod, everything on localhost:
+#   fetch            newest complete dump set (_COMPLETE) from platform-backups: globals.sql + lakefs.dump
+#   postgres         scratch Postgres (sidecar)               <- globals + lakefs.dump restored into it
+#   seaweedfs        scratch SeaweedFS (sidecar, bucket lake)  <- the bundles of the newest catalog, unpacked (ADR-016)
+#   lakefs           scratch lakeFS on those two (sidecar), same encryption key and admin key as the real one
+#   check            per repository: main's commit, then EVERY object on main read once (streamed, from the scratch
+#                    SeaweedFS) and its MD5 compared with the checksum lakeFS recorded at write time; then
+#                    lake_drill_success = 1 (passed) or 0 (failed) to OCI Monitoring. Alarms: a 0, or nothing for 2 days
+# The live Postgres, SeaweedFS and lakeFS are never contacted (ops egress: DNS, metadata, OCI services, lakeFS API;
+# the drill does not use the last one). Run it now: ./scripts/lake-restore-test.sh
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lake-restore-drill
+  namespace: ops
+spec:
+  schedule: "15 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 0</script>
+<script type="application/json" id="n-c-drl">[[1, "O objetivo: provar que os backups <b>sozinhos</b> reconstroem o lake."], [4, "O dump mais recente que esteja completo (com _COMPLETE)."], [5, "Um Postgres temporário, que recebe a história do lakeFS."], [6, "Um SeaweedFS temporário, que recebe os pacotes do catálogo mais recente."], [7, "Um lakeFS temporário por cima dos dois, com as mesmas chaves do verdadeiro."], [8, "Lê cada ficheiro do main e compara o MD5 com o que o lakeFS registou ao escrever."], [11, "Os serviços verdadeiros nunca são contactados."], [19, "Diário: um alarme de ausência da Oracle espera no máximo 3 dias, por isso tem de correr todos os dias."], [25, "Sem repetições: um ensaio falhado deve ser visto, não escondido por uma segunda tentativa."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Só se descobria que os backups não serviam no dia em que fossem precisos. Foi assim que, a 17-11, se viu que a cópia tinha falhado.</div>
+  <details class="q"><summary>Pergunta: porque é que o ensaio usa a mesma chave de encriptação do lakeFS verdadeiro?</summary><p>Porque o lakeFS guarda as credenciais encriptadas na base de dados. Sem a mesma chave, a base restaurada não se consegue ler, e é exatamente isso que um restauro real teria de enfrentar.</p></details>
+  <label class="got"><input type="checkbox" data-done="l33"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l34" data-title="A limpeza do lake (GC)" data-part="6">
+  <div class="kicker">Lição 34</div>
+  <h2>A limpeza do lake: a GC semanal</h2>
+  <div class="simple"><b>Em português simples</b>Apagar um ficheiro do <code>main</code> não liberta espaço: os commits antigos ainda apontam para ele (como no git). A <b>GC</b> (garbage collection) procura os ficheiros a que nenhum ramo e nenhum commit dos últimos 15 dias se referem, e apaga-os. Primeiro só <b>marca</b> (faz a lista); apagar a sério é um passo à parte, depois de alguém ler a lista.</div>
+  <div class="file">envs/oracle/lakefs-gc/gc.yaml</div>
+  <div class="codebox" data-code="c-gc" data-notes="n-c-gc"></div>
+<script type="text/plain" id="c-gc">umask 077
+cat > /tmp/gc.properties <<EOF
+spark.master=local[2]
+spark.driver.memory=768m
+spark.local.dir=/tmp/spark
+spark.ui.enabled=false
+spark.driver.bindAddress=127.0.0.1
+spark.driver.host=127.0.0.1
+spark.hadoop.lakefs.api.url=http://lakefs.data.svc.cluster.local:8000/api/v1
+spark.hadoop.lakefs.api.access_key=$LAKEFS_ACCESS_KEY_ID
+spark.hadoop.lakefs.api.secret_key=$LAKEFS_SECRET_ACCESS_KEY
+EOF
+if [ -n "$GC_MARK_ID" ]; then
+  printf 'spark.hadoop.lakefs.gc.do_mark=false\nspark.hadoop.lakefs.gc.mark_id=%s\nspark.hadoop.lakefs.gc.do_sweep=true\n' "$GC_MARK_ID" >> /tmp/gc.properties
+  GC_SWEEP="true (reviewed mark $GC_MARK_ID only)"
+else
+  echo "spark.hadoop.lakefs.gc.do_sweep=$GC_SWEEP" >> /tmp/gc.properties
+fi
+cat >> /tmp/gc.properties <<EOF
+spark.hadoop.fs.s3a.access.key=$S3_ACCESS_KEY
+spark.hadoop.fs.s3a.secret.key=$S3_SECRET_KEY
+spark.hadoop.fs.s3a.endpoint=http://seaweedfs.data.svc.cluster.local:8333
+spark.hadoop.fs.s3a.path.style.access=true
+spark.hadoop.fs.s3a.connection.ssl.enabled=false
+spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider
+spark.hadoop.fs.s3.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+spark.hadoop.fs.s3a.buffer.dir=/tmp/s3a
+EOF
+echo "lakeFS GC of $REPOSITORY, sweep=$GC_SWEEP"
+for i in $(seq 1 30); do   # network policies reach a new pod a few seconds after it starts
+  (exec 3<>/dev/tcp/lakefs.data.svc.cluster.local/8000) 2>/dev/null && break; sleep 2
+done
+set -o pipefail   # the job fails when Spark fails; the filter only keeps the report readable
+/opt/spark/bin/spark-submit --properties-file /tmp/gc.properties \
+  --class io.treeverse.gc.GarbageCollection /opt/gc/lakefs-gc.jar "$REPOSITORY" us-east-1 2>&1 \</script>
+<script type="application/json" id="n-c-gc">[[1, "O ficheiro de configuração, que leva as chaves, só pode ser lido pelo próprio processo."], [2, "As chaves vão num ficheiro, e não na linha de comando, onde qualquer <code>ps</code> as veria."], [3, "Spark num só pod, com 2 threads. Não há cluster Spark."], [13, "Modo \"apagar uma lista já revista\": apaga exatamente o que alguém leu, nada de novo."], [17, "Senão: marcar (e apagar, se GC_SWEEP=true). Hoje está a <b>false</b>: só marca."], [22, "O SeaweedFS, onde estão os ficheiros."], [30, "Espera que a rede o deixe chegar ao lakeFS."], [34, "Corre o programa de GC do lakeFS, que vem dentro da imagem (lição seguinte)."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Com a retenção de 15 dias, o bronze "apagado" continuaria no disco para sempre, e o lake só cresceria.</div>
+  <details class="q"><summary>Pergunta: porque é que a primeira GC só marca?</summary><p>Porque apagar é irreversível. A primeira corrida faz a lista; uma pessoa lê-a (<code>scripts/lakefs-gc-sweep.sh</code> mostra exemplos) e só depois se apaga. A partir daí, pode passar a marcar e apagar de uma vez.</p></details>
+  <label class="got"><input type="checkbox" data-done="l34"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l35" data-title="A imagem que nós construímos" data-part="6">
+  <div class="kicker">Lição 35</div>
+  <h2>A imagem que nós próprios construímos</h2>
+  <div class="simple"><b>Em português simples</b>Não existe imagem oficial da GC do lakeFS: só um ficheiro <code>.jar</code>. Podíamos descarregá-lo cada vez que a GC arranca, mas esse pod tem as chaves do lake e não deve sair para a internet. Então construímos <b>uma imagem com tudo lá dentro</b>, e cada ficheiro é verificado pela sua assinatura.</div>
+  <div class="file">images/lakefs-gc/Dockerfile</div>
+  <div class="codebox" data-code="c-img" data-notes="n-c-img"></div>
+<script type="text/plain" id="c-img"># syntax=docker/dockerfile:1.7
+# lakeFS garbage collection (Community): Spark 3.5 (Hadoop 3.3.4) with the lakeFS Spark client and the S3A connector
+# baked in, every jar checked by sha256 at build time. Baked, not downloaded at run time, so the pod that holds the
+# lakeFS and SeaweedFS keys never needs internet access (ADR-015). Built and scanned by .github/workflows/images.yml.
+FROM apache/spark:3.5.9-scala2.12-java17-ubuntu@sha256:5eb9236efcfee5e447d6fe30cf8376e2ca4f79671350ed89f990f9b3e84b954c
+
+# Parts of Spark the GC never uses (Hive's embedded metastore, cluster coordination): removed, with their CVEs.
+USER root
+RUN rm -f /opt/spark/jars/derby-*.jar /opt/spark/jars/zookeeper-*.jar \
+ && install -d -m 0755 /opt/gc   # created first: ADD --chmod would also give a new parent directory 0644 (not traversable)
+
+# S3A for Hadoop 3.3.4 (the Hadoop of this Spark build); checksums match Maven Central's .sha1 files
+ADD --checksum=sha256:53f9ae03c681a30a50aa17524bd9790ab596b28481858e54efd989a826ed3a4a --chmod=0644 \
+    https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar /opt/spark/jars/
+ADD --checksum=sha256:873fe7cf495126619997bec21c44de5d992544aea7e632fdc77adb1a0915bae5 --chmod=0644 \
+    https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar /opt/spark/jars/
+# lakeFS Spark client 0.22.0 (Scala 2.12, Spark 3.x). Treeverse publishes no checksum: this is the sha256 of the copy
+# downloaded and checked on 2026-11-15; a different file fails the build.
+ADD --checksum=sha256:384d4b4dfd4f5d2465b4d0598b1a3be87267c80f202ff2292b953700013f9952 --chmod=0644 \
+    https://treeverse-clients-us-east.s3.amazonaws.com/lakefs-spark-client/0.22.0/lakefs-spark-client_2.12-assembly-0.22.0.jar /opt/gc/lakefs-gc.jar
+
+USER 185</script>
+<script type="application/json" id="n-c-img">[[2, "Spark + cliente lakeFS + conector S3, metidos na imagem, e não descarregados ao arrancar (ADR-015)."], [5, "A base: a imagem oficial do Spark, fixa por digest."], [9, "Retira partes do Spark que a GC nunca usa, e com elas as suas vulnerabilidades."], [10, "A pasta é criada antes, para ter as permissões certas."], [13, "Cada ficheiro descarregado tem de ter exatamente esta assinatura: um ficheiro trocado faz falhar a construção."], [17, "A Treeverse não publica a assinatura: guardámos a do ficheiro verificado a 15-11."], [22, "Corre sem root."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Ou o pod da GC teria de poder sair para a internet com as chaves do lake, ou não havia GC e o lake crescia para sempre.</div>
+  <details class="q"><summary>Pergunta: quem constrói esta imagem, e quando?</summary><p>O CI (<code>.github/workflows/images.yml</code>), sempre que algo em <code>images/</code> muda: constrói em ARM, analisa com o Trivy e publica no GitHub. Todas as segundas volta a analisar as imagens em uso.</p></details>
+  <label class="got"><input type="checkbox" data-done="l35"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l36" data-title="Um Helm chart pelo Argo CD" data-part="7">
+  <div class="kicker">Lição 36</div>
+  <h2>Um serviço instalado por um Helm chart, pelo Argo CD</h2>
+  <div class="simple"><b>Em português simples</b>O Airflow é instalado por um <b>Helm chart</b> (um pacote de manifests com opções). A ficha do Argo CD junta três fontes: o chart oficial, as <b>nossas opções</b> (values) deste repositório, e uns manifests extra nossos. Mudar o Airflow é mudar um ficheiro e fazer commit.</div>
+  <div class="file">platform/argocd/apps/airflow.yaml</div>
+  <div class="codebox" data-code="c-afa" data-notes="n-c-afa"></div>
+<script type="text/plain" id="c-afa"># Airflow (Helm chart) under Argo CD. Three sources: the chart, this repository's values ($values), and the
+# extra manifests in platform/k8s/airflow (the logs volume). Bumping MODBUS_PIPELINES_IMAGE in the values is now a
+# commit, with no manual helm upgrade. The database role is still prepared once by scripts/install-airflow.sh.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airflow
+  namespace: argocd
+  labels:
+    platform/values-source: "true"   # sources 1 and 2 read this repository: each environment sets which branch
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: platform
+  sources:
+    - repoURL: https://airflow.apache.org
+      chart: airflow
+      targetRevision: 1.22.0
+      helm:
+        releaseName: airflow
+        valueFiles: [$values/platform/airflow/values.yaml]
+    - repoURL: https://github.com/elwarrior100/platform.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/elwarrior100/platform.git
+      targetRevision: main
+      path: platform/k8s/airflow
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: airflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true</script>
+<script type="application/json" id="n-c-afa">[[10, "Uma etiqueta que diz \"esta ficha lê o nosso repositório\": cada ambiente (local, Oracle) escolhe o ramo."], [12, "Instala-se na onda 3, depois dos dados e dos segredos."], [17, "Fonte 1: o chart oficial, numa versão fixa."], [21, "As opções vêm da fonte 2 (<code>$values</code>)."], [24, "Fonte 2: o nosso repositório, com o nome <code>values</code>."], [27, "Fonte 3: manifests extra (o volume dos logs)."], [34, "Se alguém mudar algo à mão no cluster, o Argo CD repõe o que está no git."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Instalar e atualizar o Airflow era um <code>helm upgrade</code> à mão, que ninguém sabia ao certo com que opções tinha sido feito.</div>
+  <details class="q"><summary>Pergunta: porque é que o chart e as opções são fontes separadas?</summary><p>Porque o chart vem do repositório do Airflow e as opções vêm do nosso. Assim atualizar a versão do chart e mudar uma opção são duas mudanças independentes, cada uma num commit.</p></details>
+  <label class="got"><input type="checkbox" data-done="l36"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l37" data-title="O Airflow por dentro" data-part="7">
+  <div class="kicker">Lição 37</div>
+  <h2>O Airflow por dentro: tarefas num pod cada</h2>
+  <div class="simple"><b>Em português simples</b>Com o <b>KubernetesExecutor</b>, cada tarefa corre no seu próprio pod, que nasce e morre. As DAGs vêm de um commit fixo do repositório do projeto, e a imagem das tarefas é a desse mesmo commit: código e DAG andam sempre juntos.</div>
+  <div class="file">platform/airflow/values.yaml</div>
+  <div class="codebox" data-code="c-afv" data-notes="n-c-afv"></div>
+<script type="text/plain" id="c-afv"># Values for the apache-airflow/airflow 1.22.0 chart, running Airflow 3.3.2 (newer than the chart's default 3.2.2). See modbus_data_plataform docs/adr/007.
+# Installed and kept in sync by Argo CD (platform/argocd/apps/airflow.yaml).
+executor: KubernetesExecutor
+
+# The platform runs the OFFICIAL Airflow image: no project code is baked in. Each project brings its DAGs from its
+# own repository (DAG bundles, below) and runs its tasks in its own image (pod_override in the DAG).
+images:
+  airflow:
+    repository: apache/airflow
+    # 3.3.2 pinned by digest (a tag can be moved; a digest cannot). 3.2.2 had CRITICAL vulnerabilities.
+    tag: "3.3.2@sha256:e9982ad3f49a60418622e1baf80c34b0daf3fa5091a336cb5ee61f0cdd189371"
+    pullPolicy: IfNotPresent
+  # The task pods' template too: without this the chart fills it with its own default (3.2.2, CRITICAL CVEs), used by
+  # any task that does not set its own image (found by scripts/deployed-images.sh, 2026-11-15).
+  pod_template:
+    repository: apache/airflow
+    tag: "3.3.2@sha256:e9982ad3f49a60418622e1baf80c34b0daf3fa5091a336cb5ee61f0cdd189371"
+    pullPolicy: IfNotPresent
+
+config:
+  core:
+    parallelism: 2                # at most 2 task pods at once on the whole platform (2 OCPU on Oracle)
+    # A DAG that is in git runs: new DAGs start unpaused, so the two clusters cannot drift on a click in the UI (the
+    # local lake_housekeeping sat paused for days). To stop a DAG, change it in git (schedule=None), not the UI.
+    dags_are_paused_at_creation: "False"
+  dag_processor:
+    # One bundle per project. GitDagBundle (apache-airflow-providers-git, shipped in the official image) clones the
+    # project repository and refreshes it every refresh_interval seconds: a pushed DAG shows up without a new image.
+    # (one line: the chart copies this value into airflow.cfg). tracking_ref is the SAME commit as MODBUS_PIPELINES_IMAGE:
+    # DAG and task code move together, in one platform commit, so they can never drift apart.
+    # Memory (2026-11-16): one parsing process instead of the default 2 (a handful of DAGs, parsed in seconds): ~60Mi
+    parsing_processes: "1"
+    # The DAG code is pinned to a commit (tracking_ref below): re-reading it every 30 s (default) only rewrites the same
+    # DAGs to the database. Every 300 s; the bundle refresh every 600 s (a new commit changes this file and restarts
+    # the pod anyway).
+    min_file_process_interval: "300"
+    dag_bundle_config_list: '[{"name": "modbus", "classpath": "airflow.providers.git.bundles.git.GitDagBundle", "kwargs": {"repo_url": "https://github.com/elwarrior100/modbus_data_plataform.git", "tracking_ref": "c2d511fc3ec8008346cc1661dff73a86ba45d215", "subdir": "pipelines/dags", "refresh_interval": 600}}]'</script>
+<script type="application/json" id="n-c-afv">[[3, "Cada tarefa num pod próprio: nada fica a ocupar memória entre corridas."], [22, "No máximo 2 tarefas ao mesmo tempo em toda a plataforma (2 OCPU)."], [25, "Uma DAG que está no git corre. Para parar uma DAG muda-se o git, não a interface."], [32, "Um só processo a ler as DAGs (poupança de memória)."], [36, "Relê as DAGs de 5 em 5 minutos: o código está fixo num commit."], [37, "As DAGs vêm do repositório do projeto, no commit <code>tracking_ref</code>, o mesmo da imagem das tarefas."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>As DAGs e o código das tarefas podiam divergir (DAG nova, código antigo), e um clique na interface mudava o comportamento sem ficar no git.</div>
+  <details class="q"><summary>Pergunta: porque é que a DAG e a imagem das tarefas usam o mesmo commit?</summary><p>Para a DAG nunca chamar uma função que a imagem ainda não tem, ou o contrário. Atualizar é mudar os dois valores num só commit da plataforma.</p></details>
+  <label class="got"><input type="checkbox" data-done="l37"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l38" data-title="O OpenMetadata emagrecido" data-part="7">
+  <div class="kicker">Lição 38</div>
+  <h2>O OpenMetadata: o catálogo, à medida de uma VM pequena</h2>
+  <div class="simple"><b>Em português simples</b>O OpenMetadata é o <b>catálogo</b>: diz que tabelas existem, o que têm e de onde vêm. Os valores por omissão são para empresas grandes. Aqui foi emagrecido, com cada número medido: usa o Postgres que já existe, tem menos memória Java e um teto nas ligações à base de dados.</div>
+  <div class="file">platform/openmetadata/values.yaml</div>
+  <div class="codebox" data-code="c-omv" data-notes="n-c-omv"></div>
+<script type="text/plain" id="c-omv"># OpenMetadata 2.0.7 on the existing PostgreSQL and the native Kubernetes orchestrator (one Job per ingestion).
+# The database password comes from the `openmetadata-db` Secret (External Secrets Operator, from the vault).
+# Installed and kept in sync by Argo CD (platform/argocd/apps/openmetadata.yaml).
+# Images pinned by digest (2026-11-15: the exact builds both clusters ran), not only by chart version: a tag can be
+# moved, a digest cannot. On a chart upgrade, update the digests too (helm template ... | grep image: shows them).
+image:
+  pullPolicy: IfNotPresent
+  tag: 2.0.7@sha256:327cdd85b868f9ce27828e1ce519d4e2ba603345520bd728b754241c9f38374c
+openmetadata:
+  config:
+    database:
+      host: postgres.data.svc.cluster.local
+      port: 5432
+      driverClass: org.postgresql.Driver
+      dbScheme: postgresql
+      databaseName: openmetadata
+      dbParams: ""
+      auth:
+        username: openmetadata
+        password:
+          secretRef: openmetadata-db
+          secretKey: password
+    pipelineServiceClientConfig:
+      type: k8s
+      k8s:
+        ingestionImage: "docker.getcollate.io/openmetadata/ingestion-base:2.0.7"
+        rbac:
+          enabled: true
+# It had no requests or limits at all. CPU capped at 1 so a restart (JVM warm-up) cannot starve k3s on 2 OCPU
+# (2026-11-15 incident); memory from its measured use (~1.1Gi).
+resources:
+  requests: {cpu: 50m, memory: 900Mi}       # CPU measured ~13m idle (2026-11-17); the limit (1) covers peaks
+  limits: {cpu: "1", memory: 1400Mi}
+# JVM heap 768m instead of the image's 1G default (2026-11-15): the defaults are sized for enterprise catalogs.
+extraEnvs:
+  - {name: OPENMETADATA_HEAP_OPTS, value: "-Xmx768m -Xms768m"}
+  # Database pool (2026-11-16): the defaults (max 100, 20 kept idle) could take every one of Postgres' 100 connections
+  # and starve ingestion and lakeFS; ~30 sat idle (~2 MB each). Max 20, 5 idle: plenty for one catalog.
+  - {name: DB_CONNECTION_POOL_MAX_SIZE, value: "20"}</script>
+<script type="application/json" id="n-c-omv">[[8, "Versão fixa por digest."], [12, "Usa o nosso Postgres em vez de trazer um MySQL próprio."], [21, "A palavra-passe vem do cofre, pelo estafeta."], [24, "As recolhas de metadados correm como Jobs do Kubernetes, sem o Airflow próprio do OpenMetadata."], [33, "Teto de CPU: ao arrancar, a Java não pode deixar o k3s sem CPU."], [36, "768 MB de memória Java, em vez de 1 GB por omissão."], [39, "No máximo 20 ligações ao Postgres (antes: 100, todas as que o Postgres aceita)."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Só o OpenMetadata ocuparia quase metade da VM, e podia esgotar as ligações do Postgres.</div>
+  <details class="q"><summary>Pergunta: porque é que as recolhas são Jobs do Kubernetes e não o Airflow do OpenMetadata?</summary><p>Porque o Airflow próprio seria mais um serviço pesado sempre ligado. Um Job nasce, recolhe e desaparece.</p></details>
+  <label class="got"><input type="checkbox" data-done="l38"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l39" data-title="Prometheus e Grafana" data-part="7">
+  <div class="kicker">Lição 39</div>
+  <h2>O Prometheus e o Grafana: medir sem pesar</h2>
+  <div class="simple"><b>Em português simples</b>O <b>Prometheus</b> recolhe números de tudo (CPU, memória, reinícios) de minuto a minuto, e o <b>Grafana</b> desenha-os. Foram afinados para uma VM pequena: 2 dias de histórico, sem as métricas internas do k3s que ninguém lê, e o Grafana sem acesso aos segredos.</div>
+  <div class="file">platform/monitoring/values.yaml</div>
+  <div class="codebox" data-code="c-mon" data-notes="n-c-mon"></div>
+<script type="text/plain" id="c-mon">alertmanager:
+  enabled: false                 # no mail account yet: external alerting is done by OCI alarms
+grafana:
+  admin:
+    existingSecret: grafana-admin          # from the vault (monitoring-grafana-admin-<env>)
+    userKey: admin-user
+    passwordKey: admin-password
+  defaultDashboardsTimezone: utc
+  persistence:
+    enabled: false               # dashboards are provisioned from git; nothing to keep
+  resources:
+    requests: {cpu: 20m, memory: 192Mi}
+    limits: {memory: 512Mi}        # 256Mi was OOM-killed at start-up (Grafana 12 loads its plugins)
+  image:
+    sha: 54e297ac67e2b72572f926892f4e06074dc4f79f2a56ed9a9ca9a88a46f28733
+  # Security (2026-11-17 audit): by default Grafana's service account may read EVERY Secret in the cluster (the chart's
+  # ClusterRole always lists secrets). It now uses our own ClusterRole (extraManifests at the end): configmaps only,
+  # in every namespace, so a project can still ship dashboards from its own namespace.
+  rbac:
+    namespaced: false
+    useExistingClusterRole: grafana-configmaps-reader
+  sidecar:
+    image:
+      sha: 52d311dcedd587421a236c4d6c621f05614c40a51386e955e0699dca97ec0880
+    dashboards:
+      resource: configmap
+    datasources:
+      resource: configmap
+      initDatasources: true
+      watchMethod: LIST          # the init container gets the sidecar's method: LIST loads once and exits (WATCH never ends)
+      skipReload: true           # Grafana is not up yet while an init container runs: it reads the file when it starts
+  testFramework:
+    enabled: false
+  # Memory (2026-11-16): the datasources never change at run time, so they load once in an init container instead of a
+  # sidecar watching all day (~85Mi). Grafana's own alerting holds no rules here (alarms are OCI's, rules are
+  # Prometheus'): off, so it does not run its scheduler and state store. Dashboards are unchanged.
+  grafana.ini:
+    unified_alerting:
+      enabled: false
+    # Memory (2026-11-16): Grafana starts one backend process per bundled datasource (14, ~5 MB each). Only Prometheus
+    # is used; these are disabled (re-enable one by removing it here if a project needs it).
+    plugins:
+      disable_plugins: jaeger,loki,mssql,mysql,opentsdb,tempo,zipkin,grafana-pyroscope-datasource,stackdriver,cloudwatch,elasticsearch,influxdb,grafana-postgresql-datasource
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 60s
+    retention: 2d                  # 3d -> 2d (2026-11-15): Grafana is for the last hours; history lives in OCI alarms
+    retentionSize: 1500MB</script>
+<script type="application/json" id="n-c-mon">[[2, "Sem Alertmanager: os alarmes importantes estão na Oracle (lição 28), e os do Prometheus chegam por lá (lição 16)."], [5, "A palavra-passe do Grafana vem do cofre."], [9, "O Grafana não guarda nada: os dashboards vêm do git."], [19, "O Grafana tem um ClusterRole nosso, só com configmaps. Por omissão podia ler todos os segredos do cluster."], [43, "13 tipos de datasource que não usamos, desligados (14 processos → 1)."], [46, "Recolhe de minuto a minuto."], [47, "2 dias de histórico: o Grafana serve para as últimas horas; o histórico dos alarmes está na Oracle."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Ou não havia gráficos para perceber um problema, ou o Prometheus ocuparia vários GB de memória.</div>
+  <details class="q"><summary>Pergunta: se há Prometheus, porque é que os alarmes importantes estão na Oracle?</summary><p>Porque o Prometheus vive na VM. Se a VM morrer, morre com ela e não avisa ninguém. A Oracle está fora.</p></details>
+  <label class="got"><input type="checkbox" data-done="l39"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l40" data-title="O CI que valida tudo" data-part="8">
+  <div class="kicker">Lição 40</div>
+  <h2>O CI: o inspetor de cada commit</h2>
+  <div class="simple"><b>Em português simples</b>Cada commit é verificado por um robô (GitHub Actions) <b>antes</b> de chegar à Oracle. Ele confirma várias coisas: que não há segredos no git, que os manifests estão bem escritos, que o Terraform é válido e que regras de segurança importantes continuam certas. Só um commit com o CI verde pode ser promovido (lição 15).</div>
+  <div class="file">.github/workflows/validate.yml</div>
+  <div class="codebox" data-code="c-val" data-notes="n-c-val"></div>
+<script type="text/plain" id="c-val"># Checks every push and pull request before Argo CD ever sees it: secrets scan, rendered Kustomize for both
+# environments, Kubernetes manifests against their schemas, Terraform format/validate, and shell scripts.
+# Tools are pinned by version and checksum; actions by commit SHA.
+name: validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"      # Mondays: has Oracle changed the service ranges the egress policies allow?
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  oci-ranges:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: OCI service ranges in the backup and ops egress policies
+        run: ./scripts/check-oci-cidrs.sh
+
+  validate:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0                 # gitleaks scans the whole history
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.15.3
+      - name: tools (pinned by checksum)
+        run: |
+          curl -sSL -o kc.tgz https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-arm64.tar.gz
+          echo "1f53fc8e81258197a35e8603054162a5af1de8c5af13746c71ab680d9534ed87  kc.tgz" | sha256sum -c -
+          curl -sSL -o gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_arm64.tar.gz
+          echo "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080  gl.tgz" | sha256sum -c -
+          curl -sSL -o tv.tgz https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-ARM64.tar.gz
+          echo "ab9d51f86e6a5fb936f605faff6b593ac51bc378fff4d3e8b9d58358b9c367c3  tv.tgz" | sha256sum -c -
+          tar -xzf kc.tgz kubeconform && tar -xzf gl.tgz gitleaks && tar -xzf tv.tgz trivy
+          sudo mv kubeconform gitleaks trivy /usr/local/bin/
+          sudo apt-get install -y -qq shellcheck >/dev/null
+      - name: bootstrap order (the root application's project must be created by install-argocd.sh)
+        run: |
+          for env in local oracle; do
+            p=$(awk '/^  project:/ {print $2}' envs/$env/root-app.yaml)
+            grep -q "projects/$p.yaml" scripts/install-argocd.sh || { echo "root ($env) is in project $p, which install-argocd.sh does not create"; exit 1; }
+          done
+      - name: lakeFS GC keeps history at least as long as the database dumps live (else an older dump points at swept objects)
+        run: |
+          gc=$(grep -o '"default_retention_days":[0-9]*' scripts/lakefs-repo.sh | head -1 | cut -d: -f2)
+          # only the DELETE rule counts (the bucket also has an ABORT rule for unfinished multipart uploads)
+          dumps=$(awk '/resource "oci_objectstorage_object_lifecycle_policy" "backups"/,/^}/' terraform/oracle/backups.tf \
+            | awk '/action *= *"DELETE"/{d=1} d && /time_amount/{print $NF; exit}')
+          echo "GC retention: $gc days, dump lifecycle: $dumps days"
+          [ -n "$gc" ] && [ -n "$dumps" ] && [ "$gc" -ge "$dumps" ] || { echo "GC retention must be >= the dump lifecycle"; exit 1; }
+      - name: secrets (gitleaks, full history)</script>
+<script type="application/json" id="n-c-val">[[1, "O que se verifica, por ordem."], [10, "À segunda-feira: confirma que a Oracle não mudou os endereços que as regras de rede deixam passar."], [13, "O robô só pode ler o repositório."], [19, "Corre em ARM, como a VM."], [32, "As \"actions\" fixas por commit (SHA), não por versão: uma versão pode ser trocada."], [38, "Cada ferramenta descarregada é verificada pela sua assinatura."], [46, "Confirma a ordem de arranque de um cluster novo (o erro da 6.ª revisão)."], [59, "A GC tem de guardar a história pelo menos tanto tempo como os dumps, senão um dump antigo apontaria para ficheiros já apagados."], [60, "A seguir: procura segredos em toda a história do git."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um erro só se descobria quando o Argo CD falhasse na Oracle, ou um segredo copiado por engano ficava público no GitHub.</div>
+  <details class="q"><summary>Pergunta: porque é que um check falhado (15 commits) passou despercebido a 16-11?</summary><p>Porque o CI corria, mas nada obrigava a olhar para ele. Agora o promote-oracle.sh pergunta o resultado ao GitHub e recusa sem verde.</p></details>
+  <label class="got"><input type="checkbox" data-done="l40"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l41" data-title="O teste de arranque do zero" data-part="8">
+  <div class="kicker">Lição 41</div>
+  <h2>O teste de arranque: um cluster novo, todas as semanas</h2>
+  <div class="simple"><b>Em português simples</b>Atualizar um cluster que já existe esconde erros: algo pode funcionar só porque <b>já lá estava</b>. Este teste cria um cluster descartável (kind), instala o Argo CD como o README diz e confirma que todas as aplicações aparecem sem erros, para os dois ambientes.</div>
+  <div class="file">.github/workflows/bootstrap.yml</div>
+  <div class="codebox" data-code="c-bts" data-notes="n-c-bts"></div>
+<script type="text/plain" id="c-bts"># Proves a FRESH cluster can be bootstrapped exactly as README.md says (the 6th review found it could not: the root
+# application's project was only created by the root application itself). For BOTH environments, on a throw-away
+# kind cluster: install-argocd.sh, then that environment's root application pointed at the commit under test; passes
+# when root syncs, every application of envs/<env>/apps exists, and none has an InvalidSpecError (a wrong project,
+# destination or permission) or a ComparisonError (manifests that do not generate). Every child application is pinned
+# to the commit too (kustomize patches on the root application), so the whole tree is tested, not a branch. It does not wait for workloads to become healthy (no vault, no data here): it tests the
+# bootstrap order and the app-of-apps. Runs when that path changes, weekly, and by hand.
+name: bootstrap
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - platform/argocd/**
+      - envs/*/root-app.yaml
+      - envs/*/apps/**
+      - scripts/install-argocd.sh
+      - .github/workflows/bootstrap.yml
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read</script>
+<script type="application/json" id="n-c-bts">[[1, "A razão: a 6.ª revisão descobriu que um cluster novo não arrancava."], [3, "Um cluster Kubernetes dentro do próprio robô, que desaparece no fim."], [4, "Falha se alguma aplicação tiver um projeto, destino ou permissão errados..."], [5, "...ou manifests que não se geram."], [5, "Todas as aplicações são apontadas para o commit em teste, para se testar a árvore inteira."], [13, "Corre quando muda algo do arranque, todas as semanas, e à mão."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Só se descobria que um cluster novo não arranca no pior dia: quando a VM tivesse de ser reconstruída.</div>
+  <details class="q"><summary>Pergunta: porque é que o teste não espera que os serviços fiquem saudáveis?</summary><p>Porque no cluster descartável não há cofre nem dados. O teste prova a ordem de arranque e a árvore de aplicações; a saúde dos serviços prova-se no cluster local e na Oracle.</p></details>
+  <label class="got"><input type="checkbox" data-done="l41"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l42" data-title="Um projeto novo em 1 comando" data-part="8">
+  <div class="kicker">Lição 42</div>
+  <h2>Um projeto novo em 1 comando</h2>
+  <div class="simple"><b>Em português simples</b>Para pôr um projeto novo na plataforma (por exemplo "energia"), o <code>new-project.sh</code> cria tudo o que a plataforma exige: o projeto do Argo CD, os namespaces com o selo da rede, as regras de rede fechadas e a pasta dos manifests. <b>Não faz commit</b>: tu revês primeiro.</div>
+  <div class="file">scripts/new-project.sh</div>
+  <div class="codebox" data-code="c-nwp" data-notes="n-c-nwp"></div>
+<script type="text/plain" id="c-nwp">#!/usr/bin/env bash
+# Scaffolds a new project on the platform (ADR-010): one Argo CD project, one namespace per component, closed network
+# policies and a manifests folder per component, which the "projects" ApplicationSet picks up on its own.
+#   1. platform/argocd/projects/<project>.yaml (+ kustomization): only its namespaces, no cluster-wide resources
+#   2. platform/k8s/00-namespaces.yaml: each namespace with Pod Security labels and platform/network-reviewed
+#   3. platform/k8s/network-policies/egress-allowlists.yaml: each namespace may reach DNS and itself, nothing else
+#      (no internet, no other namespace, no cloud metadata endpoint): open what it needs, on purpose, later
+#   4. projects/<project>/k8s/<component>/00-about.yaml: a placeholder so the ApplicationSet creates the application
+# Nothing is committed: review the diff (git diff), then commit, test on the local cluster, promote.
+# Usage: ./scripts/new-project.sh <project> <component> [component ...]     e.g.  ./scripts/new-project.sh energy meters
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+PROJECT="${1:?project name}"; shift
+[ "$#" -ge 1 ] || { echo "at least one component (it becomes a namespace and an application)" >&2; exit 1; }
+NAME_RE='^[a-z][a-z0-9-]{1,30}[a-z0-9]$'
+[[ "$PROJECT" =~ $NAME_RE ]] || { echo "invalid project name: $PROJECT (lowercase letters, digits, dashes)" >&2; exit 1; }
+[ ! -e "platform/argocd/projects/$PROJECT.yaml" ] && [ ! -e "projects/$PROJECT" ] || { echo "project $PROJECT already exists" >&2; exit 1; }
+for c in "$@"; do
+  [[ "$c" =~ $NAME_RE ]] || { echo "invalid component name: $c" >&2; exit 1; }
+  taken=false
+  grep -qE "^  name: $c\$" platform/k8s/00-namespaces.yaml && taken=true
+  grep -rqE "^  name: $c\$" envs/oracle/backup envs/oracle/ops 2>/dev/null && taken=true
+  for d in projects/*/k8s/"$c"; do [ -d "$d" ] && taken=true; done
+  [ "$taken" = false ] || { echo "namespace/component $c already exists" >&2; exit 1; }</script>
+<script type="application/json" id="n-c-nwp">[[2, "Os 4 passos, por ordem."], [7, "As regras de rede nascem <b>fechadas</b>: abre-se o que o projeto precisa, de propósito, depois."], [9, "Nada é enviado: revês o <code>git diff</code>, fazes commit, testas no cluster local e promoves."], [11, "Qualquer erro para o script."], [16, "Nomes só com minúsculas, números e traços (são nomes de namespaces)."], [18, "Recusa um projeto ou namespace que já existe."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um projeto novo começava sem fechaduras, ou alguém tinha de se lembrar de 4 ficheiros em 4 sítios diferentes.</div>
+  <details class="q"><summary>Pergunta: porque é que as regras de rede de um projeto novo nascem fechadas?</summary><p>Porque é mais seguro abrir de propósito o que é preciso do que esquecer-se de fechar. Um projeto novo começa sem internet nem acesso a outros namespaces.</p></details>
+  <label class="got"><input type="checkbox" data-done="l42"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l43" data-title="Instalar o Argo CD" data-part="8">
+  <div class="kicker">Lição 43</div>
+  <h2>O primeiro passo de um cluster: instalar o Argo CD</h2>
+  <div class="simple"><b>Em português simples</b>Tudo é instalado pelo Argo CD, menos o próprio Argo CD: alguém tem de o pôr lá pela primeira vez. Este script fá-lo com o Helm e cria o projeto onde vive a aplicação raiz. A partir daí, o Argo CD gere-se a si próprio a partir do git.</div>
+  <div class="file">scripts/install-argocd.sh</div>
+  <div class="codebox" data-code="c-iac" data-notes="n-c-iac"></div>
+<script type="text/plain" id="c-iac">#!/usr/bin/env bash
+# Installs (or upgrades) Argo CD in the cluster. Idempotent.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export KUBECONFIG="${KUBECONFIG:-$HOME/.lima/industrial/copied-from-guest/kubeconfig.yaml}"
+CHART_VERSION=10.11.1
+
+helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
+helm repo update argo >/dev/null
+helm upgrade --install argocd argo/argo-cd --version "$CHART_VERSION" \
+  --namespace argocd --create-namespace \
+  -f "$ROOT/platform/argocd/values.yaml" --wait --timeout 8m
+
+# The root application lives in the AppProject "bootstrap", which root itself also syncs afterwards. On an empty
+# cluster it does not exist yet, so Argo CD would refuse root: create it here, before root-app.yaml is applied.
+kubectl apply -f "$ROOT/platform/argocd/projects/bootstrap.yaml"</script>
+<script type="application/json" id="n-c-iac">[[5, "Atenção: por omissão aponta para o cluster LOCAL. Para a Oracle, exporta primeiro <code>KUBECONFIG=~/.kube/oracle.yaml</code>."], [6, "Versão do chart fixa."], [10, "Instala ou atualiza, com as mesmas opções que o Argo CD usa depois."], [16, "Cria o projeto da aplicação raiz <b>antes</b> dela; senão o Argo CD recusava-a (o erro da 6.ª revisão)."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Não havia forma de começar um cluster a partir do git: o Argo CD não se pode instalar a si próprio.</div>
+  <details class="q"><summary>Pergunta: o que acontece depois deste script?</summary><p>Aplica-se <code>envs/&lt;ambiente&gt;/root-app.yaml</code>: a aplicação raiz, que cria todas as outras (a lição "A aplicação raiz" explica-a).</p></details>
+  <label class="got"><input type="checkbox" data-done="l43"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l47" data-title="Verificar no Mac antes do push" data-part="8">
+  <div class="kicker">Lição 47</div>
+  <h2>Verificar no Mac antes do push: o Makefile (e a licença)</h2>
+  <div class="simple"><b>Em português simples</b>O CI verifica cada commit, mas só depois do push, e um CI vermelho bloqueia a promoção. O <code>Makefile</code> deixa-te correr <b>as mesmas verificações no Mac, antes</b>: <code>make validate</code>. E o ficheiro <code>LICENSE</code> (MIT) diz o que os outros podem fazer com este código público: usar, copiar e mudar, mantendo o teu nome. É grátis: é só um ficheiro de texto.</div>
+  <div class="file">Makefile</div>
+  <div class="codebox" data-code="c-mk" data-notes="n-c-mk"></div>
+<script type="text/plain" id="c-mk"># Local checks, the same as CI's validate.yml (run before pushing). Not used by CI.
+#   make validate      everything below
+#   make kustomize     render both environments
+#   make kubeconform   rendered manifests against Kubernetes schemas
+#   make terraform     fmt -check + validate (no init, no plan, no state access)
+#   make shellcheck    every script
+#   make secrets       gitleaks over the working tree
+.PHONY: validate kustomize kubeconform terraform shellcheck secrets
+TMP := $(shell mktemp -d)
+
+validate: kustomize kubeconform terraform shellcheck secrets
+
+kustomize:
+	kubectl kustomize envs/local/apps > $(TMP)/local.yaml
+	kubectl kustomize envs/oracle/apps > $(TMP)/oracle.yaml
+	@echo "kustomize: both environments render"
+
+kubeconform: kustomize
+	kubeconform -strict -ignore-missing-schemas -summary $(TMP)/local.yaml $(TMP)/oracle.yaml
+
+terraform:
+	cd terraform/oracle && terraform fmt -check -recursive && terraform validate   # needs a prior terraform init (your normal one)
+
+shellcheck:
+	shellcheck -S error scripts/*.sh envs/oracle/*.sh
+
+secrets:
+	gitleaks dir . --no-banner --redact</script>
+<script type="application/json" id="n-c-mk">[[1, "As mesmas verificações do <code>validate.yml</code>. O CI não usa este ficheiro: é só para ti."], [8, "Os nomes das tarefas (não são ficheiros)."], [9, "Uma pasta temporária para os manifests gerados."], [11, "<code>make validate</code> corre tudo, por ordem."], [14, "Gera os manifests dos dois ambientes, como o Argo CD faria."], [19, "Confirma cada manifest contra o esquema do Kubernetes."], [22, "Formato e validade do Terraform, sem <code>init</code> nem plano: não toca no estado nem na Oracle."], [25, "Os scripts, com o mesmo nível do CI."], [28, "Procura segredos nos ficheiros antes de irem para o git."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Só se descobria um erro depois do push, com o CI vermelho a bloquear a promoção, às vezes num momento de pressa.</div>
+  <details class="q"><summary>Pergunta: porque é que o alvo do Terraform não corre terraform init?</summary><p>Porque o init podia mexer na configuração local que usas para os applies a sério (o backend remoto). O validate só precisa de um init já feito, o teu de sempre.</p></details>
+  <label class="got"><input type="checkbox" data-done="l47"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l44" data-title="Collector e writer" data-part="9">
+  <div class="kicker">Lição 44</div>
+  <h2>O projeto na plataforma: collector e writer</h2>
+  <div class="simple"><b>Em português simples</b>O projeto modbus vive na plataforma como <b>manifests</b> na pasta <code>projects/modbus/</code>. O <b>collector</b> ouve o OPC UA e guarda cada amostra na spool (Postgres). O <b>writer</b> junta-as em lotes e escreve-as no bronze do lakeFS. São dois Deployments separados, e cada um corre sempre num só exemplar.</div>
+  <div class="file">projects/modbus/k8s/ingest/ingest.yaml</div>
+  <div class="codebox" data-code="c-ing" data-notes="n-c-ing"></div>
+<script type="text/plain" id="c-ing"># Collector (OPC UA -> spool) and writer (spool -> bronze in lakeFS), in separate Deployments:
+# the spool lives in PostgreSQL (ADR-006), so they no longer need to share a volume or a pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: ingest
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate        # never two collectors subscribing at once (they would duplicate the work)
+  selector:
+    matchLabels: {app: collector}
+  template:
+    metadata:
+      labels: {app: collector}
+    spec:
+      containers:
+        - name: collector
+          image: ghcr.io/elwarrior100/modbus-ingest:f5b17ea025676c34fceb26890553312af47f1be0
+          imagePullPolicy: IfNotPresent
+          args: ["collect"]
+          env:
+            - {name: OPCUA_URL, value: "opc.tcp://ot-edge.ot.svc.cluster.local:4840/ot-gateway"}
+          envFrom:
+            - secretRef: {name: ingest-db}
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {memory: 256Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: writer
+  namespace: ingest
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate        # never two writers forming batches at once
+  selector:
+    matchLabels: {app: writer}
+  template:
+    metadata:
+      labels: {app: writer}
+    spec:
+      containers:
+        - name: writer
+          image: ghcr.io/elwarrior100/modbus-ingest:f5b17ea025676c34fceb26890553312af47f1be0
+          imagePullPolicy: IfNotPresent
+          args: ["write"]
+          env:
+            - {name: LAKEFS_ENDPOINT, value: "http://lakefs.data.svc.cluster.local:8000"}
+            - {name: BATCH_ROWS, value: "5000"}
+            - {name: BATCH_AGE_S, value: "60"}
+            - {name: WRITE_INTERVAL_S, value: "10"}
+          envFrom:
+            - secretRef: {name: ingest-db}
+            - secretRef: {name: lakefs-credentials}</script>
+<script type="application/json" id="n-c-ing">[[1, "Separados: a spool está no Postgres, por isso não precisam de partilhar disco."], [11, "<b>Recreate</b>: numa atualização, o antigo para antes de o novo arrancar. Dois collectors duplicariam as amostras."], [20, "A imagem do projeto, pelo commit do repositório do projeto."], [22, "A mesma imagem, em modo collector..."], [24, "...que liga ao gateway OPC UA no namespace <code>ot</code>."], [50, "...ou em modo writer."], [54, "Um lote fecha ao fim de 60 s (ou 5000 linhas). Quando retomares as mudanças, passa a 300 s."], [58, "A chave do lakeFS, que vem do cofre pelo estafeta."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Um único programa a fazer as duas coisas perderia amostras sempre que o lakeFS estivesse lento: com a spool no meio, a recolha nunca espera pela escrita.</div>
+  <details class="q"><summary>Pergunta: porque é que a spool fica no Postgres e não em memória?</summary><p>Porque sobrevive a reinícios: se o writer cair, as amostras ficam na spool à espera. Foi a decisão do ADR-006.</p></details>
+  <label class="got"><input type="checkbox" data-done="l44"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l45" data-title="A limpeza da spool" data-part="9">
+  <div class="kicker">Lição 45</div>
+  <h2>A limpeza diária da spool</h2>
+  <div class="simple"><b>Em português simples</b>A spool guardava todas as amostras para sempre (~370 MB por dia), e os backups cresciam com ela. Agora, todas as noites às 02:00, apagam-se as amostras <b>já escritas no bronze</b> com mais de 7 dias. Fica sempre a mais recente de cada sensor, para não haver duplicados.</div>
+  <div class="file">projects/modbus/k8s/ingest/spool-retention.yaml</div>
+  <div class="codebox" data-code="c-spr" data-notes="n-c-spr"></div>
+<script type="text/plain" id="c-spr">psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+\echo events before:
+SELECT count(*) FROM events;
+CREATE TEMP TABLE keep AS SELECT max(seq) AS seq FROM events GROUP BY source, opcua_node_id;
+DELETE FROM events e USING batches b
+ WHERE e.batch_id = b.batch_id AND b.state = 'exported'
+   AND e.ingest_ts < (extract(epoch from now() - interval '7 days') * 1000000)::bigint
+   AND e.seq NOT IN (SELECT seq FROM keep);
+DELETE FROM events e USING batches b
+ WHERE e.batch_id = b.batch_id AND b.state = 'rejected'
+   AND e.ingest_ts < (extract(epoch from now() - interval '30 days') * 1000000)::bigint
+   AND e.seq NOT IN (SELECT seq FROM keep);
+DELETE FROM batches b
+ WHERE b.state IN ('exported', 'rejected')
+   AND NOT EXISTS (SELECT 1 FROM events e WHERE e.batch_id = b.batch_id);
+\echo events after:</script>
+<script type="application/json" id="n-c-spr">[[1, "Um erro de SQL para o job (e fica a falhado), em vez de continuar."], [4, "A amostra mais recente de cada sensor: nunca se apaga."], [6, "Só amostras de lotes <b>já exportados</b> para o bronze. Os pendentes nunca são tocados."], [7, "Com mais de 7 dias. Ficam no bronze (15 dias) e na cópia do lake."], [10, "Os lotes recusados pelo G1 ficam 30 dias, para se poder investigar."], [15, "Os lotes que ficaram sem amostras também saem."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>A spool crescia ~370 MB por dia, os dumps cresciam com ela, e em semanas passavam os 20 GB grátis do Object Storage.</div>
+  <details class="q"><summary>Pergunta: porque é que se guarda sempre a amostra mais recente de cada sensor?</summary><p>Porque o OPC UA reenvia o valor atual de sensores parados (ligado, alarme) com o mesmo identificador quando o collector se religa. Se o original tivesse sido apagado, a spool deixava-o entrar outra vez e haveria duplicados no bronze.</p></details>
+  <label class="got"><input type="checkbox" data-done="l45"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="l46" data-title="O ApplicationSet dos projetos" data-part="9">
+  <div class="kicker">Lição 46</div>
+  <h2>Como um projeto aparece sozinho no Argo CD</h2>
+  <div class="simple"><b>Em português simples</b>Não é preciso escrever uma ficha do Argo CD por cada componente de um projeto. O <b>ApplicationSet</b> é uma fábrica: para cada pasta <code>projects/&lt;projeto&gt;/k8s/&lt;componente&gt;/</code> cria uma aplicação, no projeto do Argo CD com o mesmo nome. Basta criar a pasta.</div>
+  <div class="file">platform/argocd/apps/projects.yaml</div>
+  <div class="codebox" data-code="c-aps" data-notes="n-c-aps"></div>
+<script type="text/plain" id="c-aps"># One project = one folder under projects/<project>/k8s/<component>/. This ApplicationSet creates one Argo CD
+# application per component without touching the platform. The application name and namespace are the
+# component name (ingest, ot), the same as before the split.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: projects
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/elwarrior100/platform.git
+        revision: main
+        directories:
+          - path: projects/*/k8s/*
+  syncPolicy:
+    preserveResourcesOnDeletion: true   # deleting the ApplicationSet never deletes a project's workloads
+  template:
+    metadata:
+      name: "{{ .path.basename }}"
+      namespace: argocd
+      labels:
+        project: "{{ index .path.segments 1 }}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"     # after the platform (wave 1)
+    spec:
+      project: "{{ index .path.segments 1 }}"   # the AppProject named after the project (platform/argocd/projects)
+      source:
+        repoURL: https://github.com/elwarrior100/platform.git
+        targetRevision: main
+        path: "{{ .path.path }}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .path.basename }}"
+      syncPolicy:
+        automated:
+          prune: false        # the ingest spool holds samples not yet written to lakeFS
+          selfHeal: true</script>
+<script type="application/json" id="n-c-aps">[[1, "A regra: uma pasta = uma aplicação."], [5, "A fábrica de aplicações."], [17, "Procura todas as pastas com esta forma."], [19, "Apagar a fábrica <b>nunca</b> apaga os serviços dos projetos."], [22, "O nome da aplicação é o nome da pasta (ingest, ot)."], [25, "O projeto do Argo CD é o nome do projeto: é ele que limita o que pode fazer (lição 24)."], [39, "Nunca apaga sozinho: a spool tem amostras ainda por escrever no lake."], [40, "Repõe o que for mudado à mão. Foi esta linha que se tirou na Oracle durante a pausa."]]</script>
+  <div class="whatif"><b>E se isto não existisse?</b>Cada componente novo precisava de uma ficha escrita à mão na plataforma, e um projeto podia ficar meio instalado.</div>
+  <details class="q"><summary>Pergunta: como se pôs o projeto em pausa só na Oracle?</summary><p>Com um patch no kustomization da Oracle que retirava a sincronização automática desta fábrica. Os pods foram parados à mão, e o Argo CD não os repôs. A retoma foi apagar essa linha.</p></details>
+  <label class="got"><input type="checkbox" data-done="l46"> Percebi esta lição</label>
+</section>
+
+<section class="lesson" id="lnext" data-title="Fim do guia">
+  <div class="kicker">Fim do guia</div>
+  <h2>Chegaste ao fim</h2>
+  <p>As nove partes cobrem a plataforma inteira:</p>
+  <ul>
+    <li><b>como as coisas chegam ao cluster</b> (Parte 1);</li>
+    <li><b>quem guarda os dados</b> (2);</li>
+    <li><b>a carteira e a saúde</b> (3);</li>
+    <li><b>as fechaduras</b> (4);</li>
+    <li><b>a Oracle em código</b> (5);</li>
+    <li><b>os backups e a prova de que servem</b> (6);</li>
+    <li><b>os serviços</b> (7);</li>
+    <li><b>o inspetor e as ferramentas</b> (8);</li>
+    <li><b>como um projeto vive na plataforma</b> (9).</li>
+  </ul>
+  <p>Para cada ficheiro há um "porquê" no próprio código (os comentários) e, para cada decisão maior, um ADR no repositório do projeto. Quando quiseres testar se percebeste, pede-me um exame com cenários: "o que fazes se…".</p>
 </section>
 </main>
 </div>
@@ -819,7 +2488,7 @@ spec:
   });
   // nav
   const nav = document.getElementById("navlinks");
-  const parts = {"1": "Parte 1 · Os alicerces", "2": "Parte 2 · Os dados"};
+  const parts = {"1": "Parte 1 · Os alicerces", "2": "Parte 2 · Os dados", "3": "Parte 3 · A carteira e a saúde", "4": "Parte 4 · As fechaduras", "5": "Parte 5 · A Oracle em Terraform", "6": "Parte 6 · Backups e ensaios", "7": "Parte 7 · Os serviços", "8": "Parte 8 · O CI e os scripts", "9": "Parte 9 · O projeto na plataforma"};
   let lastPart = null;
   document.querySelectorAll("section.lesson").forEach((s, i) => {
     if (s.id === "lnext") return;

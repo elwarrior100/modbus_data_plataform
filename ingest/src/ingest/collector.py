@@ -42,16 +42,29 @@ class _Handler:
         self.queue.put(to_event(node.nodeid.to_string(), data.monitored_item.Value, to_us(self.clock()), self.source))
 
 
+# Teto da fila em memória: ~3 h de amostras (~12 por segundo, ~0,8 KB cada: ~110 MB, dentro dos 256 MiB do contentor).
+# Auditoria de 2026-11-17: sem teto, um Postgres em baixo ~5 h levava a um OOM e perdia-se TUDO o que estava na fila.
+MAX_WAITING = 150_000
+
+
 class _Queue:
     """Amostras ainda não gravadas. Se o spool falhar (rede, reinício do Postgres), ficam aqui em memória
-    e tenta-se outra vez; só saem da fila depois de gravadas."""
+    e tenta-se outra vez; só saem da fila depois de gravadas. Com a fila cheia, as amostras NOVAS são descartadas
+    (contadas e avisadas no log): perde-se o fim da falha, não o que já estava guardado. O G2 vê o buraco."""
 
-    def __init__(self, spool: Spool, retry_s: float = 1.0):
-        self.spool, self.retry_s = spool, retry_s
+    def __init__(self, spool: Spool, retry_s: float = 1.0, max_waiting: int = MAX_WAITING):
+        self.spool, self.retry_s, self.max_waiting = spool, retry_s, max_waiting
         self._items: list[Event] = []
         self._wake = asyncio.Event()
+        self.dropped = 0
 
     def put(self, event: Event) -> None:
+        if len(self._items) >= self.max_waiting:
+            self.dropped += 1
+            if self.dropped == 1 or self.dropped % 10_000 == 0:
+                log.error("fila cheia (%d amostras à espera do spool): %d amostras novas descartadas até agora",
+                          len(self._items), self.dropped)
+            return
         self._items.append(event)
         self._wake.set()
 

@@ -43,6 +43,7 @@ def test_a_normal_run_exports_everything_to_main(dsn):
     assert sorted(ids) == sorted(e.event_id for b in done for e in spool.rows(b[0]))
     assert len(ids) == len(set(ids)) == 25
     assert any(path.startswith("bronze/dt=2026-11-07/hour=14/") for path in lake.main_files())
+    assert not [b for b in lake.branches if b.startswith("etl-")]               # os branches exportados são apagados
 
 
 def test_killing_the_writer_at_every_step_never_duplicates_or_loses(new_dsn):
@@ -81,6 +82,7 @@ def test_a_malformed_sample_rejects_its_batch_and_never_reaches_main(dsn):
     assert lake_event_ids(lake) == []                                          # o main não foi tocado
     branch = f"etl-{done[0][0]}"
     assert any(p.endswith("g1_report.json") for p in lake.branches[branch]["committed"])   # a autópsia está no branch
+    assert ("delete_branch", branch) not in lake.calls                             # um lote recusado guarda o branch
     assert spool.batch(done[0][0]).state == "rejected"
     assert "G1-03" in spool.db.execute("SELECT detail FROM batches").fetchone()[0]
 

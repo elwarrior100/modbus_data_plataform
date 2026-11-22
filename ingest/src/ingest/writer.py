@@ -49,6 +49,14 @@ class Writer:
         self.lake.merge(branch, self.target, f"bronze: lote {batch.batch_id} validado pelo G1")
         self.hook("merge")
         self.spool.set_state(batch.batch_id, "exported")
+        # O branch já está no main: apagá-lo logo (2026-11-22). Guardados 7 dias, chegaram a ~4 500 e a GC do lakeFS
+        # falhou a percorrê-los. Só DEPOIS de o lote ficar "exported": um crash antes disto refaz tudo de forma
+        # idempotente. Se falhar, a limpeza diária (lake_housekeeping) apaga-o mais tarde. Os recusados ficam.
+        try:
+            self.lake.delete_branch(branch)
+        except Exception as error:                      # noqa: BLE001 — nunca falha um lote já exportado
+            log.warning("lote %s exportado, mas o branch %s não foi apagado (%s): fica para a limpeza diária",
+                        batch.batch_id, branch, error)
         log.info("lote %s exportado: %d linhas em %d partições", batch.batch_id, len(events), len(parts))
         return "exported"
 

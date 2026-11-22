@@ -6,7 +6,8 @@ import duckdb
 
 from .catalog import Tag, to_arrow
 
-VERSION = "1"                      # versão do código da transformação; entra em cada linha (silver_version)
+VERSION = "2"                      # versão do código da transformação; entra em cada linha (silver_version)
+                                   # 2 (ADR-018): dentro do mesmo segundo, as linhas ordenam-se pelo server_ts
 
 # Os estados OPC UA que o gateway usa. Qualquer outro aparece como código em hexadecimal.
 STATUS_NAMES = {
@@ -72,7 +73,7 @@ SELECT
     ], lambda x: x IS NOT NULL) AS dq_flags,
     ingest_ts, source_ts, server_ts, event_id AS bronze_event_id, batch_id AS bronze_batch_id, ? AS silver_version
 FROM typed
-ORDER BY ts_utc, asset_id, tag_name, bronze_event_id
+ORDER BY ts_utc, asset_id, tag_name, server_ts, bronze_event_id
 """
 
 

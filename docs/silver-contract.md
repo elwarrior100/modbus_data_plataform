@@ -16,7 +16,7 @@ linha de silver (1 para 1), por isso contagens batem sempre.
 |---|---|---|
 | `asset_id` | string | do `opcua_node_id`: `ns=2;s=PUMP-01.outlet_pressure` → `PUMP-01` |
 | `tag_name` | string | idem → `outlet_pressure` |
-| `ts_utc` | timestamp UTC | `source_ts`; se faltar, `ingest_ts` (e fica o aviso `ts_fallback`) |
+| `ts_utc` | timestamp UTC | `source_ts`; se faltar, `ingest_ts` (e fica o aviso `ts_fallback`). Precisão: a do relógio do equipamento (1 s nos PLC Modbus); dentro do mesmo segundo, as linhas vêm ordenadas pelo `server_ts` (ADR-018) |
 | `value_double` | double, nulo | `raw_value` lido como JSON, para tags numéricas, contadores e estados |
 | `value_bool` | bool, nulo | para tags booleanas |
 | `value_str` | string, nulo | etiqueta do estado (`RUNNING`) ou o instante do `device_clock` |

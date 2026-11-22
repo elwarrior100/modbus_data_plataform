@@ -23,7 +23,9 @@ PROJECT_IMAGE = {"pod_override": k8s.V1Pod(spec=k8s.V1PodSpec(containers=[k8s.V1
 with DAG(
     "silver_hourly",
     start_date=datetime(2026, 11, 7, 16, tzinfo=timezone.utc),  # primeira hora com bronze real
-    schedule="10 * * * *",
+    # :15 (era :10): o writer passa a juntar lotes de 5 em 5 min (BATCH_AGE_S=300), e a última amostra de uma hora
+    # pode chegar ao bronze até ~5 min depois; ver docs/PLAN.md (retoma do projeto)
+    schedule="15 * * * *",
     catchup=True,
     max_active_runs=1,                   # em série: com 2 CPUs na Oracle uma hora de cada vez (docs/PLAN.md §9)
     default_args={"retries": 2, "retry_delay": timedelta(minutes=2)},

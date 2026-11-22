@@ -754,6 +754,9 @@ quality/  docs/  tests/
     <tr><td>1 180 horas, 1 worker</td><td class="num">137 s</td></tr>
     <tr><td>Dados reais (SeaweedFS / Postgres)</td><td class="num">83 MB / 357 MB</td></tr>
     <tr><td>Imagens de contentores (Mac)</td><td class="num">16 GB, o maior consumo de disco</td></tr>
+    <tr><td>Oracle depois da poupança de memória (16-11)</td><td class="num">6,5 GB usados, 5,4 GB disponíveis, CPU ~25%</td></tr>
+    <tr><td>Maiores consumidores na Oracle</td><td class="num">k3s 1,0 GB · OpenMetadata 0,95 · OpenSearch 0,9 · Prometheus 0,5 · Airflow ~0,9 no total</td></tr>
+    <tr><td>Do sensor ao bronze / ao silver</td><td class="num">~35 s / ~40 min em média (o silver corre à hora certa + 10 min)</td></tr>
   </table></div>
   <p>Conclusão: com 2 CPU, executar em série custa pouco (o dobro do tempo num backfill, que é raro) e dá um pico previsível que não compete com o Postgres e o lakeFS.</p>
   <div class="pitfall"><b>Em parte resolvido:</b> o Postgres e o SeaweedFS têm a PriorityClass <code>platform-data</code> (são os últimos a ser despejados pelo kubelet) e o OpenSearch está limitado a 1 CPU. Os limites continuam a somar mais do que a RAM; com o monitoring, a Oracle está a ~69 % de memória.</div>
@@ -798,10 +801,10 @@ quality/  docs/  tests/
 <!-- ============================================================ 13 -->
 <section class="chapter" id="critica">
   <div class="chapnum">Capítulo 13 · Parte V</div>
-  <h2>Revisão crítica: de 44 para 88,4</h2>
-  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a 2026-11-14: dez revisões: 44, 56, 66,75, 74, 77,75, 79,6, 81,6, 83,9, 86,25 e 88,4/100.</div>
+  <h2>Revisão crítica: de 44 para 90,2</h2>
+  <div class="goal"><b>Objetivo:</b> saber onde a plataforma estava fraca, o que se corrigiu, e o que ainda falta. Duas revisões feitas por um agente independente, só de leitura, a partir de 2026-11-14: doze revisões: 44, 56, 66,75, 74, 77,75, 79,6, 81,6, 83,9, 86,25, 88,4, 89,0 e 90,2/100.</div>
 
-  <p><span class="big">88,4</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (44 → 56 → 67 → 74 → 78 → 80 → 82 → 84 → 86 → 88)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
+  <p><span class="big">90,2</span><span style="font-family: var(--font-head); color: var(--muted)"> / 100 (44 → 56 → 67 → 74 → 78 → 80 → 82 → 84 → 86 → 88 → 89 → 90)</span><br>Escala: 10 = pronto para produção numa equipa pequena; 5 = funciona, com falhas reais; abaixo de 5 = risco a assinalar.</p>
 
   <div class="score" id="scorecard"></div>
 
@@ -927,6 +930,176 @@ quality/  docs/  tests/
     <li><b>Lição 2 — um teste manual pode enganar o vigilante.</b> O sinal de vida da GC contava como "agendada" uma corrida criada à mão a partir do CronJob (que também fica com ele como dono). Corrigido: ignora as corridas marcadas como manuais, com um período de graça até à primeira semana.</li>
     <li>Veredicto do crítico: "genuinamente boa: a cópia do lake foi redesenhada numa noite depois de uma fatura real, e o restauro foi provado no formato novo na mesma noite". Teto realista: 92–93.</li>
   </ul>
+  <h3>Auditoria de custos (16-11): "custo zero" não é o mesmo que "barato"</h3>
+  <ul>
+    <li><b>O ponto de partida:</b> a conta da Oracle é <em>pay-as-you-go</em>. Se algo passar os limites grátis, a Oracle cobra; não bloqueia. Um agente independente concluiu "custo zero: NÃO" e apontou porquê:
+      <ul>
+        <li>a spool do Postgres crescia sem fim (~370 MB por dia);</li>
+        <li>a cópia do lake podia chegar a ~7 vezes o tamanho do lake;</li>
+        <li>não havia nada que <em>parasse</em> um gasto, só avisos.</li>
+      </ul></li>
+    <li><b>Corrigido (grátis):</b>
+      <ul>
+        <li>a spool guarda 7 dias de lotes exportados e 30 de rejeitados (CronJob <code>spool-retention</code>);</li>
+        <li>a cópia do lake faz um pacote completo por semana, e o próprio Object Storage apaga pacotes e catálogos com mais de 9 dias (~2,5 vezes o lake, em vez de ~7);</li>
+        <li>há um alarme para o total do Object Storage acima de 15 GB;</li>
+        <li>os envios a meio são abortados ao fim de 2 dias.</li>
+      </ul></li>
+    <li><b>A fatura de novembro:</b> €0,0198. A limpeza da cópia antiga, objeto a objeto (~20 mil pedidos de "apagar"), fez passar o limite grátis do mês. <b>Lição: apagar muitos objetos faz-se com uma regra de ciclo de vida do bucket (grátis), não com um pedido por objeto.</b></li>
+  </ul>
+  <h3>O corta-custos (ADR-017): parar sozinho, nunca apagar</h3>
+  <ul>
+    <li><b>O que faz:</b> um CronJob de hora a hora (<code>ops/cost-guard</code>) lê o gasto do mês na API de orçamentos. Se chegar a <b>€1,00</b>:
+      <ol>
+        <li>cria uma <em>quota</em> que põe a zero 48 famílias de serviços pagos, para que nada pago se possa criar;</li>
+        <li>desliga a própria VM com um encerramento ordenado (SOFTSTOP), para que nenhum job faça pedidos;</li>
+        <li><b>nunca apaga dados.</b></li>
+      </ol>
+      A retoma faz-se do Mac, com <code>scripts/cost-guard-resume.sh</code>.</li>
+    <li><b>Porque não uma Oracle Function, como o Gemini sugeria:</b> precisava de uma imagem no registo da Oracle e de um token para a enviar, mais uma peça para manter. O CronJob usa o que já existe: a identidade da VM e as regras de rede.</li>
+    <li><b>Privilégio mínimo:</b> a VM pode <em>criar</em> quotas mas não as apagar nem alterar. Uma VM comprometida não consegue levantar a quota que a parou.</li>
+    <li><b>Provado a sério:</b> com o limite baixado a €0,001, o guarda criou a quota e a VM ficou parada em ~1,5 min. O script de retoma religou-a e as 19 aplicações voltaram Healthy em ~10 min, sem dados perdidos.</li>
+    <li><b>Os detalhes que o teste e as revisões apanharam:</b>
+      <ul>
+        <li><b>Desarme por engano:</b> o script de retoma desarmava o guarda até ao fim do mês, mesmo num teste. Agora só põe a etiqueta se o gasto passar mesmo €1.</li>
+        <li><b>Mês retomado sem teto:</b> um mês retomado ficava sem limite nenhum. Agora o limite é o gasto no momento da retoma mais €1.</li>
+        <li><b>Viragem do mês:</b> os dados do orçamento chegam atrasados e, no dia 1, ainda podem trazer o gasto do mês anterior. O guarda ignora um gasto calculado antes do mês atual.</li>
+        <li><b>Números estranhos:</b> um gasto minúsculo pode aparecer como <code>3.4e-07</code>; agora é lido corretamente.</li>
+        <li><b>Prazo para religar:</b> com a VM parada, a regra dos 9 dias continua a apagar pacotes. Por isso, religar em menos de 9 dias.</li>
+      </ul></li>
+  </ul>
+  <h3>11.ª ronda (89,0): o CI estava vermelho e ninguém viu</h3>
+  <ul>
+    <li><b>A lição:</b> ao acrescentar uma regra ABORT ao bucket dos dumps, uma verificação do CI passou a ler dois números em vez de um e falhou. Durante 15 commits, todos os passos seguintes (gitleaks, kubeconform, terraform, trivy) não correram, e o <code>promote-oracle.sh</code> promoveu na mesma. <b>Um portão que ninguém consulta não é um portão.</b></li>
+    <li><b>Corrigido:</b>
+      <ul>
+        <li>o check lê só a regra DELETE;</li>
+        <li>a promoção para a Oracle <b>recusa</b> um commit sem CI verde (testado: recusou com o CI a correr e promoveu depois);</li>
+        <li>os alertas do Prometheus, que não chegavam a ninguém (não há Alertmanager), passam a ser contados pelo <code>node-health</code> e geram um email da Oracle;</li>
+        <li>o runbook foi reescrito para os pacotes e a limpeza aos 9 dias;</li>
+        <li>a reconciliação só conta a janela que a spool ainda guarda (a spool guarda 7 dias, o bronze 15).</li>
+      </ul></li>
+  </ul>
+  <h3>12.ª ronda (90,2): memória e performance sem perder nada</h3>
+  <ul>
+    <li><b>Regra do Stéphane:</b> só se corta o que não baixa o score nem limita projetos futuros. Nenhum serviço foi desligado.</li>
+    <li><b>Memória</b> (usada na VM: 7,26 → 6,54 GB; disponível: 4,7 → 5,4 GB):
+      <ul>
+        <li>o Prometheus deixou de guardar histogramas internos do k3s que ninguém lê (o k3s até os expunha duas vezes);</li>
+        <li>o Grafana ficou sem 13 datasources que não usamos (14 processos → 1);</li>
+        <li>o k3s e o Argo CD ganharam um <code>GOMEMLIMIT</code>;</li>
+        <li>o lakeFS ficou com uma cache em memória menor;</li>
+        <li>o OpenMetadata passou a abrir no máximo 20 ligações ao Postgres. Antes podia abrir 100, as 100 todas que o Postgres aceita, e deixar a ingestão sem ligação: esta mudança <em>melhorou</em> a robustez.</li>
+      </ul></li>
+    <li><b>Performance:</b>
+      <ul>
+        <li>a verificação de saúde do Airflow gastava 3,4 s de CPU por corrida, a cada minuto, em dois pods: ~22% de toda a CPU dos contentores. Passou a correr de 5 em 5 min;</li>
+        <li>o Postgres escrevia ~16 GB de registo (WAL) em 2 dias para poucos MB de dados reais, 95% em páginas completas. Agora comprime-as (lz4) e faz checkpoints de 15 em 15 min.</li>
+      </ul></li>
+    <li><b>Lição — medir antes de acreditar.</b> O agente sugeriu <code>GOMEMLIMIT=1100MiB</code> para o k3s. Medido: 547 MB vivos e o GC a limpar já aos 1,12 GB. 1100 MiB não mudaria nada, por isso ficou 900 MiB.</li>
+  </ul>
+  <h3>Incidente de 17-11: o que funciona pequeno parte quando cresce</h3>
+  <ul>
+    <li><b>O que se viu:</b> três emails de manhã. A cópia do lake falhou, o ensaio de restauro falhou e o alarme de pedidos continuava a disparar. O gasto não mudou (€0,0198).</li>
+    <li><b>Causa 1, o envio em partes.</b> O pacote da noite (9440 objetos novos) passou os 256 MB a partir dos quais o rclone envia em várias partes (<em>multipart</em>). Na Oracle, começar um envio em partes exige a permissão <code>OBJECT_OVERWRITE</code>. A VM não a tem, de propósito, porque é isso que torna a cópia impossível de adulterar. A resposta da Oracle a uma permissão em falta foi "404 BucketNotFound": enganadora, mas é assim que ela esconde o que não podes ver. <b>Correção:</b> enviar sempre num só pedido (até 5 GiB no rclone). O backup do Postgres tinha o mesmo risco a dias de distância (dump da spool com 107 MB, para um limite de 128 MiB) e ficou com <code>--no-multipart</code>.</li>
+    <li><b>Causa 2, o ensaio tinha um SeaweedFS temporário pequeno demais:</b> 20 volumes de 64 MB. Com o lake a passar 1 GB, deixou de ter onde escrever. <b>Correção:</b> volumes de 256 MB, tantos quanto o disco temporário permitir.</li>
+    <li><b>A causa de fundo, os índices do lakeFS.</b> O lake tinha 1,0 GB, dos quais <b>82% eram índices</b> (<code>_lakefs/</code>) e só 18% eram dados. A cada commit o lakeFS guarda a lista de todos os ficheiros, partida em pedaços ("ranges"). Por omissão um pedaço leva 50 000 ficheiros, por isso o lake inteiro cabia num só pedaço de ~0,5 MB, reescrito em cada commit: 2 por minuto, ~2900 por dia. E a GC nunca apaga commits, logo estes índices nunca seriam limpos. <b>Correção:</b> pedaços de ~1000 ficheiros (<code>range_raggedness_entries</code>), para cada commit reescrever só o último pedacinho.</li>
+    <li><b>Também:</b> a CPU <em>reservada</em> estava a 97% (usada: ~20%) e os jobs ficavam à espera de vaga. As reservas dos serviços parados baixaram para o uso medido com folga: 79%.</li>
+    <li><b>A lição:</b> um teste que passa hoje só prova o tamanho de hoje. Cada limite (de envio, de volume, de partição, de reserva) tem de ser comparado com <b>a velocidade a que o dado cresce</b>, e com a data em que lá chega. Foi por isso que se pediu a seguir uma auditoria de "bombas-relógio".</li>
+  </ul>
+  <h3>Duas auditorias de 17-11 e a pausa do projeto</h3>
+  <ul>
+    <li><b>Bombas-relógio</b> (o que funciona hoje e rebenta quando cresce): um agente mediu cada limite contra a velocidade de crescimento e deu-lhe uma data.
+      <ul>
+        <li>A mais urgente: o SeaweedFS do ensaio estava a 493 de 512 MiB de memória e podia falhar nessa mesma noite.</li>
+        <li>Corrigidas a seguir: os prazos do ensaio (1 h) e da GC (3 h), o disco da cópia (20 Gi) e os dumps a 7 dias.</li>
+        <li>Fica marcada uma para dezembro: o pacote completo semanal vai passar os 5 GiB de um só envio e terá de ser partido.</li>
+      </ul></li>
+    <li><b>Código, segurança e recuperação:</b>
+      <ul>
+        <li><b>A mais grave:</b> o Grafana podia ler <em>todos</em> os segredos do cluster, porque o chart dá-lhe isso por omissão. Agora tem um ClusterRole nosso, só com configmaps.</li>
+        <li><b>Também corrigido:</b>
+          <ul>
+            <li>as tarefas do Airflow ficaram sem token do Kubernetes;</li>
+            <li>a chave do lakeFS chega só às tarefas;</li>
+            <li>a regra de admissão cobre também <code>kubectl debug</code>;</li>
+            <li>há um alarme para horas de silver em falta ou atrasadas, que antes ficavam buracos silenciosos;</li>
+            <li>a spool guarda o último evento de cada sensor, para não haver duplicados;</li>
+            <li>o runbook ganhou o procedimento "perdi a VM inteira".</li>
+          </ul></li>
+      </ul></li>
+    <li><b>Lição — o que é silencioso é o que mais custa.</b> Uma hora de silver que falha não fazia barulho, porque a hora seguinte mantinha o sinal de vida verde. Um alarme tem de perguntar "falta alguma coisa?", e não só "chegou alguma coisa?".</li>
+    <li><b>A pausa:</b> o projeto modbus está parado na Oracle até o Stéphane estar a par de todo o código.
+      <ul>
+        <li>Os serviços pararam por ordem: primeiro a origem, depois o writer, só com a spool vazia.</li>
+        <li>As DAGs estão em pausa e o Argo CD da Oracle deixou de repor o projeto.</li>
+        <li>A plataforma continua: backups, ensaio, GC, corta-custos e alarmes.</li>
+        <li>O lake fica congelado (~1 GB) e o custo é €0. A lista para retomar está no PLAN.</li>
+      </ul></li>
+  </ul>
+  <h3>21-11: a retoma, o guia completo e a revisão do repositório</h3>
+  <ul>
+    <li><b>Retoma do projeto:</b> o modbus voltou a correr na Oracle com o mesmo código de antes da pausa.
+      <ul>
+        <li>Desfez-se o patch e o Argo CD repôs sozinho o collector, o writer e o simulador.</li>
+        <li>As DAGs voltaram, e o silver recuperou as horas da pausa (sem bronze, cada uma saltada em segundos).</li>
+        <li>Os alarmes do silver voltaram a ligar-se.</li>
+        <li>As mudanças por rever continuam no PLAN, item 30.</li>
+      </ul></li>
+    <li><b>Guia do código completo:</b> 46 lições em 9 partes, das fechaduras ao Terraform, aos backups, aos serviços, ao CI e ao projeto.</li>
+    <li><b>Revisão do repositório com três agentes,</b> cada um a verificar o anterior:
+      <ul>
+        <li><b>O primeiro</b> encontrou o que faltava: um README de 31 linhas, um ficheiro do Mac no git, scripts que apontam para o cluster errado por omissão e documentação contraditória.</li>
+        <li><b>O segundo</b> verificou o primeiro e apanhou dois erros que teriam custado caro:
+          <ul>
+            <li>apagar a importação da VM tirava a única proteção contra uma <em>segunda VM paga</em>;</li>
+            <li>apertar o CI sozinho bloqueava a promoção.</li>
+          </ul>
+          Também encontrou riscos de custo numa reconstrução: o disco da VM perdida que fica para trás e enche os 200 GB grátis, o corta-custos que não existe com a VM em baixo, e a quota a zero que impede criar a VM nova.</li>
+        <li><b>O terceiro</b> respondeu a uma só pergunta: "isto mexe no que já provámos que custa zero?". Só passou o <b>conjunto mínimo seguro</b>, que é documentação e higiene do repositório. O resto ficou para depois, com teste, ou foi recusado.</li>
+      </ul></li>
+    <li><b>O que entrou:</b>
+      <ul>
+        <li>o README novo (arquitetura, arranque do zero, segurança, backups, custos, CI, índice de scripts);</li>
+        <li>o runbook com os riscos de custo de uma reconstrução e a regra "a VM já usa os 2 OCPU / 12 GB grátis: nunca crescer";</li>
+        <li>a licença MIT, que é grátis: só um ficheiro de texto;</li>
+        <li>um <code>Makefile</code> para correr no Mac as verificações do CI.</li>
+      </ul>
+      O CI ficou verde e o Argo CD não teve nada a aplicar.</li>
+    <li><b>Lição — uma revisão também se revê.</b> Uma sugestão sensata ("apagar código que já não é preciso") pode retirar uma proteção que ninguém se lembrava de que existia. Antes de mudar algo que funciona e foi provado, pergunta-se o que pode deixar de proteger.</li>
+  </ul>
+  <h3>21-11 (tarde): o custo escondido, as partes, o G1 provado e o catálogo</h3>
+  <ul>
+    <li><b>O custo que ninguém mediu: as leituras dos alarmes.</b> Um agente auditor descobriu que os alarmes da Oracle também <em>leem</em> dados, com um limite grátis de 1 000 milhões de pontos por mês.
+      <ul>
+        <li>Os alarmes "não houve sinal no último dia" (<code>[1d].absent()</code>) releem o dia inteiro a cada minuto.</li>
+        <li>Três deles gastavam ~110 milhões por dia: o grátis acabaria a 25-11, e daí em diante ~€3 por mês.</li>
+        <li>Correção: um vigia (<code>ops/job-freshness</code>) diz de 30 em 30 min há quantas horas cada job correu bem, e os alarmes passaram a "mais de 26 h" numa janela de 1 hora.</li>
+        <li>Medido a seguir: de 3,7 para 0,11–0,22 milhões por hora. Novembro fecha em ~510 dos 1 000 milhões grátis.</li>
+        <li>Testado com um alarme temporário (emails suprimidos) que passou a FIRING em 4 minutos e foi apagado.</li>
+      </ul></li>
+    <li><b>Lição — o custo esconde-se onde não se mede.</b> Mediu-se pedidos, espaço, disco e CPU; ninguém mediu as leituras dos alarmes. Regra nova: nunca janelas de um dia inteiro em alarmes da Oracle. E pedir auditorias de custos de vez em quando, a quem não fez o trabalho.</li>
+    <li><b>A cópia do lake em partes:</b> cada pacote divide-se em partes de até 3 GiB, porque um só envio aceita no máximo 5 GiB e o lake cresce.
+      <ul>
+        <li>O "completo da semana" passou a ler-se do catálogo, para um completo meio falhado não enganar a cópia.</li>
+        <li>Provado na Oracle: um incremental em 3 partes, restaurado pelo ensaio (27 515 objetos).</li>
+        <li>Pelo caminho apareceu uma falha passageira da identidade da VM (erro 401). O primeiro pedido à Oracle passou a tentar até 5 vezes.</li>
+      </ul></li>
+    <li><b>O G1 provado no cluster:</b> uma amostra inválida injetada na spool fez o writer recusar o lote (G1-02 e G1-03). O relatório ficou no branch do lote, e nada chegou ao <code>main</code>.</li>
+    <li><b>Uma reparação a sério:</b> o lakeFS local tinha o <code>main</code> ilegível (a VM foi desligada sem o <code>vm-stop.sh</code>).
+      <ul>
+        <li>O procedimento do runbook funcionou: hard reset para o último commit bom, e o único lote perdido voltou à fila. A reconciliação a seguir deu 0/0/0.</li>
+        <li>O runbook ganhou três correções. A mais importante: um lote encravado bloqueia todos os seguintes.</li>
+      </ul></li>
+    <li><b>O catálogo no OpenMetadata</b> (código por rever):
+      <ul>
+        <li>as tabelas bronze e silver, com as colunas dos contratos;</li>
+        <li>a linhagem bronze → silver;</li>
+        <li>as 7 regras do G2 como testes de qualidade, com um resultado por hora.</li>
+      </ul>
+      Se o catálogo estiver em baixo, o silver não falha.</li>
+    <li><b>Os testes dos gates</b> (<code>spike</code> → aviso, <code>comms_gap</code> → bloqueio) estão a correr no cluster local.</li>
+  </ul>
   <h3>O que não deu para corrigir, e porquê</h3>
   <ul>
     <li><strong>Chaves do lakeFS por aplicação.</strong> O lakeFS Community só admite um utilizador (o admin); mais utilizadores são da versão Enterprise. O servidor ACL open source é só uma referência "not fit for production". Ficou a proteção do <code>main</code> (só merges) e o limite está escrito no ADR-008.</li>
@@ -946,6 +1119,20 @@ quality/  docs/  tests/
       <details><summary>Ver resposta</summary><div>Porque qualquer um que possa criar um pod pode pôr-lhe a etiqueta, incluindo um DAG através do <code>pod_override</code>. A exceção tem de ser por algo que um projeto não controla, como o namespace, que a AppProject não deixa usar.</div></details></div>
     <div class="q"><div class="qt"><input type="checkbox" id="q13b-2"><label for="q13b-2">Porque é que um backup sem teste de restauro "não conta"?</label></div>
       <details><summary>Ver resposta</summary><div>Porque só o restauro prova que o ficheiro está completo e utilizável. Um dump pode estar vazio, truncado ou incompatível; só se descobre no pior momento se nunca se testou.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-4"><label for="q13b-4">O corta-custos pode criar quotas mas não as pode apagar. Porquê essa assimetria?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque criar uma quota só pode <em>travar</em> gastos, enquanto apagá-la pode <em>soltá-los</em>. Se a VM fosse comprometida, um atacante com permissão de apagar podia levantar a quota e criar recursos pagos. Por isso a retoma é feita por uma pessoa, com a sua própria identidade, a partir do Mac.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-5"><label for="q13b-5">Durante 15 commits o CI esteve vermelho e as mudanças chegaram à Oracle na mesma. O que faltava?</label></div>
+      <details><summary>Ver resposta</summary><div>Faltava ligar o portão ao caminho: o CI corria, mas a promoção não lhe perguntava nada. Agora o <code>promote-oracle.sh</code> consulta a API do GitHub e recusa um commit sem a verificação <code>validate.yml</code> a verde. Há uma saída de emergência explícita (<code>PROMOTE_SKIP_CI=1</code>), que avisa quando é usada.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-6"><label for="q13b-6">Porque é que baixar o máximo de ligações do OpenMetadata de 100 para 20 aumenta a fiabilidade, e não só poupa memória?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque o Postgres aceita 100 ligações no total e é partilhado pela ingestão, pelo lakeFS e pelo Airflow. Um pico do OpenMetadata podia ocupá-las todas e deixar o writer sem ligação, parando a escrita do bronze. Com o teto de 20, sobra espaço para os outros.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-7"><label for="q13b-7">A Oracle respondeu "404 BucketNotFound" a um bucket que existe. O que estava realmente a acontecer?</label></div>
+      <details><summary>Ver resposta</summary><div>Faltava uma permissão. O envio em várias partes precisa de <code>OBJECT_OVERWRITE</code> e a VM não a tem, de propósito. A Oracle responde muitas vezes "não encontrado" em vez de "proibido", para não revelar o que existe. Lição: perante um 404 inesperado na cloud, verificar primeiro as permissões da operação exata.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-8"><label for="q13b-8">Porque é que os índices do lakeFS cresciam mais depressa do que os dados?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque cada commit reescrevia o pedaço do índice onde estava a mudança, e com pedaços de 50 000 entradas o lake inteiro era um só pedaço. Dois commits por minuto reescreviam o índice inteiro ~2900 vezes por dia. Com pedaços de ~1000, cada commit só reescreve o último. E como a GC não apaga commits, o que já foi escrito fica.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-9"><label for="q13b-9">Porque é que o bloco de importação da VM no Terraform protege contra custos?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque, se o ficheiro de estado do Terraform se perdesse com a VM ainda viva, um <code>apply</code> sem a importação criaria uma <em>segunda</em> VM. Numa conta pay-as-you-go, essa VM seria cobrada. Com a importação, o Terraform adota a VM que existe em vez de criar outra.</div></details></div>
+    <div class="q"><div class="qt"><input type="checkbox" id="q13b-10"><label for="q13b-10">Porque é que um alarme "sem sinal no último dia" custava tanto, se o sinal chega só uma vez por dia?</label></div>
+      <details><summary>Ver resposta</summary><div>Porque a Oracle avalia cada alarme a cada minuto e, em cada avaliação, relê a janela inteira, minuto a minuto, incluindo os minutos vazios. Um dia são 1 440 minutos; vezes 1 440 avaliações por dia dá ~2 milhões por série, e havia várias séries e alarmes. Com uma janela de 1 hora, cada avaliação lê 60 minutos.</div></details></div>
     <div class="q"><div class="qt"><input type="checkbox" id="q13b-3"><label for="q13b-3">O Trivy travou a imagem de pipelines. Porque é que isso é uma boa notícia?</label></div>
       <details><summary>Ver resposta</summary><div>Porque o CI fez exatamente o que devia: impediu que uma imagem com vulnerabilidades críticas conhecidas fosse publicada, e revelou que a própria plataforma usa essa imagem. Sem a análise, ninguém saberia.</div></details></div>
   </div>
@@ -958,13 +1145,14 @@ quality/  docs/  tests/
   <div class="goal"><b>Objetivo:</b> perceber porque há duas camadas de alertas, uma dentro e outra fora da VM.</div>
   <div class="two">
     <div class="card"><h4>Dentro do cluster: Prometheus + Grafana</h4><p><code>kube-prometheus-stack</code> pelo Argo CD. Métricas de todos os pods, 24 dashboards de Kubernetes, regras de alerta visíveis no Grafana. ~930 Mi na Oracle. Abre-se em <code>localhost:3000</code> (<code>ui.sh</code>); palavra-passe no cofre.</p></div>
-    <div class="card"><h4>Fora da VM: alarmes da Oracle</h4><p>OCI Monitoring + Notifications (grátis), por email: VM sem métricas há 10 min, CPU &gt; 90 % durante 30 min, memória &gt; 92 % durante 15 min, e nenhum backup bem-sucedido em 26 h (o job publica <code>backup_success</code>).</p></div>
+    <div class="card"><h4>Fora da VM: alarmes da Oracle</h4><p>OCI Monitoring + Notifications (grátis), por email: VM sem métricas há 10 min, CPU &gt; 90 % durante 30 min, memória &gt; 92 % durante 15 min, e nenhum backup bem-sucedido em 24 h (o job publica <code>backup_success</code>). Hoje são 20 alarmes. Os "sinais de vida" de cada job: backup, cópia do lake, ensaio de restauro, GC, frescura da silver, disco e corta-custos. Os limites de custo: pedidos por dia, espaço por bucket e no total, e gasto do mês. Mais um que conta os alertas do Prometheus a disparar.</p></div>
   </div>
+  <p><strong>Alertas do Prometheus sem Alertmanager:</strong> as 220 regras do Prometheus mostravam alertas no Grafana, mas ninguém os recebia. O job <code>ops/node-health</code> conta, de 30 em 30 min, os alertas <em>warning</em> e <em>critical</em> a disparar (exceto o Watchdog, que dispara sempre de propósito) e envia o número à Oracle. Acima de 0, chega um email. Assim, um Job falhado ou um pod em ciclo de reinícios chegam ao email sem um Alertmanager.</p>
   <p><strong>Porquê as duas:</strong> o Grafana dentro da VM morre com ela; não pode avisar que ela caiu. Os alarmes da Oracle estão fora, e o do backup é um "dead man's switch": avisa quando um sinal esperado deixa de chegar.</p>
   <div class="quiz">
     <h3>Perguntas do capítulo 13c</h3>
     <div class="q"><div class="qt"><input type="checkbox" id="q13c-1"><label for="q13c-1">O que é um "dead man's switch" e porque é que o alarme do backup é um?</label></div>
-      <details><summary>Ver resposta</summary><div>É um alarme que dispara quando um sinal periódico deixa de chegar. O backup publica <code>backup_success</code> quando corre bem; se nenhum chegar em 26 h, a Oracle avisa. Apanha tanto o backup que falha como o que nem chegou a correr.</div></details></div>
+      <details><summary>Ver resposta</summary><div>É um alarme que dispara quando um sinal periódico deixa de chegar. O backup publica <code>backup_success</code> quando corre bem; se nenhum chegar em 24 h, a Oracle avisa. Apanha tanto o backup que falha como o que nem chegou a correr.</div></details></div>
     <div class="q"><div class="qt"><input type="checkbox" id="q13c-2"><label for="q13c-2">Porque é que o node-exporter corre sem hostNetwork?</label></div>
       <details><summary>Ver resposta</summary><div>Porque a regra de admissão recusa hostNetwork fora do kube-system (um pod na rede do nó escaparia às NetworkPolicies). As métricas do nó continuam a vir de /proc e /sys montados no pod.</div></details></div>
   </div>
@@ -1297,6 +1485,14 @@ nc -z -w 3 github.com 443                       && echo aberto || echo recusado 
   <h2>Termos</h2>
   <div class="tablewrap"><table>
     <tr><th>Termo</th><th>Significado</th></tr>
+    <tr><td>Corta-custos (kill-switch)</td><td>Job que, ao passar um limite de gasto, trava a conta (quota a zero) e desliga a VM, sem apagar dados (ADR-017).</td></tr>
+    <tr><td>GOMEMLIMIT</td><td>Limite "suave" de memória de um programa em Go: perto dele o Go limpa memória mais vezes; nunca mata o processo.</td></tr>
+    <tr><td>Quota (OCI)</td><td>Regra da conta que limita quanto de um serviço se pode criar; a zero, nada desse serviço se cria. O que já existe continua.</td></tr>
+    <tr><td>WAL</td><td>Write-Ahead Log: o registo onde o Postgres escreve cada alteração antes de a aplicar, para recuperar de uma falha.</td></tr>
+    <tr><td>Página completa (full-page image)</td><td>Cópia inteira de uma página de 8 KB que o Postgres põe no WAL na primeira alteração depois de cada checkpoint.</td></tr>
+    <tr><td>Multipart (envio em partes)</td><td>Envio de um ficheiro grande em vários pedaços. Na Oracle exige <code>OBJECT_OVERWRITE</code>, que a VM não tem; por isso os backups vão sempre num só pedido.</td></tr>
+    <tr><td>Range (lakeFS)</td><td>Pedaço do índice de um commit: uma lista ordenada de ficheiros. Os commits partilham os ranges que não mudaram.</td></tr>
+    <tr><td>Ciclo de vida (lifecycle) de um bucket</td><td>Regra do Object Storage que apaga ou arquiva objetos sozinha, sem pedidos pagos.</td></tr>
     <tr><td>App-of-apps</td><td>Uma aplicação do Argo CD cujo conteúdo são outras aplicações.</td></tr>
     <tr><td>ApplicationSet</td><td>Gerador de aplicações do Argo CD a partir de um padrão (pastas, listas).</td></tr>
     <tr><td>ClusterSecretStore</td><td>Configuração do ESO: onde está o cofre e como se autenticar.</td></tr>
@@ -1335,8 +1531,8 @@ nc -z -w 3 github.com 443                       && echo aberto || echo recusado 
 (function () {
   var SCORES = [
     ["Segurança", 9, 20, 5], ["Fiabilidade e backups", 9, 20, 2], ["Consistência GitOps", 9.5, 10, 5],
-    ["Terraform", 9, 10, 6], ["CI/CD e cadeia de fornecimento", 9.25, 10, 6], ["Observabilidade", 8.5, 10, 1],
-    ["Custo e recursos", 8.5, 10, 6], ["Documentação e ADRs", 8.75, 5, 6], ["Simplicidade para uma pessoa", 6.5, 5, 5]
+    ["Terraform", 9, 10, 6], ["CI/CD e cadeia de fornecimento", 9.2, 10, 6], ["Observabilidade", 9, 10, 1],
+    ["Custo e recursos", 8.8, 10, 6], ["Documentação e ADRs", 9, 5, 6], ["Simplicidade para uma pessoa", 6.5, 5, 5]
   ];
   var sc = document.getElementById("scorecard");
   SCORES.forEach(function (s) {

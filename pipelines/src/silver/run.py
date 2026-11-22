@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from . import g2
+from . import g2, openmetadata
 from .catalog import load_catalog
 from .transform import VERSION, SilverError, transform
 
@@ -46,7 +46,9 @@ def run_hour(lake, hour: datetime, *, target: str = "main", hook=None, keep_bran
         local = []
         for i, path in enumerate(bronze_files):
             local.append(Path(tmp) / f"bronze{i}.parquet")
-            local[-1].write_bytes(lake.read(branch, path))
+            # lido do `target` (onde foi listado), não do branch: um branch silver-* que ficou de uma corrida falhada
+            # é anterior ao bronze que chegou depois, e não teria esses ficheiros (auditoria de 2026-11-17)
+            local[-1].write_bytes(lake.read(target, path))
         out = Path(tmp) / "silver.parquet"
         catalog = load_catalog()
         result = transform(local, out, catalog)                 # levanta SilverError se o bronze não cumprir o contrato
@@ -57,6 +59,7 @@ def run_hour(lake, hour: datetime, *, target: str = "main", hook=None, keep_bran
     attested = {silver_path: lake.checksum(branch, silver_path)}
     lake.upload(branch, f"_gates/g2/dt={dt}/hour={hh}.json", report.attestation(attested))   # a prova que o hook do lakeFS confere
     hook("g2")
+    openmetadata.publish(hour, report)      # o histórico do G2 no catálogo (melhor esforço: nunca falha a hora)
 
     lake.commit(branch, f"silver: {dt} hora {hh}", {"bronze_files": str(len(bronze_files)), "bronze_rows": str(result.bronze_rows),
                                                   "silver_rows": str(result.silver_rows), "silver_version": VERSION})

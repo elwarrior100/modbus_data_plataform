@@ -36,6 +36,10 @@ class FakeLake:
         self.calls.append(("merge", branch, into))
         return bool(changed)
 
+    def delete_branch(self, name):
+        self.branches.pop(name, None)
+        self.calls.append(("delete_branch", name))
+
     def list(self, ref, prefix):
         return sorted(p for p in self._b(ref)["committed"] if p.startswith(prefix))
 

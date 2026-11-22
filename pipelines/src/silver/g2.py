@@ -88,7 +88,9 @@ def evaluate(silver_file: str | Path, hour: datetime, catalog: list[Tag]) -> Rep
     dup_ids = con.execute("SELECT count(*) FROM (SELECT bronze_event_id FROM s GROUP BY 1 HAVING count(*) > 1)").fetchall()[0][0]
     if dup_ids:
         f.append(Finding("G2-02", "blocker", dup_ids, 0, f"{dup_ids} bronze_event_id repetidos"))
-    dup_ts = con.execute("""SELECT count(*) FROM (SELECT 1 FROM s GROUP BY asset_id, tag_name, ts_utc
+    # (ativo, tag, instante): o instante é o do equipamento (source_ts), com a precisão do relógio dele (1 s nos PLC
+    # Modbus); duas leituras verdadeiras no mesmo segundo desempatam pelo server_ts (ms). ADR-018.
+    dup_ts = con.execute("""SELECT count(*) FROM (SELECT 1 FROM s GROUP BY asset_id, tag_name, ts_utc, server_ts
                             HAVING count(DISTINCT coalesce(CAST(value_double AS VARCHAR), CAST(value_bool AS VARCHAR), value_str)) > 1)""").fetchall()[0][0]
     if dup_ts:
         f.append(Finding("G2-02", "warn", dup_ts, 0, f"{dup_ts} (ativo, tag, instante) com valores diferentes"))

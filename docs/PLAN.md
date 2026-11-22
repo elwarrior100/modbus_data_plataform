@@ -293,6 +293,12 @@ Timescale em paralelo.
 (verificado por contagem de `event_id` distintos); G1 rejeita um payload malformado injetado
 de propósito e o branch correspondente **não** chega a `main`.
 
+> **G1 provado no cluster (2026-11-21, cluster local):** uma amostra inválida injetada na spool (nó desconhecido,
+> `event_id` que não se recalcula) fez o writer REJEITAR o lote `be1809225aa6b955` (G1-02 e G1-03). O relatório
+> ficou em `bronze/_rejected/<lote>/g1_report.json` no branch dele; nenhum commit do `main` refere o lote. A
+> reconciliação a seguir deu 0 em falta, 0 a mais e 0 duplicados (1,48 M de amostras). Falta, para fechar o DoD: o
+> caminho *live* para o Timescale (as 24 h contínuas já se cumprem na Oracle desde 14-11).
+>
 > **Estado real (2026-11-08).** Feito e verificado: collector OPC UA, spool, writer idempotente,
 > gate G1 (8 regras) e reconciliação spool↔lakeFS sem faltas nem duplicados no cluster
 > (27 116 amostras), incluindo mortes do writer e um reinício do Postgres. **Desvios:** o spool é
@@ -321,7 +327,18 @@ reprocessar a mesma partição duas vezes não altera contagens; uma falha a mei
 > `lake_housekeeping` (diário, em simulação até rever o primeiro relatório; ver ADR-007).
 > Por fazer, fora do DoD: GC de objetos órfãos do lakeFS (precisa de Spark; só se o armazenamento o justificar).
 
-### Fase 5 — Governança e gates  🔵 em curso (2026-11-11)
+### Fase 5 — Governança e gates  🟢 DoD cumprido no cluster local (2026-11-21); falta levar o catálogo à Oracle
+
+> **DoD provado (21-11, cluster local):**
+> - **`spike`:** PUMP-01.bearing_temp a 500 °C durante 30 s, às 19:10. A hora das 19 teve AVISO do G2-03, o merge passou
+>   e a silver está no `main`.
+> - **`comms_gap`:** os 3 ativos sem comunicação durante 15 min, às 22:09. A hora das 22 teve 43/60 min (72%): BLOQUEIO
+>   do G2-01, o merge foi recusado e a silver não está no `main` (404).
+> - **No OpenMetadata:** os dois casos ficaram com histórico, no G2-03 e no G2-01. A linhagem bronze → silver_hourly →
+>   silver está no catálogo.
+> - **Falta:** o catálogo na Oracle (PLAN item 33, depois da revisão do código e do token no cofre) e o G3 (Fase 6).
+> - **Nota:** a 1.ª tentativa do `comms_gap` não valeu: o Mac adormeceu, a VM local ficou em pausa e a hora falhou por
+>   falta de dados. Testes locais longos precisam do Mac acordado e com a tampa aberta.
 > **Estado:** contrato (`docs/gates-contract.md`) e ADR-008 feitos; G2 (7 regras) implementado e calibrado; hook Lua
 > `pre-merge` + proteção `pre-commit` instalados no `industrial-lake`; 4 testes contra o lakeFS real e 34 locais a passar;
 > primeira corrida real: o G2 recusou as horas com buracos de recolha. **Falta:** `comms_gap` injetado de propósito no
@@ -605,5 +622,163 @@ código e explica-o; ver CLAUDE.md.)*
 23. ✅ (2026-11-16) Auditoria de custos (conta PAYG): retenção da spool (7 dias exportados / 30 rejeitados), cópia do
    lake com completo semanal e remoção automática aos 9 dias, alarme do total de Object Storage > 15 GB, ABORT de
    multipart nos dumps, alarmes de "sinal em falta" corrigidos ([1d]/[3h].absent()).
-   - ⬜ **Quotas da conta (aguarda o "sim" do Stéphane):** terraform/oracle/quotas.tf ainda por criar/aplicar.
-   - ⬜ Ligar a remoção da GC após o relatório de 22-11; atualizar ADR-016 (semanal + 9 dias) e o livro.
+   - ✅ ADR-016 atualizado (completo semanal + remoção aos 9 dias).
+   - ⬜ Ligar a remoção da GC após o relatório de 22-11; atualizar o livro com as lições da auditoria.
+24. ✅ (2026-11-16) **Corta-custos automático (ADR-017)**: ops/cost-guard de hora a hora; a €1,00 no mês põe quotas
+   a zero (48 famílias) e faz SOFTSTOP à VM, nunca apaga dados. Retoma com `scripts/cost-guard-resume.sh`. Testado:
+   dry-run na VM, regras de quota aceites (compartimento de teste, apagado), corrida real a €0,0198. Substitui as
+   "quotas preventivas" do item 23: as quotas só entram quando o limite é atingido.
+   - ✅ Teste real a 2026-11-16 (07:21): quota criada, VM STOPPED em ~1,5 min, retoma com o script, 19 apps
+     Healthy em ~10 min. O script já não etiqueta `cost-guard-ack` se o gasto estiver abaixo de €1.
+25. ✅ (2026-11-16) **Memória aparada sem perder funções** (aprovado pelo Stéphane, só o que não baixa o score):
+   - **Prometheus:** deixou de guardar 8 histogramas internos do k3s que ninguém usa; ficam o SLI do API server e
+     `workqueue_queue_duration` (painel do dashboard do API server). Séries do kubelet ~51k → ~26k, do apiserver
+     ~35k → ~19k. Memória 700 → 493 Mi (desce mais quando a "head" compactar).
+   - **Grafana:** datasources carregados por um init container (modo LIST) e alertas do Grafana desligados.
+     Memória 685 → 325 Mi.
+   - **Airflow:** o processador de DAGs passou a usar 1 processo (273 → 255 Mi); as 3 DAGs carregam sem erros.
+   - **Ficou de fora de propósito:** Argo CD (já afinado), baixar os requests (desprotegia o Postgres) e desligar o
+     OpenMetadata.
+   - ✅ 11.ª revisão de production readiness: **89,0/100** (+0,6). Subiu a segurança de custos; desceu pelo CI
+     vermelho (o check GC ≥ dumps lia também a regra ABORT nova) e pelo runbook desatualizado.
+26. ✅ (2026-11-16) Correções da 11.ª revisão (todas grátis):
+   - **CI** de novo verde; o `promote-oracle.sh` recusa promover um commit sem CI verde (testado: recusou com o CI a
+     correr e promoveu depois de ficar verde).
+   - **Alertas do Prometheus chegam ao email:** o `node-health` publica `prometheus_alerts_firing` e há um alarme
+     na Oracle acima de 0 (hoje: 0).
+   - **Runbook:** o restauro do lake por pacotes, a limpeza automática aos 9 dias e as tabelas de alarmes e
+     salvaguardas atualizadas.
+   - **Corta-custos:** lê qualquer número, a métrica já não o pode parar, e um mês retomado tem teto (gasto na
+     retoma + €1).
+   - **Reconciliação** (`tests/phase3/reconcile.py`): "a mais" conta só a janela que o spool guarda. Local: OK,
+     0/0/0, com 1 512 808 eventos na janela.
+   - ✅ 12.ª revisão: **90,2/100** (+1,2). Os 5 pontos foram verificados.
+27. ✅ (2026-11-16) Performance (agente de performance; tudo grátis, nada desligado):
+   - **Verificação de saúde do Airflow** passou de cada 60 s para cada 300 s. Cada verificação gastava ~3,4 s de CPU,
+     ~22% da CPU de todos os contentores.
+   - **Postgres:** `wal_compression=lz4`, `checkpoint_timeout=15min` e `max_wal_size=2GB`. Escrevia ~16 GB de WAL em
+     47 h, 95% em páginas completas.
+   - **DAGs relidas de 300 em 300 s** e o bundle de 600 em 600 s (o código está fixado num commit).
+   - **Correções da 12.ª revisão:** o corta-custos ignora um gasto calculado antes do mês atual (viragem do mês); o
+     runbook diz para religar a VM em menos de 9 dias; o texto do alarme de pedidos diz ~6 por noite.
+   - **Custo de novembro:** €0,0198 a 16-11 (budget calculado às 09:03). A limpeza manual da cópia antiga gastou
+     ~20 mil pedidos e passou o limite grátis do mês; o alarme de pedidos apaga-se quando a janela de 1 dia passar.
+     Lição: apagar muitos objetos faz-se com uma regra de ciclo de vida (grátis), não objeto a objeto.
+   - ⬜ Correr `tests/phase3/run.sh` contra a Oracle (a ferramenta de segurança bloqueou o acesso aos segredos de
+     produção; corre o Stéphane, ou dá permissão).
+   - ✅ (21-11) Medido: scheduler do Airflow 0,079 → 0,038 núcleos, processador de DAGs 0,082 → 0,022 (~0,1 núcleo
+     poupado). WAL do Postgres ~347 → ~286 MB/h (−18%, abaixo dos 2–2,5× estimados: as páginas completas vêm sobretudo
+     do índice UUID aleatório e do insert + update da spool; o remédio de fundo é mudar o desenho da spool, não
+     urgente com o disco a 1–2% de utilização).
+28. ✅ (2026-11-16) RAM, agente de memória, pontos 1 a 6 (aprovados: não baixam o score nem limitam projetos futuros):
+   - **k3s:** `GOMEMLIMIT=900MiB` (547 MB vivos; o GC só limpava a 1,12 GB). RSS 1,48 → 1,04 GB.
+   - **lakeFS:** cache de sstables em memória 100 MB (era 400) e 5 ligações paradas (eram 25). 331 → 75 Mi, acabado
+     de arrancar.
+   - **Argo CD:** controller com `GOMEMLIMIT=512MiB`. 391 → 313 Mi.
+   - **Grafana:** 13 datasources desligados. Processos de plugins 14 → 1.
+   - **OpenMetadata:** pool de ligações com máximo 20 e 5 paradas. Antes, o máximo de 100 podia esgotar as 100
+     ligações do Postgres. Ligações ~30 → 15.
+   - **VM:** fwupd, ModemManager, udisks2 e multipathd mascarados.
+   - **Resultado na VM:** usada 7,26 → 6,54 GB; disponível 4,66 → 5,38 GB.
+   - ⬜ Ficaram por fazer: plugins do OpenSearch (risco médio; testar a pesquisa do OpenMetadata) e plugins do Oracle
+     Cloud Agent na consola (Custom Logs, Run Command), a fazer pelo Stéphane.
+29. ✅ (2026-11-17) **Incidente da noite e auditorias de "bombas-relógio" e de código/segurança** (tudo grátis):
+   - **Incidente:**
+     - a cópia do lake e o backup do Postgres passam a enviar num só pedido (multipart precisa de `OBJECT_OVERWRITE`,
+       que a VM não tem de propósito);
+     - o ensaio tem SeaweedFS com volumes maiores, 1 GiB de memória, índice em disco e prazo de 1 h;
+     - o lakeFS ficou com `range_raggedness_entries=1000`: os índices crescem ~67 MB/dia (eram ~600);
+     - as reservas de CPU baixaram de 97% para 79%.
+   - **Bombas-relógio:** GC com prazo de 3 h; disco temporário da cópia 20 Gi; dumps guardados 7 dias (eram 14).
+   - **Segurança:**
+     - o Grafana já não lê segredos (ClusterRole próprio, só configmaps);
+     - as tarefas do Airflow ficam sem token do Kubernetes;
+     - a chave do lakeFS chega só às tarefas, e não ao scheduler, à API nem ao processador de DAGs;
+     - a regra de admissão verifica também os contentores de depuração e as capacidades extra, e só abre hostPath ao
+       node-exporter.
+   - **Dados:**
+     - alarme "silver hours missing or late" (horas sem silver ou bronze chegado depois);
+     - a limpeza da spool guarda sempre o evento mais recente de cada sensor (evita duplicados ao fim de 7 dias).
+   - **Runbook:** o procedimento "lakeFS ilegível" foi corrigido e há um novo, "perdi a VM inteira".
+   - ⬜ **Ainda por fazer:**
+     - ✅ (21-11) pacote completo partido em partes de ≤3 GiB de objetos (ADR-016, revisão de 21-11), testado na Oracle;
+     - medir a GC de 22-11 (tempo e memória com mais commits);
+     - regras do Tailscale na consola (Stéphane; texto dado na conversa de 17-11).
+34. 🟡 (2026-11-22) **A primeira GC semanal agendada falhou** às 05:00: o lakeFS demorou a listar o que não estava
+   commitado em **4 464 branches** (um `etl-*` por lote, guardados 7 dias), e o cliente da GC desistiu pelo tempo de
+   espera por omissão ("postgres scan: context canceled"). Uma bomba-relógio que a auditoria não apanhou.
+   - **Plataforma (feito e promovido):** a GC ganhou tempos de espera do cliente: ligação 60 s, leitura 30 min.
+   - **Projeto (no disco, por rever):** o writer apaga o branch do lote logo a seguir ao merge (os recusados ficam).
+     Testes contra um Postgres real, incluindo matar o writer em cada passo: 29 passam.
+   - **O pacote completo semanal (03:00) e o ensaio (04:15) correram bem:** 33 389 objetos, 904 MB, 1 parte.
+   - ⬜ Correr a GC à mão (só marcar) com os tempos novos, ler o relatório e decidir a remoção (Stéphane).
+33. 🟡 (2026-11-21) **OpenMetadata: catálogo, linhagem e histórico do G2** (Fase 5; ADR-009, decisão 5). Código do
+   projeto **no disco, sem commit, por rever**:
+   - `pipelines/src/silver/openmetadata.py`: cria e mantém o serviço `lakefs` → `industrial_lake` → `bronze.events` e
+     `silver.readings`, com as colunas dos contratos. Também a linhagem bronze → (`silver_hourly`) → silver e os 7
+     casos de teste G2-01…G2-07. Envia um resultado por regra e por hora (passa → Success; aviso ou bloqueio → Failed,
+     com o texto a dizer qual). É sempre "melhor esforço": se o OpenMetadata estiver em baixo, o silver não falha.
+   - `run.py` chama-o depois do G2; `tests/test_openmetadata.py` tem 3 testes.
+   - **Testado no OpenMetadata local:** o catálogo, a linhagem, os 7 testes e um resultado de exemplo (já apagado).
+   - **Histórico real no OpenMetadata local** (21-11): 36 atestações do lakeFS local enviadas com
+     `python -m silver.openmetadata` (31 horas aprovadas, 5 recusadas). **Achado:** o G2-02 deu aviso em TODAS as 36
+     horas (leituras do mesmo sensor no mesmo instante com valores diferentes). **Causa encontrada (21-11):** o
+     `source_ts` tem precisão de 1 segundo, e o simulador atualiza ~1 vez por segundo. Duas leituras verdadeiras,
+     ~1 s uma da outra, ficam com o mesmo `source_ts`; o `server_ts` (ms) mostra que são diferentes. Exemplo:
+     PUMP-01.flow_rate 219,4 e 224,2 em `09:02:24`, `server_ts` `.839` e `25.838`. 196 de 43 810 linhas (0,45%), em
+     sinais rápidos (vibração, potência, caudal). Não são dados errados. **Decidido: solução intermédia (ADR-018).** O `source_ts`
+     fica honesto, o G2-02 desempata pelo `server_ts`, a silver ordena-se pelo `server_ts` dentro do mesmo segundo
+     (`silver_version` "2"), e os contratos dizem a precisão. Código por rever; em 11 horas reais, 2 542 → 0 falsos
+     conflitos, e um conflito verdadeiro continua a ser apanhado (teste).
+   - **Plataforma preparada:** `scripts/openmetadata-bot-token.sh`, os ExternalSecrets e as variáveis nas tarefas do
+     Airflow, já a funcionar no local. Na Oracle falta o token no cofre: a ferramenta de segurança não me deixou criá-lo;
+     corre `KUBECONFIG=~/.kube/oracle.yaml ./scripts/openmetadata-bot-token.sh oracle` e eu promovo a seguir.
+   - ⬜ **Para chegar à Oracle, depois de reveres e fazeres commit:**
+     1. guardar no cofre o token do bot de ingestão (`airflow-openmetadata-bot`, prefixo permitido no namespace
+        airflow);
+     2. criar um ExternalSecret no airflow, `OPENMETADATA_URL` e `OPENMETADATA_TOKEN` no `workers.env` e uma regra de
+        entrada no namespace openmetadata para as tarefas do Airflow;
+     3. imagem nova do pipelines e `tracking_ref`.
+32. ✅ (2026-11-21) **Reparação real do lakeFS local** com o runbook "lakeFS main is unreadable": o `main` perdeu o
+   índice do último commit (a VM local foi desligada sem `vm-stop.sh`). Foi feito hard reset para o último commit
+   legível, e o único lote perdido voltou à fila e foi reescrito. O runbook ganhou três lições:
+   - o Argo CD desfaz o "parar o writer";
+   - a proteção pede `If-Match`;
+   - o branch `etl-*` do lote perdido não se apaga (410): faz-se hard reset dele para o `main`, senão um lote encravado
+     bloqueia todos os seguintes.
+31. ✅ (2026-11-21) **Custo escondido nas leituras dos alarmes** (encontrado por um agente auditor de custos):
+   - **O problema:** os 4 alarmes `[1d].absent()` (backup, cópia, ensaio, verificação da GC) liam ~110 milhões de
+     pontos por dia. O grátis é 1 000 milhões por mês; acabaria a ~25-11, com novembro a ~€0,6–0,8 e ~€3/mês daí em
+     diante. O corta-custos não ajudava: os alarmes correm na Oracle, não na VM.
+   - **A correção:** `ops/job-freshness` envia de 30 em 30 min as horas desde o último sucesso de cada CronJob
+     (`lastSuccessfulTime`); os alarmes passam a "mais de 26 h" numa janela de 1 h (a GC, "mais de 194 h"); e há um
+     alarme `[3h].absent()` para o próprio verificador.
+   - **Testado:** um alarme temporário (GC > 100 h, emails suprimidos) passou a FIRING em ~4 min e foi apagado; todos os
+     alarmes reais estão OK.
+   - ⬜ Confirmar a 22/23-11 nos dados de uso que as leituras caíram para poucos milhões por dia.
+   - **Regra nova:** nunca janelas `[1d]` em alarmes da Oracle.
+30. ▶️ (2026-11-17 → 2026-11-21) **Projeto modbus esteve em PAUSA na Oracle; retomado a 21-11** a pedido do
+   Stéphane, com o MESMO código de antes. As mudanças por rever abaixo continuam por aplicar (passos 1 e 2 da retoma).
+   Retoma feita: patch removido, `modbus_running = true`, deployments a 1 pelo Argo CD, DAGs ativas (o catchup percorre
+   as horas da pausa, sem bronze; a hora 10 de 17-11 ficou parcial e o G2 recusa-a, como deve).
+   - **Parado:** ot-edge, collector e writer estão a 0, por esta ordem, depois de a spool ficar vazia (0 por atribuir,
+     0 pendentes). As DAGs `silver_hourly` e `lake_housekeeping` estão em pausa. O Argo CD da Oracle não sincroniza os
+     projetos (patch em `envs/oracle/apps/kustomization.yaml`). Os alarmes do silver estão desligados
+     (`modbus_running = false`).
+   - **Continua a correr:** a plataforma, os backups, a cópia do lake, o ensaio, a GC, o corta-custos e os alarmes. O
+     lake fica congelado (~1 GB) e a spool encolhe até 1 evento por sensor ao fim de 7 dias. Custo: €0.
+   - **Por rever, no projeto (no disco, sem commit; testes a passar):**
+     - `pipelines/src/silver/run.py`: lê o bronze do `target`, e não do branch, para repetir uma hora falhada
+       funcionar mesmo que tenha chegado bronze depois;
+     - `ingest/src/ingest/collector.py`: a fila em memória tem teto (~3 h); acima disso descarta as amostras novas,
+       com aviso, em vez de morrer por falta de memória;
+     - `pipelines/dags/silver_hourly.py`: o silver passa a correr à hora e 15, para ir junto com o writer a 5 min;
+     - `tests/phase3/reconcile.py`: só compara a janela que a spool guarda (de 16-11).
+   - **Para retomar, por esta ordem:**
+     1. rever e fazer commit do código acima; CI das imagens; atualizar `MODBUS_PIPELINES_IMAGE`/`tracking_ref` e a
+        imagem do ingest na plataforma;
+     2. pôr `BATCH_AGE_S=300` em `projects/modbus/k8s/ingest/ingest.yaml`, só JUNTO com a DAG às :15;
+     3. apagar a linha `remove .../automated` do kustomization da Oracle e pôr `modbus_running = true`, depois
+        `terraform apply`;
+     4. pôr o writer, o collector e o ot-edge a 1 (o Argo CD repõe-nos) e tirar as DAGs de pausa;
+     5. em 1 h, o alarme das horas de silver deve ficar em 0.
