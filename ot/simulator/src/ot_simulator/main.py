@@ -7,6 +7,7 @@ import threading
 from .clock import SystemClock
 from .control import start_control
 from .model import Plant
+from .plan import load_plan
 from .servers import RtuServer, start_tcp
 from .spec import DEVICES
 
@@ -24,6 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--scenarios", help="ficheiro YAML com cenários agendados")
     p.add_argument("--seed", type=int, help="semente do ruído (reprodutível)")
     p.add_argument("--tick", type=float, default=0.1, help="período do ciclo de simulação (s)")
+    p.add_argument("--plan", help='plano de produção (YAML), ou "builtin" para o que vem com o simulador')
+    p.add_argument("--trip-rate-per-day", type=float, default=0.0,
+                   help="avarias aleatórias por ativo e por dia a funcionar (0 = nenhuma)")
     return p
 
 
@@ -33,7 +37,9 @@ def run_ticks(plant: Plant, period: float, stop: threading.Event) -> None:
 
 
 async def serve(args) -> None:
-    plant = Plant(DEVICES, SystemClock(), args.seed)
+    plan = load_plan(args.plan) if args.plan else None
+    plant = Plant(DEVICES, SystemClock(), args.seed, plan=plan, trip_rate_per_day=args.trip_rate_per_day)
+    log.info("plano: %s; avarias aleatórias: %.2f por ativo e por dia", args.plan or "nenhum", args.trip_rate_per_day)
     if args.scenarios:
         log.info("%d cenários carregados de %s", plant.engine.load_file(args.scenarios), args.scenarios)
     stop = threading.Event()

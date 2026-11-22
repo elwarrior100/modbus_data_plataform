@@ -9,6 +9,8 @@ nodes:
   "ns=2;s=PUMP-01.vibration_rms": double
   "ns=2;s=PUMP-01.run_hours": uint32
   "ns=2;s=PUMP-01.state": uint16
+  "ns=2;s=PUMP-01.power_kw": double
+  "ns=2;s=PUMP-01.inlet_pressure": double
   "ns=2;s=PUMP-01.device_clock": datetime
   "ns=2;s=PUMP-01.alarm": boolean
   "ns=2;s=MOTOR-01.Connected": boolean
@@ -18,6 +20,7 @@ nodes:
   "ns=2;s=MOTOR-01.winding_temp": double
   "ns=2;s=MOTOR-01.vibration_rms": double
   "ns=2;s=MOTOR-01.state": uint16
+  "ns=2;s=MOTOR-01.power_kw": double
   "ns=2;s=MOTOR-01.device_clock": datetime
   "ns=2;s=MOTOR-01.alarm": boolean
   "ns=2;s=CHILLER-01.Connected": boolean
@@ -25,4 +28,5 @@ nodes:
   "ns=2;s=CHILLER-01.outlet_temp": double
   "ns=2;s=CHILLER-01.power_kw": double
   "ns=2;s=CHILLER-01.state": uint16
+  "ns=2;s=CHILLER-01.chw_flow": double
   "ns=2;s=CHILLER-01.device_clock": datetime

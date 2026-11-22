@@ -63,7 +63,12 @@ Holding registers (função 0x03):
 | 4 | 40005 | `vibration_rms` | uint16 | ×0.01 | mm/s | 0 – 50 | 1 s |
 | 5–6 | 40006–07 | `run_hours` | uint32 | ×1 | h | 0 – 4 294 967 295 | 60 s |
 | 7 | 40008 | `state` | uint16 | enum | — | ver 3.1 | à mudança |
+| 8–9 | 40009–10 | `power_kw` | float32 | ×1 | kW | 0 – 100 | 1 s |
+| 10 | 40011 | `inlet_pressure` | uint16 | ×0.01 | bar | 0 – 10 | 5 s |
 | 20–21 | 40021–22 | `device_clock` | uint32 | ×1 | s (epoch UTC) | — | 1 s |
+
+`power_kw` (potência elétrica) e `inlet_pressure` (pressão de aspiração) entraram a 2026-11-22 (ADR-019, D11): com
+eles o gold mede o consumo específico (kWh/m³) e o rendimento da bomba.
 
 Coils (função 0x01):
 
@@ -91,7 +96,10 @@ Coils (função 0x01):
 | 4 | 40005 | `winding_temp` | int16 | ×0.1 | °C | -20 – 200 | 5 s |
 | 5 | 40006 | `vibration_rms` | uint16 | ×0.01 | mm/s | 0 – 50 | 1 s |
 | 6 | 40007 | `state` | uint16 | enum (3.1) | — | — | à mudança |
+| 7–8 | 40008–09 | `power_kw` | float32 | ×1 | kW | 0 – 100 | 1 s |
 | 20–21 | 40021–22 | `device_clock` | uint32 | ×1 | s (epoch UTC) | — | 1 s |
+
+`power_kw` (potência elétrica, desde 2026-11-22): com o binário e a velocidade dá o rendimento do motor.
 
 Coil 0 (`alarm`): ligado se `vibration_rms ≥ 10` ou `winding_temp ≥ 120`; histerese 8 e 110.
 
@@ -103,7 +111,11 @@ Coil 0 (`alarm`): ligado se `vibration_rms ≥ 10` ou `winding_temp ≥ 120`; hi
 | 1 | 40002 | `outlet_temp` | int16 | ×0.1 | °C | 0 – 30 | 5 s |
 | 2–3 | 40003–04 | `power_kw` | float32 | ×1 | kW | 0 – 500 | 1 s |
 | 4 | 40005 | `state` | uint16 | enum | — | ver 5.1 | à mudança |
+| 5 | 40006 | `chw_flow` | uint16 | ×0.1 | m³/h | 0 – 300 | 5 s |
 | 20–21 | 40021–22 | `device_clock` | uint32 | ×1 | s (epoch UTC) | — | 1 s |
+
+`chw_flow` (caudal de água gelada, desde 2026-11-22): com a diferença entre `inlet_temp` e `outlet_temp` dá a potência
+de frio (caudal × 4,19 × ΔT ÷ 3,6, em kW), e com o `power_kw` o COP.
 
 ### 5.1 Enum `state` do chiller
 
@@ -140,9 +152,39 @@ ao longo do dia (±2 % em temperaturas e potência).
 | `CHILLER-01.inlet_temp` | 12.0 °C | 0.1 |
 | `CHILLER-01.outlet_temp` | 7.0 °C | 0.1 |
 | `CHILLER-01.power_kw` | 120 kW | 2 |
+| `CHILLER-01.chw_flow` | 103 m³/h | 1 |
+| `PUMP-01.inlet_pressure` | 2.3 bar | 0.02 |
+| `PUMP-01.power_kw` | ≈ 25 kW (derivada) | 0.2 |
+| `MOTOR-01.power_kw` | ≈ 30 kW (derivada) | 0.2 |
 
-`run_hours` avança 1 por hora simulada; `state` fica em RUNNING (bomba, motor) e COOLING
-(chiller).
+**Potências derivadas.** As duas potências novas calculam-se a cada leitura a partir dos outros sinais, para uma
+paragem ou uma deriva lhes mexerem de forma coerente (a física é inventada, os valores são plausíveis):
+- bomba: `caudal × (saída − aspiração) ÷ 36 ÷ 0,65` (m³/h × bar ÷ 36 = kW; 0,65 = rendimento global): ≈ 25 kW,
+  ou ≈ 0,115 kWh/m³;
+- motor: `binário × rpm × 2π ÷ 60 ÷ 1000 ÷ 0,93` (0,93 = rendimento do motor): ≈ 30 kW.
+
+Ficam incoerentes de propósito com as correntes (a 400 V, 42 A dariam ~25 kW na bomba, mas 40 A não dão 30 kW no
+motor). As correntes já existiam e mudá-las alteraria dados antigos; o gold usa as potências.
+
+`run_hours` avança 1 por hora **a funcionar** (parado não conta, desde 2026-11-22); sem paragens, `state` fica em
+RUNNING (bomba, motor) e COOLING (chiller).
+
+### 7.1 Ativo parado (desde 2026-11-22, ADR-019)
+
+Em `FAULT`, `STOPPED` ou `MAINTENANCE` (no chiller, `FAULT` ou `OFF`) a máquina não roda:
+
+| Sinais | Valor parado |
+|---|---|
+| caudais, correntes, velocidade, binário, vibrações, potências | **exatamente 0**, sem ruído |
+| `PUMP-01.outlet_pressure` | 2.3 bar, a pressão da aspiração |
+| `bearing_temp`, `winding_temp` | arrefecem até 25 °C (constante de tempo de 15 e 20 min), com ruído |
+| `CHILLER-01.outlet_temp` | aproxima-se da entrada, 12 °C (10 min) |
+| `inlet_pressure`, `CHILLER-01.inlet_temp`, `device_clock` | não dependem do estado |
+
+**Consequência a jusante:** o gateway só escreve ao mudar, por isso um sinal parado a 0 deixa de gerar amostras.
+Isto não é um sensor preso, e o G2-06 sabe distingui-lo (ver `docs/gates-contract.md`).
+
+Ao sair de uma paragem, o ativo passa sempre por `STARTING` (no chiller, `STANDBY`) durante 5 s.
 
 ## 8. Cenários injetáveis
 
@@ -159,6 +201,26 @@ jusante** (é o que os gates da Fase 5 têm de apanhar).
 | `comms_gap` | o simulador deixa de responder (timeout) a um ou a todos os unit IDs durante T segundos | buracos temporais; quebra de completude |
 | `clock_skew` | `device_clock` fica adiantado/atrasado de S segundos (opcionalmente a derivar) | `source_ts` ≠ `ingest_ts` além da tolerância |
 | `power_cycle` | resposta interrompida ~10 s, `state` passa por STARTING, `run_hours` reinicia a 0 (bomba) | contador a recuar; `state` a transitar |
+| `trip` | avaria súbita: `state = FAULT` e o ativo parado (7.1) durante `duration_s` (por omissão 900 s); alarme ligado | entrada em `FAULT`: conta para o MTBF e o MTTR |
+| `planned_stop` | paragem planeada: `STOPPED` (chiller `OFF`) durante `duration_s` | tempo parado que não é avaria |
+| `maintenance` | manutenção: `MAINTENANCE` (chiller `OFF`) durante `duration_s` | idem |
+
+Desde 2026-11-22 o `drift` também **para** a máquina quando chega à falha: em `FAULT` a vibração e o caudal vão a 0
+e as temperaturas arrefecem. Antes a máquina "avariada" continuava a vibrar, o que uma máquina real que dispara não faz.
+
+**Avarias aleatórias** (`--trip-rate-per-day N`, variável `TRIP_RATE_PER_DAY` no contentor): em média N avarias
+(`trip`) por ativo e por dia a funcionar, com duração aleatória (média de 20 min, entre 2 e 120). Por omissão 0.
+
+### 8.0 Plano de produção (`--plan`, variável `PLAN`)
+
+`ot/simulator/src/ot_simulator/plan.yaml` (com `--plan builtin`): 3 turnos de 8 h em hora de Lisboa (A 06–14, B 14–22,
+C 22–06) e paragens semanais. O simulador cumpre-as, e o gold usa o mesmo ficheiro para o tempo planeado:
+
+| Ativo | Paragem | Quando (Lisboa) |
+|---|---|---|
+| PUMP-01 | `maintenance` | domingo 06:00–10:00 |
+| MOTOR-01 | `maintenance` | domingo 10:00–12:00 |
+| CHILLER-01 | `planned_stop` | sábado 22:00 – domingo 06:00 |
 
 ### 8.1 Como se ativam
 
@@ -180,4 +242,7 @@ simulador) consegue:
    absurdo (prova de que a ordem está mesmo trocada);
 3. ler `CHILLER-01.power_kw` como `float32` e obter ≈ 120;
 4. ler o coil de alarme e observá-lo ligar-se em `drift`;
-5. observar um sinal imóvel durante `sensor_stuck`.
+5. observar um sinal imóvel durante `sensor_stuck`;
+6. ler `PUMP-01.power_kw` e `MOTOR-01.power_kw` como `float32` (≈ 25 e ≈ 30 kW; no motor na ordem `CDAB`),
+   `PUMP-01.inlet_pressure` ≈ 2.3 bar e `CHILLER-01.chw_flow` ≈ 103 m³/h;
+7. com `trip`, ver `state = 3` (FAULT), o caudal a 0 e o alarme ligado, e depois STARTING e RUNNING.

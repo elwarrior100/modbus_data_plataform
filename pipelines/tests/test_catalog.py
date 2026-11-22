@@ -26,3 +26,14 @@ def test_state_tags_carry_their_labels():
     states = {t.node_id: t.enum for t in load_catalog() if t.kind == "state"}
     assert states["ns=2;s=MOTOR-01.state"][2] == "RUNNING"
     assert states["ns=2;s=CHILLER-01.state"][0] == "OFF"      # 'OFF' tem de ser texto, não o booleano False
+
+
+def test_moves_with_run_mirrors_the_simulator():
+    """`moves_with_run` = no simulador o sinal tem valor de repouso fixo (idle sem tau_s) ou é uma potência derivada:
+    parado, fica constante e sem amostras. O G2-06 depende disto (ADR-019, D11)."""
+    from ot_simulator.model import DERIVED
+    from ot_simulator.spec import DEVICES
+
+    expected = {(d.name, s.name) for d in DEVICES for s in d.signals
+                if (s.idle is not None and not s.tau_s) or (d.name, s.name) in DERIVED}
+    assert {(t.asset, t.tag) for t in load_catalog() if t.moves_with_run} == expected

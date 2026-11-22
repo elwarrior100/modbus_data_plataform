@@ -36,6 +36,9 @@ Cada ativo tem variáveis com NodeId de texto `ns=2;s=<ATIVO>.<sinal>`, por exem
 Os nomes dos sinais, tipos, escalas e intervalos são os de `docs/register-map.md`; um teste
 compara as duas fontes.
 
+Desde 2026-11-22 (ADR-019, D11) há mais quatro medidas analógicas, sem nada de novo no gateway além da
+configuração: `PUMP-01.power_kw`, `PUMP-01.inlet_pressure`, `MOTOR-01.power_kw` e `CHILLER-01.chw_flow`.
+
 ### 2.1 Unidades (`EngineeringUnits`)
 
 `EUInformation` com `NamespaceUri = http://www.opcfoundation.org/UA/units/un/cefact`. O

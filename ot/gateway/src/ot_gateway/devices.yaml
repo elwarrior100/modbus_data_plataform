@@ -13,6 +13,8 @@ devices:
       - {name: vibration_rms, addr: 4, type: uint16, scale: 0.01, unit: mm/s, eu: [0, 50]}
       - {name: run_hours, addr: 5, type: uint32, unit: h, kind: counter}
       - {name: state, addr: 7, type: uint16, kind: state, enum: [STOPPED, STARTING, RUNNING, FAULT, MAINTENANCE]}
+      - {name: power_kw, addr: 8, type: float32, unit: kW, eu: [0, 100]}
+      - {name: inlet_pressure, addr: 10, type: uint16, scale: 0.01, unit: bar, eu: [0, 10]}
       - {name: device_clock, addr: 20, type: uint32, unit: s, kind: clock}
   - name: MOTOR-01
     unit: 2
@@ -25,6 +27,7 @@ devices:
       - {name: winding_temp, addr: 4, type: int16, scale: 0.1, unit: degC, eu: [-20, 200]}
       - {name: vibration_rms, addr: 5, type: uint16, scale: 0.01, unit: mm/s, eu: [0, 50]}
       - {name: state, addr: 6, type: uint16, kind: state, enum: [STOPPED, STARTING, RUNNING, FAULT, MAINTENANCE]}
+      - {name: power_kw, addr: 7, type: float32, unit: kW, eu: [0, 100]}
       - {name: device_clock, addr: 20, type: uint32, unit: s, kind: clock}
   - name: CHILLER-01
     unit: 3
@@ -35,4 +38,5 @@ devices:
       - {name: power_kw, addr: 2, type: float32, unit: kW, eu: [0, 500]}
       # 'OFF' tem de levar aspas: em YAML 1.1, OFF sem aspas é o booleano False
       - {name: state, addr: 4, type: uint16, kind: state, enum: ['OFF', STANDBY, COOLING, FAULT]}
+      - {name: chw_flow, addr: 5, type: uint16, scale: 0.1, unit: m3/h, eu: [0, 300]}
       - {name: device_clock, addr: 20, type: uint32, unit: s, kind: clock}

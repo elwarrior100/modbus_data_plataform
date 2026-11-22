@@ -60,6 +60,30 @@ def test_chiller_power_is_float32(client):
     assert 100 < power < 140
 
 
+def test_new_signals_read_from_outside(client):
+    """Os sinais de 2026-11-22 (ADR-019, D11), lidos por um cliente que não usa o código do simulador."""
+    pump_kw = client.convert_from_registers(regs(client, 1, 8, 2), DT.FLOAT32, word_order="big")
+    motor_kw = client.convert_from_registers(regs(client, 2, 7, 2), DT.FLOAT32, word_order="little")    # CDAB
+    assert 20 < pump_kw < 31 and 27 < motor_kw < 33
+    assert 2.0 < regs(client, 1, 10, 1)[0] * 0.01 < 2.6            # aspiração da bomba
+    assert 95 < regs(client, 3, 5, 1)[0] * 0.1 < 111                # caudal de água gelada
+
+
+def test_trip_is_observable_from_outside(live):
+    client = tcp_client(live)
+    try:
+        scn = live.http("POST", "/scenarios", {"asset": "PUMP-01", "kind": "trip", "duration_s": 3})[1]
+        time.sleep(1.5)
+        assert regs(client, 1, 7, 1)[0] == 3                        # FAULT
+        assert regs(client, 1, 1, 1)[0] == 0                        # caudal a 0
+        assert client.read_coils(0, count=1, device_id=1).bits[0] is True
+        time.sleep(3)
+        assert regs(client, 1, 7, 1)[0] == 1                        # STARTING durante 5 s
+        live.http("DELETE", f"/scenarios/{scn['id']}")
+    finally:
+        client.close()
+
+
 def test_device_clock_matches_wall_clock(client):
     seconds = client.convert_from_registers(regs(client, 2, 20, 2), DT.UINT32, word_order="little")
     assert abs(seconds - time.time()) < 5

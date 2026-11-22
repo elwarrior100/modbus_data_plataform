@@ -28,6 +28,7 @@ def _incidents(plant: Plant) -> None:
     a("PUMP-01", "power_cycle", start_in=_at(3, 8))                                                               # reinício
     a("PUMP-01", "drift", duration=6 * 3600, params={"hold_s": 3600}, start_in=_at(4, 6))                         # avaria progressiva
     a("MOTOR-01", "sensor_stuck", duration=3600, params={"signal": "vibration_rms"}, start_in=_at(5, 9))         # sensor parado
+    a("MOTOR-01", "planned_stop", duration=7200, start_in=_at(6, 2))                                             # parado 2 h (ADR-019)
 
 
 def generate(days: int = 7, poll_s: int = 30, seed: int = 42) -> list[Event]:

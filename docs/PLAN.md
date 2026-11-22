@@ -351,7 +351,13 @@ hooks* do lakeFS a impor o resultado.
 injetar `spike` gera `warn` e o merge passa; ambos ficam com histórico visível no
 OpenMetadata; a linhagem no catálogo mostra o caminho OPC UA → bronze → silver → gold.
 
-### Fase 6 — Gold + release tagging (Publish)
+### Fase 6 — Gold + release tagging (Publish)  🟡 em curso (2026-11-22): ADR-019 decidido; Fase 6a (sinais novos) no disco, por rever
+
+> **ADR-019 (escolhas do Stéphane, 22-11):** gold K3 (tudo do §5.4 com a tabela ao minuto), gold diário às 02:40 UTC com
+> uma release por dia, `LATEST_STABLE` como ficheiro no `main` imposto por hook, G3 com 6 regras e 3 hooks, manifest
+> com o commit de bronze de cada hora (a silver passa a registá-lo), OpenMetadata com propriedades por tabela.
+> **Fase 6a, antes do gold:** fontes mais completas (potência da bomba e do motor, aspiração da bomba, caudal de água
+> gelada, avarias e paragens, plano de produção) para os KPIs serem medidos e não estimados.
 Agregados de negócio, dimensões, KPIs, mecanismo de release (tag lakeFS + manifest +
 `LATEST_STABLE` + rollback), tags de release refletidas no OpenMetadata.
 **DoD:** existem ≥3 releases; um rollback é executado e demonstrado em <1 min; a partir do
@@ -711,7 +717,15 @@ código e explica-o; ver CLAUDE.md.)*
    - **Projeto (no disco, por rever):** o writer apaga o branch do lote logo a seguir ao merge (os recusados ficam).
      Testes contra um Postgres real, incluindo matar o writer em cada passo: 29 passam.
    - **O pacote completo semanal (03:00) e o ensaio (04:15) correram bem:** 33 389 objetos, 904 MB, 1 parte.
-   - ⬜ Correr a GC à mão (só marcar) com os tempos novos, ler o relatório e decidir a remoção (Stéphane).
+   - ✅ A GC manual (só marcar, 11 min) correu bem com os tempos novos: marcou **2 objetos** órfãos. Só 2 porque o lake da
+     Oracle só existe desde ~14-11, e o apagado fica 15 dias: a GC liberta espaço a sério a partir de dezembro.
+   - ✅ **Remoção revista** (Stéphane: "sim"): o Job apagou exatamente essa marcação em 37 s, e confirmou-se no SeaweedFS
+     que os 2 objetos desapareceram. O `lakefs-gc-sweep.sh` encravou no passo de pré-visualização (o port-forward morreu
+     pelo relay do Tailscale); como a lista já tinha sido revista, correu-se só o passo final, igual ao do script.
+   - ✅ **A GC semanal passa a marcar E apagar** (`GC_SWEEP=true`), promovida para a Oracle.
+   - ✅ **Código revisto em produção** (commit 82f3868 do projeto, aceite pelo Stéphane): writer de 5 em 5 min, silver
+     às :15, o branch do lote apagado depois do merge, OpenMetadata. O silver das 13:15 na Oracle deu "pass" limpo (sem
+     o aviso falso do G2-02) e enviou o catálogo e o G2 para o OpenMetadata da Oracle.
 33. 🟡 (2026-11-21) **OpenMetadata: catálogo, linhagem e histórico do G2** (Fase 5; ADR-009, decisão 5). Código do
    projeto **no disco, sem commit, por rever**:
    - `pipelines/src/silver/openmetadata.py`: cria e mantém o serviço `lakefs` → `industrial_lake` → `bronze.events` e
@@ -782,3 +796,18 @@ código e explica-o; ver CLAUDE.md.)*
         `terraform apply`;
      4. pôr o writer, o collector e o ot-edge a 1 (o Argo CD repõe-nos) e tirar as DAGs de pausa;
      5. em 1 h, o alarme das horas de silver deve ficar em 0.
+35. 🟡 (2026-11-22) **Fase 6a: fontes mais completas** (ADR-019, D11). Código **no disco, sem commit, por rever**:
+   - **Simulador:** `PUMP-01.power_kw` e `MOTOR-01.power_kw` (derivadas dos outros sinais), `PUMP-01.inlet_pressure`,
+     `CHILLER-01.chw_flow`; ativo parado com valores de repouso (o processo a 0, as temperaturas a arrefecer); cenários
+     `trip`, `planned_stop` e `maintenance`; avarias aleatórias (`--trip-rate-per-day`); plano semanal em hora de Lisboa
+     (`plan.yaml`, `--plan builtin`). `run_hours` só conta a funcionar. **Mudança de comportamento:** o `drift` também
+     para a máquina quando chega à falha (antes, em FAULT a bomba continuava a vibrar).
+   - **Contratos e espelhos:** `register-map.md` (sinais, 7.1 ativo parado, cenários, plano), `devices.yaml`,
+     `opcua-address-space.md`, `nodes.yaml` (G1), `catalog.yaml` (+ `moves_with_run`), `gates-contract.md`.
+   - **G2-06:** um ativo parado a hora toda já não dá aviso de "sensor parado".
+   - **Testes:** simulador 56, gateway 23, pipelines 48 (+14 com lakeFS), ingest 15 (+21 com Postgres), todos a passar.
+     DoD das Fases 1 e 2 para os sinais novos: um cliente Modbus independente lê-os em TCP e RS-232, um cliente OPC UA
+     vê-os GOOD, com unidades e `EURange`.
+   - ⬜ **Depois de reveres e fazeres commit:** imagens no CI; na plataforma, `PLAN=builtin` e `TRIP_RATE_PER_DAY=1` no
+     `ot-edge` (primeiro local, depois a Oracle); medir o volume real (+~20% previsto) e uma hora de silver com G2 limpo.
+   - ⬜ **Depois:** o gold (ADR-019): T1 na silver, gold K3, G3 + hooks, releases + rollback, OpenMetadata.

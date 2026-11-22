@@ -18,6 +18,7 @@ class Tag:
     eu_min: float | None = None
     eu_max: float | None = None
     enum: tuple[str, ...] = ()
+    moves_with_run: bool = False     # parado, fica constante e sem amostras (G2-06; ADR-019)
 
 
 def load_catalog() -> list[Tag]:
@@ -30,7 +31,8 @@ def load_catalog() -> list[Tag]:
             if not isinstance(label, str):      # OFF, ON, NO sem aspas viram booleanos em YAML 1.1
                 raise ValueError(f"{item['node_id']}: etiqueta {label!r} não é texto; ponha-a entre aspas")
         tags.append(Tag(item["node_id"], item["asset"], item["tag"], item["kind"], item.get("unit"),
-                        item.get("eu_min"), item.get("eu_max"), tuple(item.get("enum", ()))))
+                        item.get("eu_min"), item.get("eu_max"), tuple(item.get("enum", ())),
+                        bool(item.get("moves_with_run", False))))
     return tags
 
 

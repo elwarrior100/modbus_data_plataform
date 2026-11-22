@@ -47,13 +47,14 @@ def test_value_outside_eurange_is_uncertain_not_good():
 
 
 def test_blocks_are_contiguous_ranges():
-    assert plan_blocks(CONFIG["PUMP-01"]) == [(0, 8), (20, 2)]
-    assert plan_blocks(CONFIG["CHILLER-01"]) == [(0, 5), (20, 2)]
+    assert plan_blocks(CONFIG["PUMP-01"]) == [(0, 11), (20, 2)]      # 0–10 contíguos desde a potência e a aspiração
+    assert plan_blocks(CONFIG["CHILLER-01"]) == [(0, 6), (20, 2)]
 
 
 def pump_link(**kw):
     regs = {(1, 0): 507, (1, 1): 2204, (1, 2): 421, (1, 3): 0xFFC9, (1, 4): 251,
-            (1, 5): 0x0001, (1, 6): 0x86A0, (1, 7): 2, (1, 20): 0x6A0C, (1, 21): 0x3A80}
+            (1, 5): 0x0001, (1, 6): 0x86A0, (1, 7): 2,
+            (1, 8): 0x41CC, (1, 9): 0x0000, (1, 10): 230, (1, 20): 0x6A0C, (1, 21): 0x3A80}
     return FakeLink(regs, {(1, 0): True}, **kw)
 
 
@@ -65,6 +66,8 @@ async def test_poll_scales_decodes_and_reports_good():
     assert values["bearing_temp"] == -5.5                    # int16 negativo
     assert values["run_hours"] == 100000                      # uint32 ABCD
     assert values["state"] == 2
+    assert values["power_kw"] == 25.5                         # float32 ABCD [0x41CC, 0x0000]
+    assert values["inlet_pressure"] == 2.3
     assert all(r.status == ua.StatusCodes.Good for r in reading.signals.values())
     assert reading.alarm.value is True
     assert reading.source_time is not None
@@ -72,9 +75,10 @@ async def test_poll_scales_decodes_and_reports_good():
 
 async def test_motor_uint32_uses_cdab_order():
     regs = {(2, 0): 0x05C8, (2, 1): 0x0000, (2, 2): 1800, (2, 3): 400, (2, 4): 750, (2, 5): 200, (2, 6): 2,
-            (2, 20): 0x0000, (2, 21): 0x6A0C}
+            (2, 7): 0x0000, (2, 8): 0x41F0, (2, 20): 0x0000, (2, 21): 0x6A0C}
     reading = await DevicePoller(CONFIG["MOTOR-01"], FakeLink(regs, {})).poll()
     assert reading.signals["speed_rpm"].value == 1480    # [0x05C8, 0x0000] em CDAB
+    assert reading.signals["power_kw"].value == 30.0     # float32 0x41F00000, palavras trocadas: [0x0000, 0x41F0]
 
 
 async def test_timeout_makes_every_signal_bad_with_no_value():

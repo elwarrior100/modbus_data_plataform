@@ -9,7 +9,9 @@ for _ in $(seq 1 50); do
 done
 trap 'kill $(jobs -p) 2>/dev/null' EXIT
 
-ot-simulator --serial-port /tmp/ttyV1 ${SCENARIOS_FILE:+--scenarios "$SCENARIOS_FILE"} &
+# PLAN=builtin liga as paragens planeadas; TRIP_RATE_PER_DAY=1 dá em média uma avaria por ativo e por dia (ADR-019)
+ot-simulator --serial-port /tmp/ttyV1 ${SCENARIOS_FILE:+--scenarios "$SCENARIOS_FILE"} \
+  ${PLAN:+--plan "$PLAN"} ${TRIP_RATE_PER_DAY:+--trip-rate-per-day "$TRIP_RATE_PER_DAY"} &
 ot-gateway --modbus "rtu:///tmp/ttyV0?baud=19200&parity=N" &
 
 wait -n

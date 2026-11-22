@@ -1,0 +1,15 @@
+# Plano de produção da fábrica simulada (ADR-019, D11 F6). Horas de Lisboa.
+# O simulador cumpre estas paragens; o gold usa o mesmo plano para calcular o tempo planeado.
+timezone: Europe/Lisbon
+
+# 3 turnos de 8 h; o turno C (22:00–06:00) pertence ao dia em que começa.
+shifts:
+  - {name: A, start: "06:00"}
+  - {name: B, start: "14:00"}
+  - {name: C, start: "22:00"}
+
+# Paragens semanais. Fora delas o plano é funcionar 24 h por dia.
+planned_stops:
+  - {asset: PUMP-01, kind: maintenance, weekday: sunday, start: "06:00", hours: 4}
+  - {asset: MOTOR-01, kind: maintenance, weekday: sunday, start: "10:00", hours: 2}
+  - {asset: CHILLER-01, kind: planned_stop, weekday: saturday, start: "22:00", hours: 8}

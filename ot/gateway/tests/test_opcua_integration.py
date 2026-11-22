@@ -44,6 +44,18 @@ async def test_values_are_good_and_decoded_with_the_right_word_order(stack):
     assert (await stack.wait_for("PUMP-01.Connected", GOOD)).Value.Value is True
 
 
+async def test_new_signals_are_in_the_tree_good_and_decoded(stack):
+    """Sinais de 2026-11-22 (ADR-019, D11): a potência do motor prova o float32 em CDAB."""
+    assert 20 < (await stack.wait_for("PUMP-01.power_kw", GOOD)).Value.Value < 31
+    assert 27 < (await stack.wait_for("MOTOR-01.power_kw", GOOD)).Value.Value < 33
+    assert 2.0 < (await stack.wait_for("PUMP-01.inlet_pressure", GOOD)).Value.Value < 2.6
+    assert 95 < (await stack.wait_for("CHILLER-01.chw_flow", GOOD)).Value.Value < 111
+    flow = stack.node("CHILLER-01.chw_flow")
+    units = await (await flow.get_child(f"{stack.ns}:EngineeringUnits")).read_value()
+    eu_range = await (await flow.get_child(f"{stack.ns}:EURange")).read_value()
+    assert units.DisplayName.Text == "m³/h" and (eu_range.Low, eu_range.High) == (0.0, 300.0)
+
+
 async def test_comms_gap_turns_variables_bad_without_a_value_then_recovers(stack):
     await stack.wait_for("CHILLER-01.inlet_temp", GOOD)
     scn = stack.plant.engine.activate("CHILLER-01", "comms_gap", duration=600)

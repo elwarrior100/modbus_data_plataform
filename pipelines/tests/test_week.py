@@ -57,7 +57,7 @@ def test_the_silver_has_every_bronze_row_exactly_once(week):
     events = [e for e in week[0]                                                # só as horas que o gate deixou entrar
               if datetime.fromtimestamp(e.ingest_ts / 1e6, timezone.utc).strftime("%Y-%m-%dT%H") not in BLOCKED]
     silver_rows = sum(pq.ParquetFile(io.BytesIO(d)).metadata.num_rows for d in lake.silver().values())
-    assert silver_rows == len(events) and len(events) < len(week[0]) == 301_940
+    assert silver_rows == len(events) and len(events) < len(week[0]) == 377_304   # 301 940 antes dos 4 sinais novos (ADR-019, D11)
     ids = duckdb.sql("SELECT COUNT(*), COUNT(DISTINCT bronze_event_id) FROM read_parquet([" + ",".join(
         f"'{p}'" for p in _dump(lake)) + "])").fetchall()[0]
     assert ids == (len(events), len(events))

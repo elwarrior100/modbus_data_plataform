@@ -66,6 +66,31 @@ def test_stuck_sensor_is_a_warning_on_that_tag(reports):
     assert "vibration_rms" in r.summary
 
 
+def test_an_asset_stopped_all_hour_is_not_a_stuck_sensor(reports):
+    """Parado, os sinais de processo do motor ficam a 0 e sem linhas: não é um sensor preso (ADR-019, D11)."""
+    r = reports[("2026-11-07", 3)]                    # o motor está parado das 02:00 às 04:00
+    assert r.status == "pass", r.summary
+
+
+def test_a_silent_process_tag_while_the_asset_rotates_still_warns(tmp_path):
+    """Se outro sinal de processo do ativo mexeu, a máquina rodou: um sinal calado continua a ser suspeito."""
+    import duckdb
+    catalog = load_catalog()
+    silver = tmp_path / "s.parquet"
+    duckdb.sql(f"""COPY (SELECT a AS asset_id, t AS tag_name, 'GOOD' AS quality, [] :: VARCHAR[] AS dq_flags,
+                    TIMESTAMPTZ '2026-11-07 03:00:00+00' + INTERVAL (m) MINUTE AS ingest_ts,
+                    TIMESTAMPTZ '2026-11-07 03:00:00+00' + INTERVAL (m) MINUTE AS ts_utc,
+                    TIMESTAMPTZ '2026-11-07 03:00:00+00' + INTERVAL (m) MINUTE AS server_ts,
+                    1.0 AS value_double, NULL :: BOOLEAN AS value_bool, NULL :: VARCHAR AS value_str,
+                    a || t || m AS bronze_event_id
+                  FROM (VALUES ('MOTOR-01', 'speed_rpm'), ('MOTOR-01', 'device_clock'), ('MOTOR-01', 'winding_temp'))
+                       v(a, t), range(60) r(m)) TO '{silver}' (FORMAT parquet)""")
+    report = evaluate(silver, datetime.fromisoformat("2026-11-07T03:00:00+00:00"),
+                      [t for t in catalog if t.asset == "MOTOR-01"])
+    silent = {f.detail.split()[0] for f in report.findings if f.id == "G2-06"}
+    assert {"torque", "current", "vibration_rms", "power_kw"} <= silent
+
+
 def test_the_attestation_binds_the_gate_result_to_the_file_checksum(reports):
     import json
     att = json.loads(reports[("2026-11-02", 10)].attestation({"silver/x.parquet": "abc"}))

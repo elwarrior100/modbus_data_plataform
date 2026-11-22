@@ -124,9 +124,16 @@ def evaluate(silver_file: str | Path, hour: datetime, catalog: list[Tag]) -> Rep
             late = (end - seen.astimezone(timezone.utc)).total_seconds() / 60
             f.append(Finding("G2-05", "warn", round(late, 1), FRESHNESS_MIN, f"sem dados nos últimos {late:.0f} min da hora", asset))
 
-    # G2-06 sensor parado: variável analógica sem nenhuma linha, num ativo com comunicação saudável
+    # G2-06 sensor parado: variável analógica sem nenhuma linha, num ativo com comunicação saudável.
+    # Um ativo parado (FAULT, STOPPED, MAINTENANCE) tem os sinais de processo (`moves_with_run`) constantes, e o gateway
+    # só escreve ao mudar: ficam sem linhas, e isso não é um sensor preso. Só se avisa de um sinal de processo calado
+    # se OUTRO sinal de processo do mesmo ativo mexeu na hora (prova de que a máquina rodou). ADR-019, D11.
     present = set(con.execute("SELECT DISTINCT asset_id, tag_name FROM s").fetchall())
+    rotated = {t.asset for t in catalog if t.moves_with_run and (t.asset, t.tag) in present}
     for t in catalog:
-        if t.kind == "analog" and t.asset in healthy and (t.asset, t.tag) not in present:
-            f.append(Finding("G2-06", "warn", 0, 1, f"{t.tag} não mudou durante a hora (sensor parado?)", t.asset))
+        if t.kind != "analog" or t.asset not in healthy or (t.asset, t.tag) in present:
+            continue
+        if t.moves_with_run and t.asset not in rotated:
+            continue                                   # o ativo esteve parado a hora toda
+        f.append(Finding("G2-06", "warn", 0, 1, f"{t.tag} não mudou durante a hora (sensor parado?)", t.asset))
     return report

@@ -30,7 +30,7 @@ def test_read_holding_returns_registers(plant):
 
 def test_illegal_address_and_count(plant):
     assert read(plant, 1, 3, 100, 1) == bytes([0x83, 0x02])        # endereço fora do mapa
-    assert read(plant, 1, 3, 8, 1) == bytes([0x83, 0x02])          # buraco entre sinais (7 é o último)
+    assert read(plant, 1, 3, 11, 1) == bytes([0x83, 0x02])         # buraco entre sinais (10 é o último antes do relógio)
     assert read(plant, 1, 3, 0, 0) == bytes([0x83, 0x03])
     assert read(plant, 1, 3, 0, 126) == bytes([0x83, 0x03])
 

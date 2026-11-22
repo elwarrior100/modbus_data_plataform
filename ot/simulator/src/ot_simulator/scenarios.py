@@ -6,9 +6,13 @@ from pathlib import Path
 
 import yaml
 
-KINDS = ("drift", "sensor_stuck", "spike", "noise_burst", "comms_gap", "clock_skew", "power_cycle")
-DEFAULT_DURATION = {"spike": 3.0, "power_cycle": 10.0}
-NEEDS_DURATION = ("drift", "comms_gap")
+KINDS = ("drift", "sensor_stuck", "spike", "noise_burst", "comms_gap", "clock_skew", "power_cycle",
+         "trip", "planned_stop", "maintenance")
+# trip: avaria súbita (FAULT) · planned_stop: paragem planeada (STOPPED) · maintenance: manutenção (MAINTENANCE).
+# Nos três o ativo fica parado; ao acabar passa por STARTING e volta a funcionar (ADR-019, D11 F5).
+STOPS = ("trip", "maintenance", "planned_stop")          # por ordem de prioridade, se houver mais do que um ativo
+DEFAULT_DURATION = {"spike": 3.0, "power_cycle": 10.0, "trip": 900.0}
+NEEDS_DURATION = ("drift", "comms_gap", "planned_stop", "maintenance")
 NEEDS_SIGNAL = ("sensor_stuck", "spike", "noise_burst")
 
 

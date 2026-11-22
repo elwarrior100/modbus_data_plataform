@@ -25,7 +25,7 @@ Duas camadas, de propósito:
 | G2-03 validade | % de linhas com a flag `out_of_range` | **> 0** | > 5 % |
 | G2-04 qualidade | % de linhas com `quality != GOOD` | > 1 % | > 20 % |
 | G2-05 frescura | a última linha do ativo está a menos de 5 min do fim da hora | atraso > 5 min | — |
-| G2-06 *stuck* | variável analógica sem nenhuma linha na hora, num ativo com `device_clock` saudável | qualquer | — |
+| G2-06 *stuck* | variável analógica sem nenhuma linha na hora, num ativo com `device_clock` saudável; um sinal de processo (`moves_with_run`) só conta se outro sinal de processo do ativo mexeu na hora | qualquer | — |
 | G2-07 relógio | % de linhas com a flag `clock_skew` | > 0 | > 25 % |
 
 Severidades: `blocker` bloqueia o merge; `warn` deixa passar e fica registado; `info` só regista.
@@ -37,6 +37,14 @@ não há um número fixo de linhas por hora. E contar o `device_clock` deu um fa
 sintética: no fim de um `clock_skew` o relógio recua, repete `source_ts` e valor, e o spool descarta
 essas amostras (ponto fraco 8 da Fase 3). Minutos com dados é independente disso. Um sensor preso é
 diferente: o ativo tem dados mas aquela variável não; é o G2-06.
+
+**Ativo parado não é sensor preso (ADR-019, 2026-11-22).** Em `FAULT`, `STOPPED` ou `MAINTENANCE` os sinais de processo
+(caudais, correntes, velocidade, binário, vibrações, potências; `moves_with_run: true` no catálogo) ficam constantes e o
+gateway deixa de os escrever. Se nenhum deles teve linhas na hora, o ativo esteve parado a hora toda e o G2-06 não avisa
+desses sinais; as temperaturas, que continuam com ruído a arrefecer, continuam a ser verificadas. Se pelo menos um mexeu,
+a máquina rodou e um sinal de processo calado continua a ser suspeito. Limite aceite: se TODOS os sinais de processo de um
+ativo prenderem ao mesmo tempo com a máquina a rodar a hora toda, não se deteta (seria quase sempre falta de comunicação,
+que o G2-01 apanha). O G2-01 não muda: o `device_clock` continua a contar minutos com dados num ativo parado.
 
 **Resultado esperado dos incidentes** (é o DoD da fase):
 `comms_gap` → G2-01 `blocker` → merge recusado · `spike` → G2-03 `warn` → merge passa ·

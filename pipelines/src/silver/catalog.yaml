@@ -1,29 +1,35 @@
 # Catálogo de tags: o que cada nó OPC UA significa na silver (docs/silver-contract.md, secção 3).
 # Gerado a partir de ot/gateway/src/ot_gateway/devices.yaml; um teste compara as duas fontes.
 # kind: analog (double) | counter (inteiro) | state (código + etiqueta) | boolean | clock (instante do dispositivo)
+# moves_with_run: true = com o ativo parado o valor fica constante (quase sempre 0) e deixa de gerar amostras (o
+#   gateway só escreve ao mudar); o G2-06 não o confunde com um sensor preso. Espelha os `idle` sem `tau_s` do simulador (há um teste).
 tags:
   - {node_id: "ns=2;s=PUMP-01.Connected", asset: PUMP-01, tag: Connected, kind: boolean}
-  - {node_id: "ns=2;s=PUMP-01.outlet_pressure", asset: PUMP-01, tag: outlet_pressure, kind: analog, unit: BAR, eu_min: 0.0, eu_max: 16.0}
-  - {node_id: "ns=2;s=PUMP-01.flow_rate", asset: PUMP-01, tag: flow_rate, kind: analog, unit: MQH, eu_min: 0.0, eu_max: 500.0}
-  - {node_id: "ns=2;s=PUMP-01.motor_current", asset: PUMP-01, tag: motor_current, kind: analog, unit: AMP, eu_min: 0.0, eu_max: 100.0}
+  - {node_id: "ns=2;s=PUMP-01.outlet_pressure", asset: PUMP-01, tag: outlet_pressure, kind: analog, unit: BAR, eu_min: 0.0, eu_max: 16.0, moves_with_run: true}
+  - {node_id: "ns=2;s=PUMP-01.flow_rate", asset: PUMP-01, tag: flow_rate, kind: analog, unit: MQH, eu_min: 0.0, eu_max: 500.0, moves_with_run: true}
+  - {node_id: "ns=2;s=PUMP-01.motor_current", asset: PUMP-01, tag: motor_current, kind: analog, unit: AMP, eu_min: 0.0, eu_max: 100.0, moves_with_run: true}
   - {node_id: "ns=2;s=PUMP-01.bearing_temp", asset: PUMP-01, tag: bearing_temp, kind: analog, unit: CEL, eu_min: -20.0, eu_max: 150.0}
-  - {node_id: "ns=2;s=PUMP-01.vibration_rms", asset: PUMP-01, tag: vibration_rms, kind: analog, unit: C16, eu_min: 0.0, eu_max: 50.0}
+  - {node_id: "ns=2;s=PUMP-01.vibration_rms", asset: PUMP-01, tag: vibration_rms, kind: analog, unit: C16, eu_min: 0.0, eu_max: 50.0, moves_with_run: true}
   - {node_id: "ns=2;s=PUMP-01.run_hours", asset: PUMP-01, tag: run_hours, kind: counter, unit: HUR}
+  - {node_id: "ns=2;s=PUMP-01.power_kw", asset: PUMP-01, tag: power_kw, kind: analog, unit: KWT, eu_min: 0.0, eu_max: 100.0, moves_with_run: true}
+  - {node_id: "ns=2;s=PUMP-01.inlet_pressure", asset: PUMP-01, tag: inlet_pressure, kind: analog, unit: BAR, eu_min: 0.0, eu_max: 10.0}
   - {node_id: "ns=2;s=PUMP-01.state", asset: PUMP-01, tag: state, kind: state, enum: ['STOPPED', 'STARTING', 'RUNNING', 'FAULT', 'MAINTENANCE']}
   - {node_id: "ns=2;s=PUMP-01.device_clock", asset: PUMP-01, tag: device_clock, kind: clock}
   - {node_id: "ns=2;s=PUMP-01.alarm", asset: PUMP-01, tag: alarm, kind: boolean}
   - {node_id: "ns=2;s=MOTOR-01.Connected", asset: MOTOR-01, tag: Connected, kind: boolean}
-  - {node_id: "ns=2;s=MOTOR-01.speed_rpm", asset: MOTOR-01, tag: speed_rpm, kind: analog, unit: RPM, eu_min: 0.0, eu_max: 3600.0}
-  - {node_id: "ns=2;s=MOTOR-01.torque", asset: MOTOR-01, tag: torque, kind: analog, unit: NU, eu_min: -500.0, eu_max: 1000.0}
-  - {node_id: "ns=2;s=MOTOR-01.current", asset: MOTOR-01, tag: current, kind: analog, unit: AMP, eu_min: 0.0, eu_max: 200.0}
+  - {node_id: "ns=2;s=MOTOR-01.speed_rpm", asset: MOTOR-01, tag: speed_rpm, kind: analog, unit: RPM, eu_min: 0.0, eu_max: 3600.0, moves_with_run: true}
+  - {node_id: "ns=2;s=MOTOR-01.torque", asset: MOTOR-01, tag: torque, kind: analog, unit: NU, eu_min: -500.0, eu_max: 1000.0, moves_with_run: true}
+  - {node_id: "ns=2;s=MOTOR-01.current", asset: MOTOR-01, tag: current, kind: analog, unit: AMP, eu_min: 0.0, eu_max: 200.0, moves_with_run: true}
   - {node_id: "ns=2;s=MOTOR-01.winding_temp", asset: MOTOR-01, tag: winding_temp, kind: analog, unit: CEL, eu_min: -20.0, eu_max: 200.0}
-  - {node_id: "ns=2;s=MOTOR-01.vibration_rms", asset: MOTOR-01, tag: vibration_rms, kind: analog, unit: C16, eu_min: 0.0, eu_max: 50.0}
+  - {node_id: "ns=2;s=MOTOR-01.vibration_rms", asset: MOTOR-01, tag: vibration_rms, kind: analog, unit: C16, eu_min: 0.0, eu_max: 50.0, moves_with_run: true}
+  - {node_id: "ns=2;s=MOTOR-01.power_kw", asset: MOTOR-01, tag: power_kw, kind: analog, unit: KWT, eu_min: 0.0, eu_max: 100.0, moves_with_run: true}
   - {node_id: "ns=2;s=MOTOR-01.state", asset: MOTOR-01, tag: state, kind: state, enum: ['STOPPED', 'STARTING', 'RUNNING', 'FAULT', 'MAINTENANCE']}
   - {node_id: "ns=2;s=MOTOR-01.device_clock", asset: MOTOR-01, tag: device_clock, kind: clock}
   - {node_id: "ns=2;s=MOTOR-01.alarm", asset: MOTOR-01, tag: alarm, kind: boolean}
   - {node_id: "ns=2;s=CHILLER-01.Connected", asset: CHILLER-01, tag: Connected, kind: boolean}
   - {node_id: "ns=2;s=CHILLER-01.inlet_temp", asset: CHILLER-01, tag: inlet_temp, kind: analog, unit: CEL, eu_min: 0.0, eu_max: 40.0}
   - {node_id: "ns=2;s=CHILLER-01.outlet_temp", asset: CHILLER-01, tag: outlet_temp, kind: analog, unit: CEL, eu_min: 0.0, eu_max: 30.0}
-  - {node_id: "ns=2;s=CHILLER-01.power_kw", asset: CHILLER-01, tag: power_kw, kind: analog, unit: KWT, eu_min: 0.0, eu_max: 500.0}
+  - {node_id: "ns=2;s=CHILLER-01.power_kw", asset: CHILLER-01, tag: power_kw, kind: analog, unit: KWT, eu_min: 0.0, eu_max: 500.0, moves_with_run: true}
+  - {node_id: "ns=2;s=CHILLER-01.chw_flow", asset: CHILLER-01, tag: chw_flow, kind: analog, unit: MQH, eu_min: 0.0, eu_max: 300.0, moves_with_run: true}
   - {node_id: "ns=2;s=CHILLER-01.state", asset: CHILLER-01, tag: state, kind: state, enum: ['OFF', 'STANDBY', 'COOLING', 'FAULT']}
   - {node_id: "ns=2;s=CHILLER-01.device_clock", asset: CHILLER-01, tag: device_clock, kind: clock}
