@@ -240,8 +240,15 @@ def test_temperatures_cool_down_slowly_when_stopped(plant, clock):
 
 def test_random_trips_happen_at_the_configured_rate(clock):
     plant = Plant(DEVICES, clock, seed=7, trip_rate_per_day=24.0)     # 1 por hora, para o teste ser curto
+    trips, original = [], plant.engine.activate        # regista cada avaria criada (a lista esquece as antigas)
+
+    def record(*args, **kwargs):
+        scenario = original(*args, **kwargs)
+        trips.append(scenario.as_dict(clock.monotonic()))
+        return scenario
+
+    plant.engine.activate = record
     run(plant, clock, 6 * 3600, step=5.0)
-    trips = [s for s in plant.engine.listing() if s["kind"] == "trip"]
     assert 6 <= len(trips) <= 30                          # 3 ativos × ~6 h a funcionar, menos o tempo parado
     assert all(120 <= s["duration_s"] <= 7200 for s in trips)
 
@@ -276,3 +283,12 @@ def test_plant_obeys_the_plan(tmp_path):
     run(plant, clock, 3)
     assert plant.devices[PUMP.unit_id].state == STATE["MAINTENANCE"]
     assert plant.devices[MOTOR.unit_id].state == STATE["RUNNING"]
+
+
+def test_finished_scenarios_are_forgotten_after_an_hour(plant, clock):
+    plant.engine.activate("PUMP-01", "trip", duration=60)
+    plant.engine.activate("MOTOR-01", "drift", duration=10)       # drift sem hold_s: fica até ser cancelado
+    run(plant, clock, 120)
+    assert len(plant.engine.listing()) == 2                       # o trip acabou há pouco: ainda se vê
+    run(plant, clock, 3600, step=5.0)
+    assert [s["kind"] for s in plant.engine.listing()] == ["drift"]

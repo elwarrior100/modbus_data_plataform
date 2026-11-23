@@ -67,15 +67,15 @@ Com o gold (ADR-019, K3), os agregados ao minuto e à hora ficam para sempre (~0
 sair: perde-se o detalhe segundo a segundo, não os números. **Regra de segurança:** um dia de silver só se apaga se o
 gold desse dia existir numa release (o manifest prova-o). Implementa-se no `lake_housekeeping`, junto com o gold.
 
-Contas a 1 ano, já com a decisão 1 (metadados 1 + ~1,8 GB), bronze ~1,3 GB, gold ~0,5 GB, dumps ~1,1 GB:
+Contas a 1 ano, já com a decisão 1 (metadados 1 + ~1,8 GB), bronze ~1,7 GB, gold ~0,5 GB, dumps ~2,3 GB (**corrigidas a 2026-11-23**, ver a secção 5):
 
 | Silver guardada | Lake | Cópia, média (~1,3×) | Cópia, pico (~2,1×) | Total no pico (+ dumps) | Folga para os 20 GB |
 |---|---|---|---|---|---|
-| 6 meses (~6,5 GB) | ~11 GB | ~14,5 GB | ~23 GB | **~24 GB** | não: passa 2 dias por semana (cêntimos) e o alarme dos 15 GB dispara sempre |
-| 4 meses (~4,4 GB) | ~9 GB | ~11,7 GB | ~19 GB | **~20 GB** | à justa |
-| **3 meses (~3,3 GB)** | **~8 GB** | **~10,4 GB** | **~16,8 GB** | **~18 GB** | **sim, ~2 GB**; o alarme dos 15 GB dispara só nos 2 dias de pico |
+| 6 meses (~6,5 GB) | ~11,6 GB | ~15 GB | ~24,4 GB | **~26,7 GB** | não: a média (~17 GB com os dumps) já passa o alarme dos 15 GB |
+| 4 meses (~4,4 GB) | ~9,4 GB | ~12,2 GB | ~19,7 GB | **~22 GB** | não, no pico (2 dias por semana, cêntimos) |
+| **3 meses (~3,3 GB)** | **~8,3 GB** | **~10,8 GB** | **~17,4 GB** | **~19,7 GB** | **à justa** ao fim de 1 ano (média ~13 GB com os dumps); o alarme dos 15 GB dispara nos 2 dias de pico |
 
-Os metadados continuam a crescer ~1,8 GB por ano. Com 3 meses de silver, o pico chega aos 20 GB por volta de **meados de 2028**:
+Os metadados continuam a crescer ~1,8 GB por ano. Com 3 meses de silver, o pico chega aos 20 GB por volta do **fim de 2027**:
 nessa altura revê-se (o alarme dos 15 GB avisa muito antes).
 
 **Recomendação: 3 meses.** A Fase 8 (ML) precisa de detalhe para aprender avarias: 3 meses de silver ao segundo com o
@@ -95,3 +95,12 @@ apontam para ele). Aceita-se: é fixo e não cresce.
 ## 4. Fontes
 - Documentação do lakeFS sobre a GC: <https://docs.lakefs.io/howto/garbage-collection/gc/> (só apaga objetos que nenhum
   branch nem commit dentro da retenção usa; os metadados ficam).
+
+## 5. Revisão de 2026-11-23 (revisão de production readiness, 87/100)
+- **Dumps do PostgreSQL:** hoje 0,95 GB, mas a spool só tem 4,1 M de linhas; cheia (7 dias, ~9 M) cada dump terá ~300 MB
+  e o bucket ~2,3 GB (não 1,1). **Não** se encurtam os dumps para 5 dias: o runbook pede para retomar a VM em menos de 9
+  dias depois do corta-custos, e com 5 dias uma VM parada ficava sem nenhum dump.
+- **Bronze:** os 15 dias no `main` mais os 15 dias que a GC guarda o que se apagou dão ~30 dias físicos (~1,7 GB).
+- **Consequência:** mesmo com a silver a 3 meses, o pico da cópia chega aos ~20 GB ao fim de 1 ano, e os metadados do
+  lakeFS e o tempo da GC continuam a crescer sem teto. O teto verdadeiro é o ADR-021 (um repositório lakeFS por ano).
+- **Data limite** para a retenção da silver: **fevereiro de 2027** (antes de o alarme dos 15 GB começar a disparar).

@@ -14,6 +14,7 @@ STOPS = ("trip", "maintenance", "planned_stop")          # por ordem de priorida
 DEFAULT_DURATION = {"spike": 3.0, "power_cycle": 10.0, "trip": 900.0}
 NEEDS_DURATION = ("drift", "comms_gap", "planned_stop", "maintenance")
 NEEDS_SIGNAL = ("sensor_stuck", "spike", "noise_burst")
+FORGET_AFTER_S = 3600.0                                  # cenários acabados há mais do que isto saem da lista
 
 
 class ScenarioError(ValueError):
@@ -91,6 +92,9 @@ class ScenarioEngine:
 
     def active(self, asset: str, now: float) -> list[Scenario]:
         with self._lock:
+            # esquece os que acabaram há mais de 1 h: as avarias aleatórias (~3 por dia) ficavam na lista até o pod
+            # reiniciar. A última hora fica, para o GET /scenarios mostrar o que acabou de acontecer.
+            self._items = [s for s in self._items if (end := s._end()) is None or now < end + FORGET_AFTER_S]
             return [s for s in self._items if s.applies_to(asset) and s.is_active(now)]
 
     def listing(self) -> list[dict]:

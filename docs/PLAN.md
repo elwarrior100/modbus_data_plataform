@@ -822,3 +822,16 @@ código e explica-o; ver CLAUDE.md.)*
    - ✅ **Retenção da silver: 3 meses** (Stéphane, 22-11). ⬜ Implementar no `lake_housekeeping` junto com o gold: um dia só
      sai se o gold dele estiver numa release.
    - ⬜ Medir os metadados por dia uma semana depois de implantar.
+37. 🟡 (2026-11-23) **Revisão de production readiness: 87/100** (agente, só de leitura). Pronto para o âmbito, com prazo:
+   silver, metadados do lakeFS e tempo da GC crescem sem teto.
+   - ✅ **Plataforma `3fce2c8`, em produção:** o alarme da GC conta um ciclo feito à mão (evitou um falso alarme a 24-11);
+     horas aceites no alarme da silver (`SILVER_ACCEPTED_GAPS`); repetições e prazo nos 11 pedidos ao IMDS; o token das
+     tarefas do Airflow dura 30 min e os pods falhados são apagados; alarme de pedidos `[1h] > 200` (`terraform apply`, 1 recurso);
+     runbook. Testado na Oracle: os 3 verificadores correram bem.
+   - **No disco, por rever:** OpenMetadata atualiza o resultado quando uma hora se repete (409 → PATCH; provado no
+     OpenMetadata local); o simulador esquece cenários acabados há mais de 1 h; ADR-020 com as contas corrigidas
+     (dumps ~2,3 GB, bronze ~1,7 GB; data limite da retenção da silver: fevereiro de 2027); ADR-019 com a silver às :25.
+   - ✅ **ADR-021 aceite** (23-11): um repositório lakeFS por ano, a 1 de janeiro (o único teto para os metadados e a GC);
+     o antigo fica 30 dias só de leitura (sem GC, fora da cópia) e depois apaga-se; primeira rotação a **1-1-2027**.
+     ⬜ Antes disso: `scripts/lakefs-rotate.sh` com ensaio, o nome do repositório numa só variável, ensaio no local,
+     runbook, lembrete no início de dezembro.

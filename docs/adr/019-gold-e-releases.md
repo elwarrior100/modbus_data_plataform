@@ -97,13 +97,13 @@ Formato: **Parquet**, como o resto (decisão D4 do PLAN). Ordenado e com nome fi
 
 | Opção | Como | Releases | Atraso do gold |
 |---|---|---|---|
-| **C1 — diário (R)** | DAG `gold_daily` às **02:40 UTC**: calcula o dia anterior (a silver da 01h fica pronta às 02:15), corre o G3, faz merge, cria a tag e move o `LATEST_STABLE` | 1 por dia (+ manuais) | até ~27 h |
+| **C1 — diário (R)** | DAG `gold_daily` às **02:40 UTC**: calcula o dia anterior (a silver da 01h fica pronta às 02:25, ADR-020), corre o G3, faz merge, cria a tag e move o `LATEST_STABLE` | 1 por dia (+ manuais) | até ~27 h |
 | C2 — horário | uma tarefa a seguir a cada hora de silver; reescreve o dia em curso | 24 por dia | ~1 h |
 | C3 — misto | gold de hora a hora no `main`, release só 1 vez por dia | 1 por dia | ~1 h no `main`, ~27 h na release |
 
 O "agora" é trabalho da Fase 7 (Grafana sobre o Timescale, < 5 s), não do gold. Por isso o gold pode ser diário. Com
 C1, as 3 releases do DoD fazem-se em 3 dias, ou mais depressa com releases manuais (um reprocessamento é um PATCH).
-`max_active_runs=1`, e às 02:40 não corre mais nada pesado (a silver às :15, a limpeza às 03:30, a cópia às 03:00).
+`max_active_runs=1`, e às 02:40 não corre mais nada pesado (a silver às :25, a limpeza às 03:30, a cópia às 03:00).
 
 ### D6 — O gate G3 (regras propostas)
 

@@ -65,10 +65,10 @@ class Client:
     def __init__(self, url: str, token: str, timeout: float = 10.0):
         self.base, self.token, self.timeout = url.rstrip("/") + "/api/v1", token, timeout
 
-    def call(self, method: str, path: str, body=None):
+    def call(self, method: str, path: str, body=None, content_type: str = "application/json"):
         req = urllib.request.Request(self.base + path, method=method,
                                      data=None if body is None else json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.token})
+                                     headers={"Content-Type": content_type, "Authorization": "Bearer " + self.token})
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             raw = resp.read()
             return json.loads(raw) if raw else {}
@@ -133,7 +133,12 @@ def ensure_catalog(c: Client) -> None:
 
 
 def push_g2(c: Client, hour: datetime, report) -> None:
-    """Um resultado por regra do G2 para esta hora. pass → Success; aviso ou bloqueio → Failed (o texto diz qual)."""
+    """Um resultado por regra do G2 para esta hora. pass → Success; aviso ou bloqueio → Failed (o texto diz qual).
+
+    Repetir uma hora (um "clear" no Airflow, ou mudar o minuto da DAG) volta a enviar o resultado com o mesmo instante:
+    o OpenMetadata recusa o POST com 409 ("already exists"). Nesse caso atualiza-se esse resultado (PATCH), para o
+    catálogo ficar com o resultado da última avaliação, e segue-se para a regra seguinte (antes, o 409 parava o envio
+    das regras que faltavam; visto a 2026-11-22 na repetição da hora 21)."""
     ts = int(hour.timestamp() * 1000)
     by_rule: dict[str, list] = {}
     for f in report.findings:
@@ -145,9 +150,16 @@ def push_g2(c: Client, hour: datetime, report) -> None:
         text = ("BLOQUEIO (o merge é recusado): " if blocker else "AVISO (não bloqueia): " if found else "ok") + \
                "; ".join(f"{(f.asset + ' ') if f.asset else ''}{f.detail}" for f in found)
         fqn = urllib.parse.quote(f"{SILVER}.{rule}", safe="")
-        c.call("POST", f"/dataQuality/testCases/testCaseResults/{fqn}",
-               {"timestamp": ts, "testCaseStatus": status, "result": f"{report.partition}: {text}"[:900],
-                "testResultValue": [{"name": "achados", "value": str(len(found))}]})
+        result = {"timestamp": ts, "testCaseStatus": status, "result": f"{report.partition}: {text}"[:900],
+                  "testResultValue": [{"name": "achados", "value": str(len(found))}]}
+        try:
+            c.call("POST", f"/dataQuality/testCases/testCaseResults/{fqn}", result)
+        except urllib.error.HTTPError as error:
+            if error.code != 409:
+                raise
+            c.call("PATCH", f"/dataQuality/testCases/testCaseResults/{fqn}/{ts}",
+                   [{"op": "replace", "path": f"/{k}", "value": result[k]} for k in ("testCaseStatus", "result", "testResultValue")],
+                   content_type="application/json-patch+json")
 
 
 def publish(hour: datetime, report) -> None:
