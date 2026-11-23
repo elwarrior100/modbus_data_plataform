@@ -8,6 +8,8 @@ class FakeLake:
         self.commits = {"main": 0}
         self.snapshots = {}                 # ID de commit → ficheiros nesse commit (para ler de um commit fixo)
         self.commit_metadata = {}           # (branch, mensagem) → metadados do último commit com essa mensagem
+        self.tag_refs = {}                  # nome da tag → ID de commit (um snapshot)
+        self.tag_hook = None                # opcional: função(nome, commit) que recusa com exceção, como o pre-create-tag
 
     def ensure_branch(self, name, source="main"):
         if name not in self.branches:
@@ -18,6 +20,8 @@ class FakeLake:
         """Como no lakeFS: o commit (só o que está commitado) para onde o branch aponta agora. O ID é um hash do
         conteúdo, por isso o mesmo estado dá o mesmo ID; o estado fica guardado para se ler dele mais tarde."""
         import hashlib
+        if ref in self.tag_refs:
+            return self.tag_refs[ref]
         if ref in self.snapshots:
             return ref
         files = dict(self.branches[ref]["committed"])
@@ -29,6 +33,8 @@ class FakeLake:
         return cid
 
     def _view(self, ref):
+        if ref in self.tag_refs:
+            ref = self.tag_refs[ref]
         if ref in self.snapshots:
             return self.snapshots[ref]
         b = self.branches[ref]
@@ -85,6 +91,19 @@ class FakeLake:
 
     def delete_branch(self, name):
         del self.branches[name]
+
+    def create_tag(self, name, ref):
+        commit = self.resolve(ref)
+        if name in self.tag_refs:
+            if self.tag_refs[name] != commit:
+                raise ValueError(f"a tag {name} já existe noutro commit")
+            return
+        if self.tag_hook:
+            self.tag_hook(name, commit)
+        self.tag_refs[name] = commit
+
+    def tags(self, prefix=""):
+        return sorted((n, c) for n, c in self.tag_refs.items() if n.startswith(prefix))
 
     # --- para os testes ---
     def load_bronze(self, files: dict[str, bytes], branch="main"):

@@ -364,3 +364,20 @@ instalador, **não instalados**; o teste no lakeFS real está escrito mas não c
    uma correção pelo caminho: em ações separadas, o G2 e o G3 corriam em paralelo e derrubavam o lakeFS 1.86
    ("concurrent map writes"); agora são dois hooks da mesma ação, por ordem (ver `docs/gates-contract.md` §4). Suite
    dos pipelines contra o lakeFS real: 108/108.
+
+### 8.2 Releases, LATEST_STABLE e rollback (2026-11-23, no disco, por rever)
+- `pipelines/src/gold/release.py`: `release_day` (branch → manifest → commit → merge → tag no commit do merge → com G3
+  `pass`, o ponteiro), `point`, `rollback`, `trace` e uma linha de comandos (`python -m gold.release …`). A DAG
+  `gold_daily` faz a release logo a seguir ao gold do dia.
+- **Nome das tags: `gold-vMAJOR.MINOR.PATCH_AAAAMMDDHHmm`** (com `_`, a alternativa prevista no D7). O lakeFS aceita `+`
+  numa tag, mas o cliente Lua dos hooks não o escapa no endereço: o `get_object` pela tag dava 400 e o hook do ponteiro
+  recusava uma release que existia (medido no lakeFS real).
+- **Versão:** MAJOR.MINOR do esquema (`SCHEMA_VERSION = "1.0"`); PATCH = releases anteriores do mesmo dia (um
+  reprocessamento). Repetir o mesmo gold não cria outra release. Repetir um dia antigo nunca faz recuar o ponteiro.
+- **Hook do ponteiro** (`quality/hooks/release_pointer_pre_merge.lua`): 3.º hook da ação `g2` (por ordem, nunca em
+  paralelo). Só aceita um `LATEST_STABLE` que nomeia uma release existente com G3 sem `fail` no manifest.
+- **Provado no lakeFS real** (repositório descartável, todos os hooks): release, PATCH depois de um reprocessamento,
+  **rollback em 0,12 s**, o hook a recusar um ponteiro para uma release que não existe, o rastreio até ao bronze, e o gold
+  lido **pela tag na porta S3** (como os consumidores da Fase 7). Pipelines: 99 + 18 saltados; 117/117 com o lakeFS real.
+- **Falta para o DoD da Fase 6:** implantar (hooks no `industrial-lake`, imagem, DAG) e, na produção, ≥3 releases reais,
+  um rollback cronometrado e o `trace` de uma release. Depois: OpenMetadata (M1) e a retenção da silver.

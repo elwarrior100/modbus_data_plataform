@@ -33,9 +33,9 @@ def test_one_action_per_event_so_hooks_never_run_in_parallel():
         assert all(n == 1 for n in per_event.values()), per_event
 
 
-def test_the_gold_hooks_are_not_installed_by_default_yet():
-    assert set(ACTIONS) == {"g2", "protect"}                   # o __main__ do instalador só põe estes no industrial-lake
+def test_the_gold_actions_extend_the_base_ones():
+    assert set(ACTIONS) == {"g2", "protect"}                   # a base; o __main__ instala {**ACTIONS, **GOLD_ACTIONS}
     assert [h for h, _ in ACTIONS["g2"][2]] == ["g2_attestation"]
-    assert [h for h, _ in GOLD_ACTIONS["g2"][2]] == ["g2_attestation", "g3_attestation"]    # o G3 depois do G2
+    assert [h for h, _ in GOLD_ACTIONS["g2"][2]] == ["g2_attestation", "g3_attestation", "release_pointer"]  # por ordem
     events = {n: _events(GOLD_ACTIONS[n]) for n in GOLD_ACTIONS}
     assert events == {"g2": ["pre-merge"], "release_create": ["pre-create-tag"], "release_delete": ["pre-delete-tag"]}

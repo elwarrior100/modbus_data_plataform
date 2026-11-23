@@ -178,3 +178,12 @@ ficheiro gold pertence a uma só atestação e o hook confere-o exatamente como 
 
 **A provar num repositório descartável** antes de instalar (`tests/test_gates_hook_gold.py`, marcado `lakefs`): os
 campos `action.tag_id`/`action.commit_id` dos eventos de tag no lakeFS 1.86, e se o nome da tag aceita `+`.
+
+## 7. Releases e o `LATEST_STABLE` (ADR-019 D7 e D9; 2026-11-23)
+- **Tag** `gold-vMAJOR.MINOR.PATCH_AAAAMMDDHHmm` (com `_`: um `+` parte o `get_object` dos hooks Lua). O hook
+  `release_pre_create_tag` exige, no commit da tag, o manifest `_releases/<tag>/manifest.json` e, para cada dia, a
+  atestação G3 sem `fail` com os mesmos checksums. O `release_pre_delete_tag` recusa apagar uma `gold-v*`.
+- **Ponteiro** `_releases/LATEST_STABLE` (JSON com `release`): só muda por merge, e o hook `release_pointer_pre_merge`
+  (3.º hook da ação `g2`) só aceita uma release que existe, com manifest e G3 sem `fail`. O código só o avança sozinho
+  com G3 `pass`; com `warn` avança-se à mão (`python -m gold.release point <tag>`). Rollback:
+  `python -m gold.release rollback` (para a release aprovada anterior) ou `--to <tag>`.

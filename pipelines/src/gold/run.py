@@ -4,9 +4,8 @@
     atestação → commit → verifica → merge → apaga o branch
 
 Cada passo é idempotente: repetir o dia dá os mesmos bytes e nenhum commit novo; se algo falhar a meio, o `main` fica
-intacto (o que ficou por acabar fica no branch). As releases (tag + manifest) e o `LATEST_STABLE` ainda não existem:
-TODO(release, ADR-019 D7 e D9) — depois do merge, escrever `_releases/<tag>/manifest.json` (copiando `inputs` da
-atestação G3), criar a tag `gold-v1.0.0+<YYYYMMDDHHmm>` nesse commit e, com G3 `pass`, mover o `LATEST_STABLE`.
+intacto (o que ficou por acabar fica no branch). A release do dia (tag + manifest + `LATEST_STABLE`) faz-se a seguir,
+em `gold.release.release_day` (a DAG chama os dois).
 """
 import json
 import tempfile

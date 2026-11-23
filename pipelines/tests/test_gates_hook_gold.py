@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import lakefs
@@ -97,3 +98,64 @@ def test_a_release_tag_needs_the_manifest_and_g3_and_cannot_be_deleted(scratch):
     assert "imutáveis" in refused(lambda: repo.tag(created[0]).delete())
     repo.tag("outra").create(commit)                                       # as outras tags continuam livres
     repo.tag("outra").delete()
+
+
+def test_releases_pointer_and_rollback_on_the_real_lakefs(scratch):
+    """O ciclo inteiro no lakeFS real, com TODOS os hooks: release (tag + manifest), o LATEST_STABLE a seguir, um
+    PATCH depois de um reprocessamento, o rollback cronometrado (DoD: < 1 min), e o hook a recusar um ponteiro falso."""
+    import hashlib
+    import io
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from gold import release as rel
+    from gold.run import run_day
+
+    lake, repo = scratch
+    run_day(lake, SATURDAY)
+    first = rel.release_day(lake, SATURDAY)
+    assert first.created and first.pointer_moved and rel.current(lake) == first.tag
+    print(f"release: {first.tag}")
+
+    # um reprocessamento de sábado (um ficheiro gold muda, com a prova G3 a acompanhar), pelo merge com hooks
+    path, gate = f"gold/dim_asset/dt={SATURDAY}/data.parquet", f"_gates/g3/dt={SATURDAY}.json"
+    table = pq.read_table(io.BytesIO(lake.read("main", path)))
+    buf = io.BytesIO()
+    pq.write_table(table.append_column("reprocessed", pa.array([True] * table.num_rows)), buf)
+    lake.ensure_branch("reprocess", "main")
+    lake.upload("reprocess", path, buf.getvalue())
+    att = json.loads(lake.read("main", gate))
+    att["files"][path] = lake.checksum("reprocess", path)
+    lake.upload("reprocess", gate, json.dumps(att).encode())
+    lake.commit("reprocess", "gold: reprocessar sábado", {})
+    lake.merge("reprocess", "main", "gold: reprocessar sábado")
+    second = rel.release_day(lake, SATURDAY, now=datetime.now(timezone.utc) + timedelta(minutes=1))
+    assert second.created and second.tag.startswith("gold-v1.0.1_") and rel.current(lake) == second.tag
+
+    before, after, seconds = rel.rollback(lake)
+    print(f"rollback {before} -> {after} em {seconds:.2f} s")
+    assert after == first.tag and rel.current(lake) == first.tag and seconds < 60
+
+    # o hook do ponteiro recusa uma release que não existe (mesmo escrevendo o ficheiro à mão)
+    lake.ensure_branch("bad-pointer", "main")
+    lake.upload("bad-pointer", rel.POINTER, json.dumps({"release": "gold-v9.9.9_209901010000"}).encode())
+    lake.commit("bad-pointer", "ponteiro falso", {})
+    assert "não existe" in refused(lambda: lake.merge("bad-pointer", "main", "ponteiro falso"))
+    assert rel.current(lake) == first.tag
+
+    # do manifest ao bronze, e o gold lido PELA TAG (com "+") na porta S3 do lakeFS, como os consumidores da Fase 7
+    assert rel.trace(lake, first.tag)["silver_commit"]
+    import duckdb
+    con = duckdb.connect()
+    try:
+        con.execute("INSTALL httpfs; LOAD httpfs")
+    except duckdb.Error as error:                                  # sem internet para a extensão: fica registado
+        pytest.skip(f"sem a extensão httpfs do DuckDB: {error}")
+    env = os.environ
+    endpoint = env["LAKEFS_ENDPOINT"].split("://", 1)[-1]
+    con.execute(f"""CREATE SECRET lake (TYPE s3, KEY_ID '{env["LAKEFS_ACCESS_KEY_ID"]}', SECRET '{env["LAKEFS_SECRET_ACCESS_KEY"]}',
+                    ENDPOINT '{endpoint}', URL_STYLE 'path', USE_SSL false, REGION 'us-east-1')""")
+    rows = con.execute(f"SELECT count(*) FROM read_parquet('s3://{repo.id}/{first.tag}/gold/kpi_asset_day/dt={SATURDAY}/data.parquet')").fetchone()[0]
+    print(f"lido pela tag {first.tag} na porta S3: {rows} linhas")
+    assert rows == rel.read_manifest(lake, first.tag)["tables"][f"gold/kpi_asset_day/dt={SATURDAY}/data.parquet"]["rows"]

@@ -79,6 +79,21 @@ class Lake:
     def delete_branch(self, name: str) -> None:
         self.repo.branch(name).delete()
 
+    def create_tag(self, name: str, ref: str) -> None:
+        """Cria a tag `name` no commit de `ref`. Se já existir no mesmo commit, é como se a tivesse criado agora
+        (idempotente); noutro commit, é um erro (uma tag não se move). O hook pre-create-tag pode recusar (412)."""
+        commit = self.resolve(ref)
+        existing = {t.id: t.get_commit().id for t in self.repo.tags()}
+        if name in existing:
+            if existing[name] != commit:
+                raise ValueError(f"a tag {name} já existe noutro commit ({existing[name][:12]})")
+            return
+        self.repo.tag(name).create(commit)
+
+    def tags(self, prefix: str = "") -> "list[tuple[str, str]]":
+        """(nome, commit) das tags que começam por `prefix`, por nome."""
+        return sorted((t.id, t.get_commit().id) for t in self.repo.tags() if t.id.startswith(prefix))
+
     def branch_infos(self) -> "list[tuple[str, str, float]]":
         """(nome, commit da ponta, data do commit em segundos) de cada branch."""
         out = []

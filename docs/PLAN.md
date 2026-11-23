@@ -844,4 +844,7 @@ código e explica-o; ver CLAUDE.md.)*
    DAG `gold_daily` (02:40; 1.º dia 23-11). Escolhas do Stéphane aplicadas: parado = 0 kW, teto por sinal (300 s nos
    lentos), `memory_limit` 256 MB. **Achado:** dois hooks Lua em paralelo derrubam o lakeFS 1.86; G2 e G3 passam a ser
    hooks da mesma ação. Testes: 91 + 17 saltados; 108/108 contra o lakeFS real do local.
-   - ⬜ Releases (tag + manifest), `LATEST_STABLE` com hook e rollback < 1 min; OpenMetadata (M1); retenção da silver.
+   - ✅ (no disco) **Releases:** tag `gold-v1.0.0_AAAAMMDDHHmm` + manifest + `LATEST_STABLE` com hook + rollback + trace
+     (ADR-019 §8.2). No lakeFS real: rollback em 0,12 s; o hook recusa um ponteiro falso; gold lido pela tag por S3.
+     Achado: `+` no nome de uma tag parte os hooks Lua (400) → `_`. Testes: 99 + 18; 117/117 com o lakeFS real.
+   - ⬜ Implantar e provar o DoD na Oracle (≥3 releases, rollback < 1 min, trace); OpenMetadata (M1); retenção da silver.

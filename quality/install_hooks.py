@@ -27,13 +27,13 @@ ACTIONS = {
     "protect": ("protect_actions", "pre-commit:", [("protect_actions_dir", "protect_actions_pre_commit.lua")]),
 }
 
-# Os hooks do gold (ADR-019, D6): G3 no merge e a imutabilidade das tags de release. AINDA NÃO se instalam no
-# `industrial-lake` (o `__main__` só instala ACTIONS): primeiro provam-se num repositório descartável
-# (tests/test_gates_hook_gold.py) e só entram quando o gold for para produção. A ação `g2` daqui SUBSTITUI a de ACTIONS
-# (`{**ACTIONS, **GOLD_ACTIONS}`): o mesmo ficheiro, com o G3 a seguir ao G2.
-# TODO(gold em produção): juntar GOLD_ACTIONS ao que o `__main__` instala, e o hook do LATEST_STABLE (D9) quando existir.
+# Os hooks do gold (ADR-019, D6 e D9): G3 no merge, o LATEST_STABLE e a imutabilidade das tags de release. Provados num
+# repositório descartável do lakeFS real (tests/test_gates_hook_gold.py) e instalados pelo `__main__` desde a ida do
+# gold para produção (2026-11-23). A ação `g2` daqui SUBSTITUI a de ACTIONS (`{**ACTIONS, **GOLD_ACTIONS}`): o mesmo
+# ficheiro, com o G3 e o ponteiro a seguir ao G2, por ordem.
 GOLD_ACTIONS = {
-    "g2": ("g2", PRE_MERGE_MAIN, [("g2_attestation", "g2_pre_merge.lua"), ("g3_attestation", "g3_pre_merge.lua")]),
+    "g2": ("g2", PRE_MERGE_MAIN, [("g2_attestation", "g2_pre_merge.lua"), ("g3_attestation", "g3_pre_merge.lua"),
+                                  ("release_pointer", "release_pointer_pre_merge.lua")]),
     "release_create": ("release_create", "pre-create-tag:", [("release_needs_proof", "release_pre_create_tag.lua")]),
     "release_delete": ("release_delete", "pre-delete-tag:", [("release_immutable", "release_pre_delete_tag.lua")]),
 }
@@ -54,12 +54,12 @@ def install(repo: "lakefs.Repository", branch: str = "main", actions: dict | Non
         for file, action in (actions or ACTIONS).items():
             work.object(f"_lakefs_actions/{file}.yaml").upload(data=render(*action), mode="w")
         try:
-            work.commit("gates: instalar hooks G2", metadata={"gates_installer": "true"})
+            work.commit("gates: instalar hooks G2, G3 e releases", metadata={"gates_installer": "true"})
         except lakefs.exceptions.LakeFSException as error:
             if "no changes" in str(error).lower():
                 return False
             raise
-        work.merge_into(repo.branch(branch), message="gates: instalar hooks G2")
+        work.merge_into(repo.branch(branch), message="gates: instalar hooks G2, G3 e releases")
         return True
     finally:
         work.delete()
@@ -69,6 +69,6 @@ if __name__ == "__main__":
     client = lakefs.Client(host=os.environ["LAKEFS_ENDPOINT"], username=os.environ["LAKEFS_ACCESS_KEY_ID"],
                            password=os.environ["LAKEFS_SECRET_ACCESS_KEY"])
     name = os.environ.get("LAKEFS_REPOSITORY", "industrial-lake")
-    changed = install(lakefs.Repository(name, client=client))
+    changed = install(lakefs.Repository(name, client=client), actions={**ACTIONS, **GOLD_ACTIONS})
     print(f"{name}: hooks {'instalados/atualizados' if changed else 'já estavam atualizados'}")
     sys.exit(0)

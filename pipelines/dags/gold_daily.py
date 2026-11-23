@@ -44,13 +44,22 @@ with DAG(
         from silver.lake import Lake
         from silver.run import GateFailed
 
+        from gold.release import release_day
+
         day = (logical_date - timedelta(days=1)).date()
+        lake = Lake.from_env()
         try:
-            result = run_day(Lake.from_env(), day)
+            result = run_day(lake, day)
         except GateFailed as error:                  # o G3 recusou o dia: repetir não muda nada, por isso não há retries
             raise AirflowFailException(str(error)) from error
         print(result)
-        return {"day": result.day, "skipped": result.skipped, "g3": result.g3_status, "samples": result.samples,
-                "rows": result.rows, "silver_commit": result.silver_commit}
+        out = {"day": result.day, "skipped": result.skipped, "g3": result.g3_status, "samples": result.samples,
+               "rows": result.rows, "silver_commit": result.silver_commit}
+        if not result.skipped:
+            # a release do dia (ADR-019 D7/D9): tag + manifest; o LATEST_STABLE só avança sozinho com G3 pass
+            r = release_day(lake, day)
+            print(r)
+            out.update(release=r.tag, release_created=r.created, latest_stable_moved=r.pointer_moved)
+        return out
 
     silver_to_gold()
