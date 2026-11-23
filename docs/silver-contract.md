@@ -77,8 +77,8 @@ O Airflow corre uma tarefa por hora. Para a hora H:
 | # | Passo | Idempotente porque |
 |---|---|---|
 | 1 | cria o branch `silver-<data>-<hora>` a partir do `main` | `exist_ok` |
-| 2 | o DuckDB lê `bronze/dt=…/hour=H/*.parquet` do branch e escreve `silver/…/data.parquet` | nome fixo e linhas ordenadas: mesmo resultado |
-| 3 | commit no branch (com contagens nos metadados) | "sem alterações" conta como feito |
+| 2 | resolve o `main` para um ID de commit (`bronze_commit`, ADR-019 D8); o DuckDB lê `bronze/dt=…/hour=H/*.parquet` **desse commit** e escreve `silver/…/data.parquet` | nome fixo e linhas ordenadas: mesmo resultado |
+| 3 | commit no branch (com contagens e o `bronze_commit` nos metadados) | "sem alterações" conta como feito |
 | 4 | verifica: linhas da silver = linhas do bronze | só leitura |
 | 5 | merge para o `main` | "nada a juntar" conta como feito |
 

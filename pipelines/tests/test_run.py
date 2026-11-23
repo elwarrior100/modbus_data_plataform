@@ -89,3 +89,46 @@ def test_bronze_that_breaks_the_contract_fails_and_main_stays_clean(week):
     with pytest.raises(SilverError, match="catálogo"):
         run_hour(lake, hour)
     assert lake.silver() == {}
+
+
+# --- T1 (ADR-019, D8): a silver regista de que commit de bronze leu ---------------------------------------------
+
+def _attestation(lake, ref="main"):
+    import json
+    return json.loads(lake.read(ref, "_gates/g2/dt=2026-11-03/hour=09.json"))
+
+
+def test_the_silver_records_the_bronze_commit_it_read(lake):
+    expected = lake.resolve("main")                                        # o main antes da corrida
+    result = run_hour(lake, H)
+    assert result.bronze_commit == expected
+    assert _attestation(lake)["bronze_commit"] == expected                  # na prova do G2…
+    assert lake.commit_metadata[("silver-2026-11-03-09", "silver: 2026-11-03 hora 09")]["bronze_commit"] == expected  # …e no commit
+    assert lake.list(expected, BRONZE) == lake.list("main", BRONZE)        # e esse commit tem o bronze que se leu
+
+
+def test_bronze_that_arrives_while_the_hour_runs_is_not_mixed_in(lake, week):
+    """O main avança a meio (um lote do writer chega depois de listar): lê-se tudo do commit fixo, nada a meias."""
+    late = "bronze/dt=2026-11-03/hour=09/zz-lote-tardio.parquet"
+    extra = next(d for p, d in week[1].items() if "dt=2026-11-03/hour=08/" in p)
+
+    def writer_merges(step):
+        if step == "branch":
+            lake.branches["main"]["committed"][late] = extra               # um commit novo no main
+    before = bronze_rows(lake)
+    result = run_hour(lake, H, hook=writer_merges)
+    assert result.bronze_rows == before                                    # só o bronze do commit fixo
+    assert late not in lake.list(result.bronze_commit, BRONZE)
+    again = run_hour(lake, H)                                              # a corrida seguinte apanha o lote tardio
+    assert again.bronze_rows > before and again.bronze_commit != result.bronze_commit
+    assert _attestation(lake)["bronze_commit"] == again.bronze_commit
+
+
+def test_repeating_an_hour_keeps_the_first_bronze_commit_even_after_main_moved(lake, week):
+    first = run_hour(lake, H)
+    commits = lake.commits["main"]
+    lake.branches["main"]["committed"]["outra/coisa.txt"] = b"o main avancou"   # outro commit, nada a ver com esta hora
+    assert lake.resolve("main") != first.bronze_commit
+    again = run_hour(lake, H)
+    assert again.bronze_commit == first.bronze_commit                     # a mesma silver: a mesma origem
+    assert lake.commits["main"] == commits                                # e nenhum commit novo (mesmos bytes)

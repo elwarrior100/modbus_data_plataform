@@ -16,25 +16,43 @@ import lakefs
 
 HOOKS = Path(__file__).parent / "hooks"
 
+# Uma ação = um ficheiro `_lakefs_actions/<nome>.yaml`: (nome, evento em YAML, [(id do hook, ficheiro Lua), ...]).
+# **Os hooks da mesma ação correm um a seguir ao outro; ações diferentes no mesmo evento correm EM PARALELO.** Com o
+# lakeFS 1.86, dois hooks Lua em paralelo que chamam `lakefs.diff_refs` derrubam o servidor ("fatal error: concurrent
+# map writes" em pkg/logging, visto a 2026-11-23 no cluster local com o G2 e o G3 em ações separadas). Por isso cada
+# evento tem UMA só ação, e o G3 entra como segundo hook da ação `g2` (um teste garante isto).
+PRE_MERGE_MAIN = 'pre-merge:\n    branches: ["main"]'
 ACTIONS = {
-    "g2": ("name: g2\non:\n  pre-merge:\n    branches: [\"main\"]\nhooks:\n  - id: g2_attestation\n    type: lua\n    properties:\n      script: |\n",
-           "g2_pre_merge.lua"),
-    "protect": ("name: protect_actions\non:\n  pre-commit:\nhooks:\n  - id: protect_actions_dir\n    type: lua\n    properties:\n      script: |\n",
-                "protect_actions_pre_commit.lua"),
+    "g2": ("g2", PRE_MERGE_MAIN, [("g2_attestation", "g2_pre_merge.lua")]),
+    "protect": ("protect_actions", "pre-commit:", [("protect_actions_dir", "protect_actions_pre_commit.lua")]),
+}
+
+# Os hooks do gold (ADR-019, D6): G3 no merge e a imutabilidade das tags de release. AINDA NÃO se instalam no
+# `industrial-lake` (o `__main__` só instala ACTIONS): primeiro provam-se num repositório descartável
+# (tests/test_gates_hook_gold.py) e só entram quando o gold for para produção. A ação `g2` daqui SUBSTITUI a de ACTIONS
+# (`{**ACTIONS, **GOLD_ACTIONS}`): o mesmo ficheiro, com o G3 a seguir ao G2.
+# TODO(gold em produção): juntar GOLD_ACTIONS ao que o `__main__` instala, e o hook do LATEST_STABLE (D9) quando existir.
+GOLD_ACTIONS = {
+    "g2": ("g2", PRE_MERGE_MAIN, [("g2_attestation", "g2_pre_merge.lua"), ("g3_attestation", "g3_pre_merge.lua")]),
+    "release_create": ("release_create", "pre-create-tag:", [("release_needs_proof", "release_pre_create_tag.lua")]),
+    "release_delete": ("release_delete", "pre-delete-tag:", [("release_immutable", "release_pre_delete_tag.lua")]),
 }
 
 
-def render(header: str, lua_file: str) -> str:
-    body = (HOOKS / lua_file).read_text().splitlines()
-    return header + "".join(f"        {line}\n" for line in body)
+def render(name: str, on: str, hooks: list[tuple[str, str]]) -> str:
+    out = f"name: {name}\non:\n  {on}\nhooks:\n"
+    for hook_id, lua_file in hooks:
+        body = (HOOKS / lua_file).read_text().splitlines()
+        out += f"  - id: {hook_id}\n    type: lua\n    properties:\n      script: |\n" + "".join(f"        {line}\n" for line in body)
+    return out
 
 
-def install(repo: "lakefs.Repository", branch: str = "main") -> bool:
-    """True se instalou ou atualizou algo."""
+def install(repo: "lakefs.Repository", branch: str = "main", actions: dict | None = None) -> bool:
+    """True se instalou ou atualizou algo. `actions`: por omissão, só os hooks já em produção (ACTIONS)."""
     work = repo.branch(f"gates-install-{int(time.time())}").create(source_reference=branch)
     try:
-        for name, (header, lua) in ACTIONS.items():
-            work.object(f"_lakefs_actions/{name}.yaml").upload(data=render(header, lua), mode="w")
+        for file, action in (actions or ACTIONS).items():
+            work.object(f"_lakefs_actions/{file}.yaml").upload(data=render(*action), mode="w")
         try:
             work.commit("gates: instalar hooks G2", metadata={"gates_installer": "true"})
         except lakefs.exceptions.LakeFSException as error:

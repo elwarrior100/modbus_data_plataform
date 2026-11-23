@@ -87,6 +87,27 @@ variável da plataforma, um ensaio completo no cluster local, a secção do runb
   não fazem nenhum (fora da cópia e da GC).
 - **Estado da conta no dia da decisão:** €0,0200 em novembro (tudo de 15-11), previsão €0; 137 pedidos em 30 h.
 
+## 5.2 Revisão de custos e testes (2026-11-23, agente de verificação)
+- **As contas da 5.1 são conservadoras:** os "~10 GB do antigo" vêm das contas "a 1 ano" do ADR-020. A 1-1-2027 ainda
+  haverá pouca silver: o mais provável é a cópia do antigo ter 3–6 GB e a transição ficar abaixo dos 15 GB. O script
+  mede o tamanho real antes de rodar e mostra-o.
+- **Faltava no procedimento** (entra no `scripts/lakefs-rotate.sh` e no runbook):
+  1. **Forçar um pacote completo no bucket novo.** O `lake-sync` só faz um completo quando o mais recente tem 7 dias ou
+     mais; com um bucket novo faria um incremental gigante, com um catálogo que mistura chaves antigas e novas. O script
+     arranca a primeira cópia do novo em modo completo, com um catálogo próprio do bucket novo.
+  2. **O `lake-sync` e o ensaio de restauro (`lake-restore-drill`) passam para o bucket novo** no mesmo commit que o nome
+     do repositório.
+  3. **Os alarmes de 12 GB (cópia do lake) e de 15 GB (total)** podem disparar nos 9 dias da transição: o runbook diz que
+     é esperado, e o script avisa antes.
+  4. **A regra "não rodar nos 2 dias a seguir a um completo" contra a data fixa de 1 de janeiro:** se o completo semanal
+     do antigo cair a 30 ou 31-12, roda-se na mesma a 1-1 e apagam-se à mão, depois de o novo ter o seu completo
+     verificado, os pacotes do antigo que já não são precisos (poucos pedidos, com o nome escrito à mão, como o
+     `lake-backup-prune.sh`). A alternativa é adiar a rotação 1–2 dias; escolhe-se no dia, com o script a mostrar os números.
+- **Um efeito bom que não estava contado:** os dumps do PostgreSQL (`lakefs.dump`) também guardam os commits; encolhem
+  quando o antigo for apagado.
+- **Verificado:** nenhuma das mudanças de 22–23-11 trouxe custos (novembro €0,020030, tudo de 15-11); testes do commit
+  6828291 todos verdes; o PATCH do OpenMetadata provado no local (mesma versão da Oracle).
+
 ## 6. Consequências (se aceite)
 - Mais um procedimento de operação, com script, ensaio e runbook.
 - O nome do repositório passa a ser uma variável única na plataforma.

@@ -811,6 +811,10 @@ código e explica-o; ver CLAUDE.md.)*
    - ⬜ **Depois de reveres e fazeres commit:** imagens no CI; na plataforma, `PLAN=builtin` e `TRIP_RATE_PER_DAY=1` no
      `ot-edge` (primeiro local, depois a Oracle); medir o volume real (+~20% previsto) e uma hora de silver com G2 limpo.
    - ⬜ **Depois:** o gold (ADR-019): T1 na silver, gold K3, G3 + hooks, releases + rollback, OpenMetadata.
+   - 🟡 (2026-11-23) **No disco, por rever, sem commit** (ADR-019 secção 8): T1 na silver; gold K3 (`pipelines/src/gold/`,
+     9 tabelas por dia); G3 com 6 regras e a atestação; hooks G3 e das tags escritos mas **não instalados**; `run_day`
+     e o DAG `gold_daily`. Medido: ~2 s e ~420 MB de pico por dia (1,2 M amostras). ⬜ releases + `LATEST_STABLE` +
+     rollback; ⬜ OpenMetadata (M1); ⬜ provar os hooks num repositório descartável; ⬜ retenção da silver (3 meses).
 36. 🟡 (2026-11-22) **Crescimento do lake e metadados do lakeFS** (ADR-020). Medido: 80% do lake são metadados do lakeFS
    (1,02 GB de 1,31 GB na Oracle), que nunca se apagam e crescem com os commits; a silver cresce ~36 MB/dia e também não se
    apaga. Sem mudanças, os 20 GB grátis do Object Storage acabariam em meados de 2027.
@@ -835,3 +839,9 @@ código e explica-o; ver CLAUDE.md.)*
      o antigo fica 30 dias só de leitura (sem GC, fora da cópia) e depois apaga-se; primeira rotação a **1-1-2027**.
      ⬜ Antes disso: `scripts/lakefs-rotate.sh` com ensaio, o nome do repositório numa só variável, ensaio no local,
      runbook, lembrete no início de dezembro.
+38. 🟡 (2026-11-23) **Fase 6: gold, G3 e T1 no disco, por rever** (ADR-019 §8 e §8.1). T1 (a silver regista o commit de
+   bronze), gold K3 (9 tabelas por dia, ~2,2 s e pico 382 MB num dia real), G3 (6 regras) e os hooks, a execução diária e a
+   DAG `gold_daily` (02:40; 1.º dia 23-11). Escolhas do Stéphane aplicadas: parado = 0 kW, teto por sinal (300 s nos
+   lentos), `memory_limit` 256 MB. **Achado:** dois hooks Lua em paralelo derrubam o lakeFS 1.86; G2 e G3 passam a ser
+   hooks da mesma ação. Testes: 91 + 17 saltados; 108/108 contra o lakeFS real do local.
+   - ⬜ Releases (tag + manifest), `LATEST_STABLE` com hook e rollback < 1 min; OpenMetadata (M1); retenção da silver.

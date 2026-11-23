@@ -6,13 +6,31 @@ class FakeLake:
     def __init__(self):
         self.branches = {"main": {"committed": {}, "staged": {}}}
         self.commits = {"main": 0}
+        self.snapshots = {}                 # ID de commit → ficheiros nesse commit (para ler de um commit fixo)
+        self.commit_metadata = {}           # (branch, mensagem) → metadados do último commit com essa mensagem
 
     def ensure_branch(self, name, source="main"):
         if name not in self.branches:
             self.branches[name] = {"committed": dict(self.branches[source]["committed"]), "staged": {}}
             self.commits[name] = 0
 
+    def resolve(self, ref):
+        """Como no lakeFS: o commit (só o que está commitado) para onde o branch aponta agora. O ID é um hash do
+        conteúdo, por isso o mesmo estado dá o mesmo ID; o estado fica guardado para se ler dele mais tarde."""
+        import hashlib
+        if ref in self.snapshots:
+            return ref
+        files = dict(self.branches[ref]["committed"])
+        digest = hashlib.sha256()
+        for p in sorted(files):
+            digest.update(p.encode() + hashlib.md5(files[p]).digest())
+        cid = digest.hexdigest()[:16]
+        self.snapshots[cid] = files
+        return cid
+
     def _view(self, ref):
+        if ref in self.snapshots:
+            return self.snapshots[ref]
         b = self.branches[ref]
         return {p: d for p, d in {**b["committed"], **b["staged"]}.items() if d is not None}
 
@@ -50,6 +68,7 @@ class FakeLake:
             b.setdefault("deleted", set()).add(p)               # lembrado para o merge (como um merge a 3)
         if changed:
             self.commits[branch] += 1
+            self.commit_metadata[(branch, message)] = dict(metadata)
         return bool(changed)
 
     def merge(self, branch, into, message):

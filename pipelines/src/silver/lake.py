@@ -26,6 +26,11 @@ class Lake:
     def ensure_branch(self, name: str, source: str = "main") -> None:
         self.repo.branch(name).create(source_reference=source, exist_ok=True)
 
+    def resolve(self, ref: str) -> str:
+        """O ID do commit para onde `ref` (branch, tag ou commit) aponta agora. Um branch avança; um ID de commit não:
+        ler tudo de um ID fixo garante que se lê uma só versão do lake, e o ID fica como prova (ADR-019, D8)."""
+        return self.repo.ref(ref).get_commit().id
+
     def list(self, ref: str, prefix: str) -> list[str]:
         return sorted(o.path for o in self.repo.ref(ref).objects(prefix=prefix))
 
@@ -46,9 +51,10 @@ class Lake:
     def upload(self, branch: str, path: str, data: bytes) -> None:
         self.repo.branch(branch).object(path).upload(data=data, mode="wb")
 
-    def checksum(self, branch: str, path: str) -> str:
-        """O checksum que o lakeFS guarda para o objeto (é o que o hook do G2 compara)."""
-        return self.repo.branch(branch).object(path).stat().checksum
+    def checksum(self, ref: str, path: str) -> str:
+        """O checksum que o lakeFS guarda para o objeto (é o que os hooks do G2 e do G3 comparam). `ref` pode ser um
+        branch ou um ID de commit (o gold lê os checksums da silver do commit fixo que leu)."""
+        return self.repo.ref(ref).object(path).stat().checksum
 
     def commit(self, branch: str, message: str, metadata: dict[str, str]) -> bool:
         """False se não havia nada para commitar (já estava feito)."""

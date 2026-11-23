@@ -63,8 +63,17 @@ Um ficheiro por partição, no próprio branch, escrito pelo G2 depois do upload
       "files": { "silver/dt=2026-11-07/hour=17/data.parquet": "<checksum do lakeFS>" },
       "rows": 43848,
       "rules": [ {"id": "G2-01", "severity": "pass|warn|blocker", "asset": "...", "value": 1.0, "threshold": 0.8, "detail": "..."} ],
-      "summary": "texto curto para o humano"
+      "summary": "texto curto para o humano",
+      "bronze_commit": "<ID do commit do lakeFS de onde a silver leu o bronze>"
     }
+
+**`bronze_commit` (desde 2026-11-23, ADR-019 D8, T1).** O `run_hour` resolve o `main` para um ID de commit **antes** de
+listar o bronze e lê a lista e os ficheiros desse commit fixo (o `main` avança enquanto se lê). O ID fica aqui e nos
+metadados do commit da silver (`bronze_commit`), e o gold copia-o para o manifest da release: é assim que se responde a
+"que commit de bronze originou esta release". O hook não o lê (não muda). Ao repetir uma hora, se a silver sai igual
+(mesmo checksum) fica o commit da primeira prova: a mesma silver só vem do mesmo bronze, e repetir não cria commits.
+As provas anteriores a esta data não têm o campo (o manifest diz "desconhecido"; ou reprocessa-se a hora, dentro dos 15
+dias de bronze).
 
 Um ficheiro por hora (e não um só) porque duas horas a correr ao mesmo tempo escreveriam o mesmo
 ficheiro e o segundo merge teria conflito.
@@ -82,6 +91,13 @@ Se o merge não toca em `silver/` (por exemplo o bronze do writer), o hook não 
 Medido no protótipo: o lakeFS lê as ações **do branch de origem**, por isso um branch podia apagar o
 hook e fazer merge sem gate. Esta proteção fecha isso. O instalador é a exceção, marcando o commit
 com o metadado `gates_installer=true`.
+
+**Uma só ação por evento (2026-11-23).** Os hooks dentro da mesma ação correm um a seguir ao outro; ações diferentes no
+mesmo evento correm **em paralelo**. Com o lakeFS 1.86, dois hooks Lua em paralelo que chamam `lakefs.diff_refs`
+derrubam o servidor (`fatal error: concurrent map writes`, em `pkg/logging`): visto no cluster local com o G2 e o G3 em
+ações separadas no `pre-merge` (6 reinícios do lakeFS; o `industrial-lake` não foi afetado). Por isso o G3 entra como
+segundo hook da ação `g2` (`quality/install_hooks.py`), e um teste (`test_hooks_render.py`) recusa duas ações no mesmo
+evento.
 
 **Limite conhecido:** quem tiver permissões de administrador e souber do metadado pode alterar os
 hooks. O objetivo é impedir o acidente e obrigar a um ato deliberado, não defender de um atacante
@@ -104,3 +120,61 @@ hooks. O objetivo é impedir o acidente e obrigar a um ato deliberado, não defe
 3. mexer na silver depois de atestada: o hook recusa;
 4. as horas normais continuam a passar sem alterações ao que já corre (o DAG `silver_hourly`);
 5. cada decisão (com regras e valores) fica consultável (no OpenMetadata, na etapa final da fase).
+
+## 6. O gate G3: a coerência do gold de um dia (Fase 6, ADR-019 D6)
+
+**Implementado no disco (2026-11-23), por rever; os hooks ainda NÃO estão instalados em nenhum lakeFS.**
+
+O mesmo desenho do G2: o **G3** (Python, `pipelines/src/gold/g3.py`) decide e escreve a prova; o **hook**
+(`quality/hooks/g3_pre_merge.lua`) não confia no DAG e confere-a no merge. A unidade é o **dia UTC** (`dt`).
+
+    gold/<tabela>/dt=D/data.parquet (9 tabelas) ──► G3 (lê o gold E a silver) ──► _gates/g3/dt=D.json ──► commit
+                                                                                                          │
+                      main ◄── merge ◄── HOOK g3_pre_merge (atestação, sem fail, checksum de cada ficheiro) ◄─┘
+
+### 6.1 As regras
+
+| Regra | Verifica | `warn` | `blocker` |
+|---|---|---|---|
+| G3-01 reconciliação | soma das `samples` do `fact_tag_hour` = linhas da silver com o instante do evento em D (`ts_utc`; `server_ts` com `clock_skew`), por ativo e tag, contadas pelo G3 diretamente na silver; e o `fact_tag_minute` soma o mesmo que o `fact_tag_hour` | — | qualquer diferença |
+| G3-02 buracos | cada ativo tem as 24 horas no `fact_asset_hour`, e cada tag no `fact_tag_hour` (uma hora sem dados aparece com cobertura 0, nunca falta a linha) | — | série sem as 24 horas |
+| G3-03 física | cada hora soma 3600 s (estados + sem dados; tempo planeado + paragens planeadas); energia, volume e contagens ≥ 0; nos KPIs: disponibilidade e cobertura em [0, 1], kWh/m³ em [0,05; 2], rendimento em ]0, 1], COP em ]0, 12] **(a calibrar)** | — | fora |
+| G3-04 cobertura | horas de D sem silver no `main` (recusadas pelo G2, ou que não correram) | qualquer | > 6 h **(a calibrar)** |
+| G3-05 volume | amostras do dia contra a média dos dias anteriores que estão no gold (até 7) | ±20 % | — (`info` sem histórico) |
+| G3-06 deriva | PSI das médias horárias de cada tag analógica contra os dias anteriores (decis da referência) | PSI > 0,25 | — (`info` com menos de 3 dias de histórico) |
+
+O rendimento > 1 e o COP > 12 não estavam no ADR: são impossíveis fisicamente (um rendimento acima de 1 cria energia),
+por isso entraram no G3-03 como bloqueio. O PSI fica em aviso de propósito: com o simulador, uma deriva é muitas vezes
+um cenário (`drift`) e a Fase 8 precisa desses dados.
+
+### 6.2 A atestação
+
+    _gates/g3/dt=2026-11-01.json
+
+    {
+      "gate": "G3", "version": 1, "status": "pass | warn | fail", "partition": "2026-11-01",
+      "files": { "gold/fact_asset_hour/dt=2026-11-01/data.parquet": "<checksum do lakeFS>", "...": "(as 9 tabelas)" },
+      "rows": 1123786,                                // amostras da silver no dia
+      "rules": [ {"id": "G3-05", "severity": "info", "value": 0, "threshold": 0.2, "detail": "...", "asset": null} ],
+      "summary": "texto curto para o humano",
+      "gold_version": "1",
+      "inputs": {                                      // de onde veio o gold: o manifest da release copia isto
+        "silver_commit": "<commit do main lido pelo gold>",
+        "silver_partitions": { "silver/dt=2026-10-31/hour=23/data.parquet":
+                               {"checksum": "...", "g2": "pass", "bronze_commit": "<do G2> | desconhecido (...)"} }
+      }
+    }
+
+Todas as tabelas gold têm partição por dia, as `dim_*` incluídas (o ADR-019 D4 propunha-as sem partição): assim cada
+ficheiro gold pertence a uma só atestação e o hook confere-o exatamente como o do G2.
+
+### 6.3 Os hooks do gold (`quality/hooks/`, em `GOLD_ACTIONS` do `install_hooks.py`, ainda não instalados)
+
+| Hook | Evento | Recusa |
+|---|---|---|
+| `g3_pre_merge` | `pre-merge` para o `main` | ficheiro `gold/` sem atestação do dia, com atestação `fail`, ou com checksum diferente do atestado |
+| `release_pre_create_tag` | `pre-create-tag` | tag `gold-v*` sobre um commit sem `_releases/<tag>/manifest.json`, ou cujo dia não tem G3, tem G3 `fail`, ou cujos ficheiros não são os atestados |
+| `release_pre_delete_tag` | `pre-delete-tag` | apagar uma tag `gold-v*` (no lakeFS uma tag apaga-se; sem isto, "imutável" seria só uma promessa) |
+
+**A provar num repositório descartável** antes de instalar (`tests/test_gates_hook_gold.py`, marcado `lakefs`): os
+campos `action.tag_id`/`action.commit_id` dos eventos de tag no lakeFS 1.86, e se o nome da tag aceita `+`.

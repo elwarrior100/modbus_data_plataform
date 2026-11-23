@@ -31,10 +31,12 @@ def _incidents(plant: Plant) -> None:
     a("MOTOR-01", "planned_stop", duration=7200, start_in=_at(6, 2))                                             # parado 2 h (ADR-019)
 
 
-def generate(days: int = 7, poll_s: int = 30, seed: int = 42) -> list[Event]:
-    clock = FakeClock(start_time=START.timestamp())
-    plant = Plant(DEVICES, clock, seed=seed)
-    _incidents(plant)
+def generate(days: int = 7, poll_s: int = 30, seed: int = 42, *, start: datetime = START, incidents=_incidents,
+             plan=None, seconds: int | None = None) -> list[Event]:
+    """`start`, `incidents`, `plan` e `seconds` (em vez de `days`) servem o dia sintético do gold (tests/fixture_gold.py)."""
+    clock = FakeClock(start_time=start.timestamp())
+    plant = Plant(DEVICES, clock, seed=seed, plan=plan)
+    incidents(plant)
     tags = {t.node_id: t for t in load_catalog()}
     last: dict[str, tuple] = {}
     events: list[Event] = []
@@ -81,7 +83,7 @@ def generate(days: int = 7, poll_s: int = 30, seed: int = 42) -> list[Event]:
                         device_time if dev.online else now)
 
     poll()
-    for _ in range(days * 86400 // poll_s):
+    for _ in range((seconds if seconds is not None else days * 86400) // poll_s):
         clock.advance(poll_s)
         plant.step()
         poll()

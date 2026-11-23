@@ -47,10 +47,13 @@ class Report:
             return "sem achados"
         return "; ".join(f"{f.id}{'/' + f.asset if f.asset else ''} {f.severity}: {f.detail}" for f in self.findings[:4])
 
-    def attestation(self, files: dict[str, str]) -> bytes:
-        """O ficheiro `_gates/g2/...json` que o hook do lakeFS lê (contrato, secção 3)."""
+    def attestation(self, files: dict[str, str], bronze_commit: str | None = None) -> bytes:
+        """O ficheiro `_gates/g2/...json` que o hook do lakeFS lê (contrato, secção 3). `bronze_commit` é o commit de
+        onde a silver leu o bronze (ADR-019, D8): o hook ignora-o, o gold copia-o para o manifest da release."""
         doc = {"gate": "G2", "version": 1, "status": self.status, "partition": self.partition,
                "files": files, "rows": self.rows, "rules": [asdict(f) for f in self.findings], "summary": self.summary}
+        if bronze_commit:
+            doc["bronze_commit"] = bronze_commit
         return json.dumps(doc, ensure_ascii=False, sort_keys=True).encode()
 
 

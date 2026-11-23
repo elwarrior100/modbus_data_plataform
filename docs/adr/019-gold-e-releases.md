@@ -1,6 +1,8 @@
 # ADR-019: gold, gate G3 e releases (Fase 6)
 
-**Estado:** escolhas feitas (2026-11-22, secção 7). D11 (Fase 6a) implementado no disco, por rever; o gold ainda não.
+**Estado:** escolhas feitas (2026-11-22, secção 7). D11 (Fase 6a) implementado no disco, por rever. **2026-11-23, no
+disco, por rever (sem commit):** T1 (D8), o gold K3 (`pipelines/src/gold/`), o G3 e os 3 hooks (não instalados), o
+`run_day` e o DAG `gold_daily`; ver a secção 8. Falta: releases, `LATEST_STABLE`, OpenMetadata.
 **Liga a:** PLAN §5.4 (gold), §6 (G3), §7 (release tag), Fase 6; ADR-007 (silver), ADR-008 (gates), ADR-009
 (OpenMetadata), ADR-015 (retenção e GC), ADR-016 (cópia em pacotes), ADR-018 (precisão do relógio).
 
@@ -217,7 +219,16 @@ de 384 Mi e limite de 1 Gi, os mesmos da silver). A RAM **permanente** não muda
 | Hooks G3 e tags | ~0 (Lua dentro do lakeFS) | ms | — | 0 | 0 |
 
 Estimativas por medida: uma hora de silver custa 0,07 s de CPU e 183 MB de pico (PLAN §9); o teste de carga leu 11,9 M
-linhas em 137 s com um worker. O gold do dia lê ~1,2 M linhas e escreve < 1 MB. **A medir no protótipo e anotar aqui.**
+linhas em 137 s com um worker. O gold do dia lê ~1,2 M linhas e escreve < 1 MB.
+
+**Medido a 2026-11-23** (no Mac; dia sintético com leituras a cada 1 s, como o gateway real: 1,12–1,26 M amostras por
+dia, 26 ficheiros de silver, 31–33 MB): o `build_day` leva **1,8–2,6 s** e o G3 < 0,1 s; o pico do processo é
+**~420 MB** (52 MB de Python e bibliotecas + ~370 MB do DuckDB e do Arrow), com `memory_limit` 512 MB e `threads=1`. Com
+`memory_limit` 256 MB: ~380 MB, o mesmo tempo. O gold do dia tem ~0,4 MB (9 ficheiros). **Dentro do limite de 1 Gi;
+acima do pedido de 384 Mi** (o pod pode passar o pedido; só o limite mata). **Decidido a 23-11: `memory_limit` 256 MB**
+(medido de novo com o código final: 2,2 s, pico **382 MB**, abaixo do pedido de 384 Mi). Três mudanças do protótipo, por medida:
+um ASOF JOIN com `threads=1` levava minutos (trocado por uma janela `last_value … IGNORE NULLS`, < 1 s); a grelha
+calcula-se um ativo de cada vez (de ~600 para ~420 MB); o `bronze_event_id` só entra como hash (8 bytes).
 Alarme novo, se for preciso: "gold sem release há > 30 h", pelo `job-freshness` (nunca uma janela `[1d]`, ADR-017 e
 PLAN item 31).
 
@@ -304,3 +315,52 @@ zero), **F3**, **F2**. Se for preciso cortar, corta-se o F2 primeiro (o menor ga
 
 **Ordem proposta:** fazer F1–F6 primeiro (uma "Fase 6a", com o DoD das Fases 1 e 2 repetido para os sinais novos e a
 silver a correr com eles), e só depois o gold K3 em cima de dados que já os têm.
+
+## 8. O que ficou implementado (2026-11-23, no disco, por rever)
+
+**T1 (D8).** `silver.run.run_hour` resolve o `main` para um ID de commit antes de listar o bronze (`Lake.resolve`), lê
+a lista e os ficheiros desse commit e guarda-o como `bronze_commit` nos metadados do commit e na atestação G2. Repetir
+uma hora mantém o commit da primeira prova se a silver sair igual (sem isto, cada repetição faria um commit novo só
+porque o `main` avançou). O ficheiro da silver não muda (`silver_version` "2"); o hook do G2 não muda.
+
+**Gold K3** (`pipelines/src/gold/build.py`, `plan.py`, `plan.yaml`; o `run.py` faz o lakeFS). As 9 tabelas, todas em
+`gold/<tabela>/dt=D/data.parquet` (as `dim_*` também, ver abaixo). Como se calcula (tudo nos comentários do código):
+- o dia é uma **grelha de 86 400 s**: cada sinal vale a última leitura, no máximo 60 s nos analógicos e no
+  `device_clock`; estado, alarme, contadores e `Connected` valem até à leitura seguinte, e os três primeiros só com
+  comunicação (o `device_clock` do ativo com dados). Uma leitura `BAD` acaba o valor. Médias, energia e volume são
+  somas sobre os segundos com dados, e cada hora soma 3600 s;
+- **estado inicial**: os sinais "até à leitura seguinte" podem estar dias sem linhas; o dia D começa com o valor em
+  vigor no fim de D−1 (`value_end` do `fact_tag_hour` de D−1). Por isso os dias correm por ordem;
+- **KPIs de turno e de dia de produção** ficam na partição do dia UTC em que o período **acaba** (o turno C e o dia de
+  produção acabam às 06:00 de Lisboa do dia seguinte); leem as horas de D−1 do `fact_asset_hour` de D−1;
+  `complete = false` se faltarem horas;
+- **energia útil** por ativo (bomba: caudal × Δp ÷ 36; motor: binário × rpm × 2π ÷ 60 ÷ 1000; chiller:
+  caudal × 4,19 × ΔT ÷ 3,6), somada só nos segundos em que também há potência: o rendimento e o COP são somas ÷ somas.
+
+**Desvios ao texto do ADR (para o Stéphane confirmar):**
+- as `dim_*` têm partição por dia (D4 dizia "sem partição"): cada ficheiro gold pertence a uma só atestação G3 e o
+  hook fica igual ao do G2; custa 2 ficheiros de poucos KB por dia;
+- o G3-03 ganhou "rendimento em ]0, 1]" e "COP em ]0, 12]" (física, não estava no D6);
+- G3-06 sai de `info` com **3** dias de histórico (o D6 não dizia quantos).
+
+**G3** (`pipelines/src/gold/g3.py`; contrato em `docs/gates-contract.md`, secção 6) e os hooks
+`quality/hooks/g3_pre_merge.lua`, `release_pre_create_tag.lua`, `release_pre_delete_tag.lua` (em `GOLD_ACTIONS` do
+instalador, **não instalados**; o teste no lakeFS real está escrito mas não correu).
+
+**`run_day` e o DAG `gold_daily`** (02:40 UTC, `max_active_runs=1`, `catchup=True` a partir de 24-11). Sem releases.
+
+### 8.1 Escolhas do Stéphane sobre o que o protótipo perguntou (2026-11-23)
+1. **Ativo parado:** os sinais de processo (`moves_with_run`) valem 0 até à leitura seguinte enquanto há comunicação
+   (parado é 0 kW, não "sem dados"). Implementado em `gold/build.py` (`_hold`, `needs_clock`); teste: o chiller parado
+   dá 0,0 kW com as horas cobertas.
+2. **Teto por sinal:** `hold_s` no catálogo da silver; 300 s para as temperaturas lentas e a aspiração da bomba (60 s
+   os outros). Teste: a `inlet_temp` do chiller fica coberta > 99% do dia.
+3. **Memória:** `memory_limit` 256 MB (pico 382 MB, dentro do pedido do pod).
+4. **Início:** a DAG corre a 24-11 e o 1.º dia calculado é **23-11** (o 1.º dia completo com os sinais novos); os
+   dias antes disso não têm potência. Sem backfill.
+5. **As decisões do protótipo** (dimensões por dia, estado inicial de D−1 e dias por ordem, KPIs de turno no dia em que
+   o turno acaba, limites do rendimento e do COP no G3-03, kWh/m³ só com potência): aceites.
+6. **Hooks provados no lakeFS real** (cluster local, repositório descartável): G3 no merge e as tags de release, com
+   uma correção pelo caminho: em ações separadas, o G2 e o G3 corriam em paralelo e derrubavam o lakeFS 1.86
+   ("concurrent map writes"); agora são dois hooks da mesma ação, por ordem (ver `docs/gates-contract.md` §4). Suite
+   dos pipelines contra o lakeFS real: 108/108.

@@ -19,6 +19,7 @@ class Tag:
     eu_max: float | None = None
     enum: tuple[str, ...] = ()
     moves_with_run: bool = False     # parado, fica constante e sem amostras (G2-06; ADR-019)
+    hold_s: int | None = None        # gold: validade de uma leitura analógica (None = a regra geral, 60 s)
 
 
 def load_catalog() -> list[Tag]:
@@ -32,7 +33,7 @@ def load_catalog() -> list[Tag]:
                 raise ValueError(f"{item['node_id']}: etiqueta {label!r} não é texto; ponha-a entre aspas")
         tags.append(Tag(item["node_id"], item["asset"], item["tag"], item["kind"], item.get("unit"),
                         item.get("eu_min"), item.get("eu_max"), tuple(item.get("enum", ())),
-                        bool(item.get("moves_with_run", False))))
+                        bool(item.get("moves_with_run", False)), item.get("hold_s")))
     return tags
 
 
