@@ -56,6 +56,11 @@ with DAG(
         out = {"day": result.day, "skipped": result.skipped, "g3": result.g3_status, "samples": result.samples,
                "rows": result.rows, "silver_commit": result.silver_commit}
         if not result.skipped:
+            from gold import openmetadata
+
+            # o catálogo e o G3 do dia no OpenMetadata ANTES da release: assim as tabelas já existem quando o
+            # LATEST_STABLE se mexe e a propriedade `release` de cada uma é atualizada (melhor esforço, nunca falha)
+            openmetadata.publish(lake, day)
             # a release do dia (ADR-019 D7/D9): tag + manifest; o LATEST_STABLE só avança sozinho com G3 pass
             r = release_day(lake, day)
             print(r)

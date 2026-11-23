@@ -381,3 +381,14 @@ instalador, **não instalados**; o teste no lakeFS real está escrito mas não c
   lido **pela tag na porta S3** (como os consumidores da Fase 7). Pipelines: 99 + 18 saltados; 117/117 com o lakeFS real.
 - **Falta para o DoD da Fase 6:** implantar (hooks no `industrial-lake`, imagem, DAG) e, na produção, ≥3 releases reais,
   um rollback cronometrado e o `trace` de uma release. Depois: OpenMetadata (M1) e a retenção da silver.
+
+### 8.3 OpenMetadata do gold e retenção da silver (2026-11-23, no disco, por rever)
+- `pipelines/src/gold/openmetadata.py` (M1): o esquema `gold` com as 9 tabelas (colunas lidas do parquet do dia), a
+  linhagem silver.readings → `gold_daily` → cada tabela, os 6 casos de teste do G3 em `gold.fact_tag_hour` (um
+  resultado por dia; repetir o dia atualiza), e as propriedades `release` e `lakefs_commit` em cada tabela, mudadas
+  sempre que o `LATEST_STABLE` se mexe (release ou rollback). A DAG publica o catálogo e o G3 antes da release. Melhor
+  esforço: nunca falha o gold. Provado contra o OpenMetadata local (2.0.7, a versão da Oracle).
+- `pipelines/src/gold/retention.py` (ADR-020, decisão 3): a silver sai ao fim de 92 dias, e só de um dia D com release
+  do gold de D **e** de D+1 (o gold de D+1 lê a hora 23 de D); as provas dos gates ficam. Tarefa `expire_silver` no
+  `lake_housekeeping`, **em simulação** (`SILVER_APPLY = False`) até rever o primeiro relatório com dias a sair
+  (~2027-02-23).

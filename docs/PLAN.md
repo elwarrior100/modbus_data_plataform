@@ -847,4 +847,10 @@ código e explica-o; ver CLAUDE.md.)*
    - ✅ (no disco) **Releases:** tag `gold-v1.0.0_AAAAMMDDHHmm` + manifest + `LATEST_STABLE` com hook + rollback + trace
      (ADR-019 §8.2). No lakeFS real: rollback em 0,12 s; o hook recusa um ponteiro falso; gold lido pela tag por S3.
      Achado: `+` no nome de uma tag parte os hooks Lua (400) → `_`. Testes: 99 + 18; 117/117 com o lakeFS real.
-   - ⬜ Implantar e provar o DoD na Oracle (≥3 releases, rollback < 1 min, trace); OpenMetadata (M1); retenção da silver.
+   - ✅ **Implantado** (projeto `8741773`, plataforma `e1ea6c5`; local 14:05, Oracle 14:26): `gold_daily` às 02:40 nos dois
+     clusters; hooks do gold no `industrial-lake` (local 13:00, Oracle 14:28; merges do writer e da silver a passar, lakeFS
+     estável); silver local das 14:25 com G2 `pass` e o `bronze_commit` registado (T1).
+   - ⬜ DoD na Oracle: releases a 24, 25 e 26-11 às 02:40; rollback cronometrado; `trace` de uma release.
+   - ✅ (no disco) **OpenMetadata do gold (M1)** e **retenção da silver** (92 dias, só com release de D e D+1; em
+     simulação). ADR-019 §8.3. Testes: pipelines 107 + 19 saltados; o M1 provado no OpenMetadata local.
+   - ⬜ Ligar `SILVER_APPLY` em fevereiro de 2027, depois de rever o primeiro relatório com dias a sair.

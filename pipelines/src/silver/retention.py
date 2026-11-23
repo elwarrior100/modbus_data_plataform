@@ -5,7 +5,8 @@ Branches de trabalho (`prune`):
 - juntado ao main (o commit da ponta está na história do main) e com mais de `merged_days`: apaga-se;
 - por juntar (lote rejeitado, ou silver que falhou) e com mais de `unmerged_days`: apaga-se também;
   até lá ficam para autópsia;
-- só se tocam nomes que o pipeline cria: `etl-<hex>`, `silver-<data>-<hora>` e `retention-<data>`.
+- só se tocam nomes que o pipeline cria: `etl-<hex>`, `silver-<data>-<hora>`, `retention-<data>` e
+  `retention-silver-<data>` (a retenção da silver, `gold/retention.py`).
   O main e branches manuais (ex.: `etl-gap`) nunca se tocam.
 
 Bronze crua (`expire_bronze`): as partições `bronze/dt=D/` com D anterior a hoje - `keep_days` saem do main por um
@@ -17,7 +18,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-OURS = re.compile(r"^(etl-[0-9a-f]{8,}|silver-\d{4}-\d{2}-\d{2}-\d{2}|retention-\d{8})$")
+OURS = re.compile(r"^(etl-[0-9a-f]{8,}|silver-\d{4}-\d{2}-\d{2}-\d{2}|retention-\d{8}|retention-silver-\d{8})$")
 BRONZE_DAY = re.compile(r"^bronze/dt=(\d{4}-\d{2}-\d{2})/$")
 KEEP_BRONZE_DAYS = 15
 DAY = 86400

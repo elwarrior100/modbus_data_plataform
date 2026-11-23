@@ -141,7 +141,10 @@ def point(lake, tag: str, *, target: str = "main", reason: str = "") -> float:
                       ensure_ascii=False, sort_keys=True).encode()
     _merge_one_file(lake, target, f"pointer-{int(time.time() * 1000)}", POINTER, body,
                     f"LATEST_STABLE -> {tag}", {"release": tag, "reason": reason or "-"})
-    return time.monotonic() - started
+    seconds = time.monotonic() - started       # o rollback mede-se até aqui: o catálogo é à parte e melhor esforço
+    from .openmetadata import publish_release
+    publish_release(tag, dict(lake.tags(PREFIX))[tag])      # a propriedade `release` das tabelas no OpenMetadata
+    return seconds
 
 
 def release_day(lake, day: date, *, target: str = "main", now: datetime | None = None,

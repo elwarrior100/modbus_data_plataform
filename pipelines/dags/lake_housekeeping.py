@@ -19,6 +19,7 @@ PROJECT_IMAGE = {"pod_override": k8s.V1Pod(spec=k8s.V1PodSpec(containers=[k8s.V1
 
 APPLY = True
 BRONZE_APPLY = True
+SILVER_APPLY = False      # retenção da silver (ADR-020): em simulação até rever o 1.º relatório (fevereiro de 2027)
 
 with DAG("lake_housekeeping", start_date=datetime(2026, 11, 9, tzinfo=timezone.utc), schedule="30 3 * * *",
          catchup=False, tags=["manutenção"]):
@@ -49,5 +50,23 @@ with DAG("lake_housekeeping", start_date=datetime(2026, 11, 9, tzinfo=timezone.u
         return {"expired": report.expired, "objects": report.objects, "kept": report.kept,
                 "merged": report.merged, "applied": BRONZE_APPLY}
 
+    @task(executor_config=PROJECT_IMAGE)
+    def expire_silver() -> dict:
+        """Silver com mais de 3 meses, só dos dias com release do gold (ADR-020). Primeiro dia elegível: ~2027-02-23.
+        Começa em simulação (SILVER_APPLY = False): liga-se depois de rever o primeiro relatório com dias a sair."""
+        from datetime import datetime, timezone
+
+        from gold.retention import KEEP_SILVER_DAYS, expire_silver
+        from silver.lake import Lake
+
+        today = datetime.now(timezone.utc).date()
+        report = expire_silver(Lake.from_env(), today, dry_run=not SILVER_APPLY)
+        print(f"silver ({KEEP_SILVER_DAYS} dias): {'saíram' if SILVER_APPLY else 'sairiam'} {len(report.expired)} dias, "
+              f"{report.objects} objetos {report.expired[:5]}; à espera de release: {report.waiting[:5]}; "
+              f"ficam {report.kept} dias; merge: {report.merged}")
+        return {"expired": report.expired, "objects": report.objects, "waiting": report.waiting, "kept": report.kept,
+                "merged": report.merged, "applied": SILVER_APPLY}
+
     prune_branches()
     expire_bronze()
+    expire_silver()
