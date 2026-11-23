@@ -8,8 +8,8 @@ já lá está com folga. Não coincide com nada pesado: a silver às :25, a cóp
 o gold de D−1 para o estado inicial dos sinais que só se escrevem ao mudar, e para os turnos que atravessam a meia-noite).
 A lógica está toda em `gold.run.run_day`, que é idempotente: repetir um dia é seguro.
 
-TODO(release, ADR-019 D7/D9): a seguir ao merge, o manifest, a tag `gold-v…` e o `LATEST_STABLE` (próxima etapa).
-TODO(OpenMetadata, ADR-019 D10/M1): as tabelas gold no catálogo, com a linhagem silver → gold_daily → gold.
+Depois do gold: o catálogo no OpenMetadata (M1), a release (tag + manifest + `LATEST_STABLE`, ADR-019 D7/D9) e, numa
+tarefa à parte (`serve`), a cópia das releases para o Postgres do BI (ADR-022, S1).
 """
 from datetime import datetime, timedelta, timezone
 
@@ -67,4 +67,24 @@ with DAG(
             out.update(release=r.tag, release_created=r.created, latest_stable_moved=r.pointer_moved)
         return out
 
-    silver_to_gold()
+    @task(executor_config=PROJECT_IMAGE)
+    def serve(_gold: dict) -> dict:
+        """O gold das releases no Postgres do BI (ADR-022, S1): carrega as releases que faltem e copia o LATEST_STABLE.
+        Tarefa à parte, depois da release: se o Postgres falhar, a release já está feita e esta tarefa repete sozinha
+        (retries); o `sync` é idempotente e corrige qualquer divergência com o lakeFS."""
+        from gold import serving
+        from silver.lake import Lake
+
+        s = serving.from_env()
+        if s is None:
+            print("SERVING_DATABASE_URL não definido: o gold não vai para o Postgres neste ambiente")
+            return {"skipped": True}
+        lake = Lake.from_env()
+        r = s.sync(lake)
+        problems = s.check(lake)
+        if problems:
+            raise RuntimeError(f"o Postgres do BI ficou diferente do lakeFS: {problems}")
+        print(r)
+        return {"loaded": r.loaded, "pointer": r.pointer, "rows": r.rows}
+
+    serve(silver_to_gold())

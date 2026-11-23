@@ -144,6 +144,8 @@ def point(lake, tag: str, *, target: str = "main", reason: str = "") -> float:
     seconds = time.monotonic() - started       # o rollback mede-se até aqui: o catálogo é à parte e melhor esforço
     from .openmetadata import publish_release
     publish_release(tag, dict(lake.tags(PREFIX))[tag])      # a propriedade `release` das tabelas no OpenMetadata
+    from .serving import publish_pointer
+    publish_pointer(tag)                       # a cópia do ponteiro no Postgres do BI (ADR-022, S1); o sync diário corrige
     return seconds
 
 
@@ -235,6 +237,8 @@ if __name__ == "__main__":
     tr = sub.add_parser("trace", help="do manifest de uma release até aos commits de bronze")
     tr.add_argument("tag")
     args = parser.parse_args()
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     lake = Lake.from_env()
     if args.cmd == "release":
         print(release_day(lake, args.day, move_pointer=not args.no_pointer))

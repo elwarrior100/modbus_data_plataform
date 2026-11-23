@@ -854,3 +854,20 @@ código e explica-o; ver CLAUDE.md.)*
    - ✅ (no disco) **OpenMetadata do gold (M1)** e **retenção da silver** (92 dias, só com release de D e D+1; em
      simulação). ADR-019 §8.3. Testes: pipelines 107 + 19 saltados; o M1 provado no OpenMetadata local.
    - ⬜ Ligar `SILVER_APPLY` em fevereiro de 2027, depois de rever o primeiro relatório com dias a sair.
+39. 🟡 (2026-11-23) **Fase 7 começada: ADR-022 aceite (L1, S1, B1, P1) com as condições de uma revisão independente.**
+    Caminho live (L1, fecha o que faltava da Fase 3) no disco, por rever. É o trigger na spool que copia cada amostra
+    para a hypertable `live.readings` e nunca faz falhar o collector.
+   - ✅ Testes: `ingest/tests/test_live.py`, 8 testes contra o TimescaleDB real.
+   - ✅ Ensaio de falha no cluster local: 0 perdas e 0 duplicados.
+   - ✅ Restauro sem o `live` ensaiado.
+   - ✅ Caminho dos dados medido: mediana 1,97 s, máximo 2,00 s.
+   - ✅ Plataforma no `main` (6ecbe99) e aplicada no cluster local: extensão, papel `grafana_live`, Grafana com
+     refresh de 1 s, dashboard "Modbus · Live" e dumps sem o `live`.
+   - ✅ **Latência pelo Grafana (local, 20 corridas):** dados mediana 1,98 s, p95 2,02 s; no ecrã, p95 3,02 s.
+     O DoD 1 da Fase 7 (< 5 s) está cumprido no cluster local.
+   - ⬜ Oracle: criar o segredo `monitoring-grafana-live-oracle`, fazer a imagem do collector com o `live.py` (precisa
+     do commit do projeto) e a promoção, correr o bootstrap e repetir a medição.
+   - 🟡 **S1, o gold no Postgres por release:** o código está no disco do projeto, com os testes (5 + pipelines 112).
+     A plataforma (base `serving`, segredo, env das tarefas) está no disco do repo `platform`, à espera do commit e do push.
+     O ensaio ponta a ponta precisa de uma release real no cluster local (a 1.ª é a 24-11 às 02:40) e da imagem nova.
+   - ⬜ Depois: os dashboards de qualidade e o executivo, B1 (Superset) e a semana de medição da memória (P1).

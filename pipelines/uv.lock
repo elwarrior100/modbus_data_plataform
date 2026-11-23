@@ -706,6 +706,7 @@ source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
     { name = "lakefs" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "pyarrow" },
     { name = "pyyaml" },
 ]
@@ -721,6 +722,7 @@ dev = [
 requires-dist = [
     { name = "duckdb", specifier = ">=1.4" },
     { name = "lakefs", specifier = ">=0.16.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.8" },
     { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
