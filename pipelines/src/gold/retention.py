@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from .release import PREFIX, read_manifest
+from .release import read_manifest, releases
 
 KEEP_SILVER_DAYS = 92                # ~3 meses (ADR-020, decisão 3)
 SILVER_DAY = re.compile(r"^silver/dt=(\d{4}-\d{2}-\d{2})/$")
@@ -34,7 +34,7 @@ class SilverReport:
 def released_days(lake) -> set[str]:
     """Os dias com uma release cujo G3 não falhou (pelos manifests das tags gold-v*)."""
     days = set()
-    for tag, _ in lake.tags(PREFIX):
+    for tag, _ in releases(lake):
         m = read_manifest(lake, tag)
         if m.get("gates", {}).get("g3") in ("pass", "warn"):
             days.add(m["covers"]["day"])

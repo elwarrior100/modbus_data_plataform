@@ -25,6 +25,7 @@ Uso:  python -m gold.release release 2026-11-23   |   current   |   list   |   r
 import io
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -36,6 +37,9 @@ from .build import GOLD_VERSION
 SCHEMA_VERSION = "1.0"               # MAJOR.MINOR do esquema do gold (MAJOR = quebra; MINOR = tabela/coluna nova)
 PREFIX = "gold-v"
 POINTER = "_releases/LATEST_STABLE"
+# só isto é uma release: uma tag `gold-v…` fora deste formato (a `gold-v0.1.0` do spike da Fase 0, no cluster local,
+# sem manifest) é ignorada, em vez de fazer rebentar quem lê os manifests de todas as releases
+RELEASE_TAG = re.compile(r"^gold-v\d+\.\d+\.\d+_\d{12}$")
 UTC = timezone.utc
 
 
@@ -66,8 +70,8 @@ def _when(tag: str) -> str:
 
 
 def releases(lake) -> list[tuple[str, str]]:
-    """(tag, commit) de todas as releases, da mais antiga à mais recente."""
-    return sorted(lake.tags(PREFIX), key=lambda t: (_when(t[0]), t[0]))
+    """(tag, commit) de todas as releases, da mais antiga à mais recente (só as tags no formato de uma release)."""
+    return sorted((t for t in lake.tags(PREFIX) if RELEASE_TAG.match(t[0])), key=lambda t: (_when(t[0]), t[0]))
 
 
 def read_manifest(lake, tag: str) -> dict:
@@ -133,7 +137,7 @@ def point(lake, tag: str, *, target: str = "main", reason: str = "") -> float:
     """Aponta o `LATEST_STABLE` para `tag`. Devolve os segundos que levou (o rollback do DoD tem de ser < 1 min).
     O hook release_pointer_pre_merge recusa uma release que não existe ou cujo G3 falhou."""
     started = time.monotonic()
-    if tag not in dict(lake.tags(PREFIX)):
+    if tag not in dict(releases(lake)):
         raise ReleaseError(f"a release {tag} não existe")
     if current(lake, target) == tag:
         return time.monotonic() - started

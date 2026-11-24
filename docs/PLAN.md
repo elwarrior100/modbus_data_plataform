@@ -850,7 +850,8 @@ código e explica-o; ver CLAUDE.md.)*
    - ✅ **Implantado** (projeto `8741773`, plataforma `e1ea6c5`; local 14:05, Oracle 14:26): `gold_daily` às 02:40 nos dois
      clusters; hooks do gold no `industrial-lake` (local 13:00, Oracle 14:28; merges do writer e da silver a passar, lakeFS
      estável); silver local das 14:25 com G2 `pass` e o `bronze_commit` registado (T1).
-   - ⬜ DoD na Oracle: releases a 24, 25 e 26-11 às 02:40; rollback cronometrado; `trace` de uma release.
+   - 🟡 DoD na Oracle: releases a 24 (✅ `gold-v1.0.0_202611240240`), 25 e 26-11 às 02:40; rollback cronometrado;
+     `trace` de uma release.
    - ✅ (no disco) **OpenMetadata do gold (M1)** e **retenção da silver** (92 dias, só com release de D e D+1; em
      simulação). ADR-019 §8.3. Testes: pipelines 107 + 19 saltados; o M1 provado no OpenMetadata local.
    - ⬜ Ligar `SILVER_APPLY` em fevereiro de 2027, depois de rever o primeiro relatório com dias a sair.
@@ -870,4 +871,25 @@ código e explica-o; ver CLAUDE.md.)*
    - 🟡 **S1, o gold no Postgres por release:** o código está no disco do projeto, com os testes (5 + pipelines 112).
      A plataforma (base `serving`, segredo, env das tarefas) está no disco do repo `platform`, à espera do commit e do push.
      O ensaio ponta a ponta precisa de uma release real no cluster local (a 1.ª é a 24-11 às 02:40) e da imagem nova.
+   - ✅ (23-11, 21:56 UTC) **Promovido para a Oracle** (platform b271363, imagens 915a3df), com as imagens descarregadas antes.
+     Verificado por um agente independente: "em ordem com ressalvas", nada que impeça a release das 02:40.
+     - live: atraso de 0,16 s e 0 falhas; os jobs do Timescale correm; a spool ~14,7/s;
+     - Grafana: o datasource e o dashboard foram provisionados; o papel `grafana_live` só lê `live`;
+     - `gold_daily`: com as tarefas `silver_to_gold` e `serve`, e o segredo `serving-db` sincronizado;
+     - o dump das 02:30 foi ensaiado com as flags novas; custo €0.
+   - ⚠️ **Ressalva 1:** perderam-se ~520 amostras na origem (buracos de 4–13 s às 21:57 e às 22:01), por causa de dois
+     reinícios do collector. O primeiro veio da promoção; o segundo foi manual, porque o collector arrancou antes de a
+     extensão existir. A subscrição OPC UA não guarda nada enquanto está desligada. Lição: o collector deve voltar a
+     tentar instalar o live sozinho (por exemplo, a cada 5 min), sem precisar de ser reiniciado. 🟡 (24-11) Corrigido no
+     disco, por rever: um vigia (`live.keep_installed`, numa thread do collector) verifica a cada 5 min (`LIVE_CHECK_S`)
+     o trigger e a hypertable, e reinstala o que faltar. Testes do ingest: 41 passam, 4 deles novos. Falta o commit, a
+     imagem e a promoção.
+   - ⬜ **Ressalva 2:** testar a ligação do datasource de ponta a ponta na Oracle (abrir o dashboard "Modbus · Live").
+     Medir a latência na Oracle numa altura em que 20 spikes não contem: eles entram na silver e no gold do dia.
+   - ⬜ **Ressalva 3:** o commit da correção das tags `gold-v*` fora do formato (está no disco, com testes). Só afeta
+     o cluster local, que tem a `gold-v0.1.0` do spike.
+   - ✅ (24-11) **1.ª release real na Oracle, com o S1:** `gold-v1.0.0_202611240240` do dia 23-11 (G3 `pass`,
+     1 264 537 amostras), o `LATEST_STABLE` movido e o OpenMetadata atualizado. A tarefa `serve` copiou 42 598 linhas
+     para a base `serving` (15 MB), e as vistas `gold.*` mostram essa release. O dump das 02:30 saiu completo com as
+     flags novas. A retenção da silver das 03:30 (simulação) não tirou nenhum dia. O live tem 0 falhas e 0,87 s de atraso.
    - ⬜ Depois: os dashboards de qualidade e o executivo, B1 (Superset) e a semana de medição da memória (P1).

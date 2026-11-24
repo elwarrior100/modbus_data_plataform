@@ -10,7 +10,7 @@ from .bronze import load_nodes
 from .collector import Collector
 from .envelope import Event
 from .lake import Lake
-from .live import try_install
+from .live import start_keeper
 from .spool import Spool
 from .writer import Writer
 
@@ -42,7 +42,8 @@ def main() -> None:
     args = build_parser().parse_args()
     spool = Spool(args.database_url)
     if args.command == "collect":
-        try_install(args.database_url)          # caminho live (ADR-022): melhor esforço, nunca impede o arranque
+        # caminho live (ADR-022): um vigia à parte instala-o e repõe-no se faltar; nunca impede o arranque
+        start_keeper(args.database_url, every=float(env("LIVE_CHECK_S", "300")))
         try:
             asyncio.run(Collector(args.opcua, spool).run())
         except KeyboardInterrupt:

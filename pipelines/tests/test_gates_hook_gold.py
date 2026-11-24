@@ -137,6 +137,28 @@ def test_releases_pointer_and_rollback_on_the_real_lakefs(scratch):
     print(f"rollback {before} -> {after} em {seconds:.2f} s")
     assert after == first.tag and rel.current(lake) == first.tag and seconds < 60
 
+    # ADR-022 (S1): as duas releases copiadas do lakeFS REAL (lidas pelas tags) para o Postgres do BI, e a vista
+    # a mostrar a que o LATEST_STABLE diz (a primeira, depois do rollback). Só com um Postgres (SERVING_TEST_DSN).
+    if os.environ.get("SERVING_TEST_DSN"):
+        import uuid
+
+        import psycopg
+
+        from gold.serving import Serving
+        prefix = "t" + uuid.uuid4().hex[:10]
+        s = Serving(os.environ["SERVING_TEST_DSN"], serving=f"{prefix}_serving", views=f"{prefix}_gold")
+        try:
+            r = s.sync(lake)
+            assert r.loaded == [first.tag, second.tag] and r.pointer == first.tag and s.check(lake) == []
+            with psycopg.connect(os.environ["SERVING_TEST_DSN"]) as db:
+                seen = db.execute(f"SELECT DISTINCT release FROM {s.v}.kpi_asset_day").fetchall()
+                rows = db.execute(f"SELECT count(*) FROM {s.v}.fact_tag_hour").fetchone()[0]
+            assert seen == [(first.tag,)] and rows > 0
+            print(f"serving: {r.rows} linhas de {len(r.loaded)} releases; a vista mostra {first.tag} ({rows} horas)")
+        finally:
+            with psycopg.connect(os.environ["SERVING_TEST_DSN"], autocommit=True) as db:
+                db.execute(f"DROP SCHEMA IF EXISTS {s.v} CASCADE; DROP SCHEMA IF EXISTS {s.s} CASCADE")
+
     # o hook do ponteiro recusa uma release que não existe (mesmo escrevendo o ficheiro à mão)
     lake.ensure_branch("bad-pointer", "main")
     lake.upload("bad-pointer", rel.POINTER, json.dumps({"release": "gold-v9.9.9_209901010000"}).encode())

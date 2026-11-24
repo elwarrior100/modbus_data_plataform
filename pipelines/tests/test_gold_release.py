@@ -142,3 +142,15 @@ def test_from_a_release_to_the_bronze_commits(lake):
     for path, bronze in t["hours"].items():                        # cada hora: o commit de bronze que a silver leu
         g2 = json.loads(lake.read("main", path.replace("silver/", "_gates/g2/").replace("/data.parquet", ".json")))
         assert g2["bronze_commit"] == bronze
+
+
+def test_a_gold_v_tag_that_is_not_a_release_is_ignored(lake):
+    """A `gold-v0.1.0` do spike da Fase 0 (no cluster local, sem manifest) não pode fazer rebentar as releases,
+    a retenção da silver nem o serving, que leem o manifest de cada release."""
+    from gold.retention import released_days
+    lake.tag_refs["gold-v0.1.0"] = lake.resolve("main")          # como ficou do spike: sem manifest, sem carimbo
+    sat = rel.release_day(lake, SATURDAY, now=T1)
+    assert [t for t, _ in rel.releases(lake)] == [sat.tag]
+    assert released_days(lake) == {SATURDAY.isoformat()}
+    with pytest.raises(rel.ReleaseError):
+        rel.point(lake, "gold-v0.1.0")                             # nem se pode apontar para ela

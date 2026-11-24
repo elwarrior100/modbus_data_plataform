@@ -5,7 +5,10 @@ import pytest
 
 from helpers import NOW, SEC, sample
 from ingest.bronze import load_nodes
-from ingest.live import install, node_rows, try_install
+import threading
+import time
+
+from ingest.live import ensure, install, installed, keep_installed, node_rows, try_install
 from ingest.spool import Spool
 
 
@@ -109,3 +112,70 @@ def test_install_is_idempotent_and_follows_the_nodes_yaml(live):
 
 def test_try_install_without_timescale_does_not_raise():
     assert try_install("postgresql://ninguem@127.0.0.1:1/nada?connect_timeout=1") is False
+
+
+def test_the_keeper_puts_back_a_live_schema_dropped_while_the_collector_runs(live):
+    """Um restauro (ou um DROP à mão) apaga o live com o collector a correr: na volta seguinte o vigia repõe-no e
+    as amostras novas voltam a entrar, sem reiniciar o collector."""
+    spool, dsn, name = live
+    assert installed(dsn, live=name) and ensure(dsn, live=name)          # inteiro: o vigia não mexe em nada
+    with psycopg.connect(dsn, autocommit=True) as db:
+        db.execute(f"DROP SCHEMA {name} CASCADE")
+    assert not installed(dsn, live=name)
+    spool.add([sample(1)])                                                 # perdida para o live, não para o spool
+    assert ensure(dsn, live=name) and installed(dsn, live=name)
+    spool.add([sample(2)])
+    assert len(rows(dsn, name)) == 1 and spool.counts()["events"] == 2
+
+
+def test_the_keeper_notices_a_disabled_trigger(live):
+    spool, dsn, name = live
+    with psycopg.connect(dsn, autocommit=True) as db:
+        db.execute("ALTER TABLE events DISABLE TRIGGER live_copy")
+    assert not installed(dsn, live=name)
+    assert ensure(dsn, live=name) and installed(dsn, live=name)           # o CREATE OR REPLACE volta a ativá-lo
+
+
+def test_the_keeper_installs_when_the_extension_arrives_later(new_dsn, monkeypatch):
+    """O caso da promoção de 23-11: o collector arranca, o live ainda não se instala (aqui finge-se a extensão em
+    falta); uma volta depois instala-se sozinho, sem reinício."""
+    from ingest import live as mod
+    dsn = new_dsn()
+    with psycopg.connect(dsn, autocommit=True) as db:
+        if db.execute("SELECT count(*) FROM pg_extension WHERE extname = 'timescaledb'").fetchone()[0] == 0:
+            pytest.skip("a base de teste não tem a extensão timescaledb")
+        schema = db.execute("SELECT current_schema()").fetchone()[0]
+    name = schema + "_live"
+    spool = Spool(dsn)
+    real, calls = mod.install, []
+
+    def install_later(*a, **k):                     # 1.ª tentativa: "a extensão timescaledb não está criada"
+        calls.append(1)
+        if len(calls) == 1:
+            raise psycopg.errors.UndefinedObject("a extensão timescaledb não está criada nesta base")
+        return real(*a, **k)
+
+    monkeypatch.setattr(mod, "install", install_later)
+    stop = threading.Event()
+    t = threading.Thread(target=keep_installed, args=(dsn, stop), kwargs={"every": 0.2, "live": name}, daemon=True)
+    try:
+        t.start()
+        deadline = time.monotonic() + 10
+        while not installed(dsn, live=name) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        assert installed(dsn, live=name) and len(calls) == 2
+        time.sleep(0.6)                              # as voltas seguintes só verificam: não reinstalam
+        assert len(calls) == 2
+        spool.add([sample(1)])
+        assert len(rows(dsn, name)) == 1
+    finally:
+        stop.set()
+        t.join(5)
+        spool.close()
+        with psycopg.connect(dsn, autocommit=True) as db:
+            db.execute(f"DROP SCHEMA IF EXISTS {name} CASCADE")
+    assert not t.is_alive()
+
+
+def test_ensure_without_a_database_does_not_raise():
+    assert ensure("postgresql://ninguem@127.0.0.1:1/nada?connect_timeout=1") is False

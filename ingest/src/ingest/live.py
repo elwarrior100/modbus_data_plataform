@@ -20,9 +20,11 @@ O instante de cada leitura é o do dispositivo (`source_ts`), a menos que o rel�
 60 s do gateway (a mesma regra `clock_skew` da silver, ADR-018); aí usa-se o do gateway, e por fim o da ingestão.
 
 Retenção: 7 dias, comprimido ao fim de 1 dia (políticas do Timescale). O esquema `live` fica fora dos dumps: refaz-se
-sozinho (o collector chama `install` ao arrancar) e o histórico está no bronze e na silver.
+sozinho (o vigia do collector, `keep_installed`, verifica-o a cada 5 min e reinstala o que faltar) e o histórico está
+no bronze e na silver.
 """
 import logging
+import threading
 
 import psycopg
 
@@ -128,13 +130,55 @@ def install(dsn: str, *, live: str = LIVE, nodes: dict[str, str] | None = None) 
                         "SET asset = EXCLUDED.asset, tag = EXCLUDED.tag, kind = EXCLUDED.kind", rows)
 
 
-def try_install(dsn: str) -> bool:
-    """Chamado pelo collector ao arrancar. Melhor esforço: sem Timescale (ou com outro erro), o collector arranca na
-    mesma e o live fica parado até ao próximo arranque."""
+def try_install(dsn: str, *, live: str = LIVE) -> bool:
+    """Melhor esforço: sem Timescale (ou com outro erro) devolve False e o collector continua na mesma."""
     try:
-        install(dsn)
-        log.info("caminho live instalado (trigger no spool → %s.readings)", LIVE)
+        install(dsn, live=live)
+        log.info("caminho live instalado (trigger no spool → %s.readings)", live)
         return True
     except psycopg.Error as error:
         log.warning("caminho live não instalado (%s): o spool e o bronze continuam normais", error)
         return False
+
+
+def installed(dsn: str, *, live: str = LIVE) -> bool:
+    """O live está inteiro? A hypertable, o contador e o trigger ativo na `events`. Só leituras ao catálogo: não
+    bloqueia a spool (o `install`, esse, troca o trigger e prende a `events` por um instante)."""
+    with psycopg.connect(dsn, connect_timeout=5) as db:
+        return db.execute(
+            "SELECT to_regclass(%s) IS NOT NULL AND to_regclass(%s) IS NOT NULL AND EXISTS ("
+            "  SELECT FROM pg_trigger WHERE tgname = 'live_copy' AND tgrelid = to_regclass('events')"
+            "  AND tgenabled <> 'D')",
+            (f"{live}.readings", f"{live}.health")).fetchone()[0]
+
+
+def ensure(dsn: str, *, live: str = LIVE) -> bool:
+    """Uma volta do vigia: se o live estiver inteiro não faz nada; se não, instala. True = está inteiro."""
+    try:
+        if installed(dsn, live=live):
+            return True
+    except psycopg.Error as error:
+        log.warning("live: não consegui ver se está instalado (%s)", error)
+        return False
+    return try_install(dsn, live=live)
+
+
+def keep_installed(dsn: str, stop: threading.Event, *, every: float = 300, live: str = LIVE) -> None:
+    """O vigia do collector (lição da promoção de 23-11): verifica já e depois a cada `every` segundos, e reinstala
+    o que faltar. Cobre o collector que arranca antes de a extensão existir e um restauro que apague o esquema
+    `live`, sem reiniciar o collector (um reinício perde as amostras desses segundos: o OPC UA não as guarda)."""
+    healthy = None
+    while not stop.is_set():
+        ok = ensure(dsn, live=live)
+        if ok != healthy and healthy is not None:
+            log.info("live: %s", "reposto" if ok else "deixou de estar instalado; volto a tentar")
+        healthy = ok
+        stop.wait(every)
+
+
+def start_keeper(dsn: str, *, every: float = 300) -> threading.Event:
+    """Lança o vigia numa thread à parte (fora do ciclo asyncio do collector). Devolve o evento para o parar."""
+    stop = threading.Event()
+    threading.Thread(target=keep_installed, args=(dsn, stop), kwargs={"every": every},
+                     name="live-keeper", daemon=True).start()
+    return stop
