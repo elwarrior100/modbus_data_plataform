@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from fixture_gold import SATURDAY, SUNDAY
-from gold.build import TABLES, build_day, gold_path, silver_window
+from gold.build import LOOKBACK_HOURS, TABLES, build_day, gold_path, silver_window
 from gold.plan import load_plan
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +33,23 @@ def build(lake, tmp: Path, day=SUNDAY, previous=None, skip=()):
         kw = {"previous_tag_hour": previous.files[gold_path("fact_tag_hour", day.fromordinal(day.toordinal() - 1))],
               "previous_asset_hour": previous.files[gold_path("fact_asset_hour", day.fromordinal(day.toordinal() - 1))]}
     return build_day(silver_files(lake, day, tmp, skip), day, out, **kw)
+
+
+def lookback_from(lake, tmp: Path, calls: list | None = None):
+    """O `lookback` do build, como o run.py o faz: a silver de uma hora anterior à janela, ou None se não houver."""
+    def look(hour):
+        if calls is not None:
+            calls.append(hour)
+        path = f"silver/dt={hour:%Y-%m-%d}/hour={hour:%H}/data.parquet"
+        if path not in lake.silver():
+            return None
+        local = tmp / ("lookback_" + path.replace("/", "_"))
+        local.write_bytes(lake.silver()[path])
+        return local
+    return look
+
+
+STATES = "SELECT asset_id, hour_utc, run_s, starting_s, stopped_s, fault_s, maintenance_s, no_data_s FROM T ORDER BY 1, 2"
 
 
 @pytest.fixture(scope="module")
@@ -200,3 +217,84 @@ def test_an_hour_refused_by_g2_shows_up_as_an_hour_without_data(days):
     assert sorted(r[0] for r in rows) == ["CHILLER-01", "MOTOR-01", "PUMP-01"]
     assert all(3540 <= nd < 3600 and es <= 60 for _, nd, es in rows)
     assert gap.rows["fact_asset_hour"] == 72                            # a hora está lá, com cobertura 0
+
+
+# --- o estado inicial que falta (Oracle, 23-11: o MOTOR-01 "sem dados" o dia inteiro) --------------------------------
+
+def test_without_the_previous_day_the_lookback_finds_the_state_in_the_older_silver(days):
+    """O 1.º dia do gold não tem D−1: o estado em vigor procura-se na silver anterior à janela, e o dia fica igual ao
+    calculado com o gold de sábado (o chiller OFF desde sábado às 22:00 já conta como parado à meia-noite)."""
+    lake, tmp, _, sunday = days
+    calls = []
+    found = build_day(silver_files(lake, SUNDAY, tmp), SUNDAY, tmp / "out-lookback", lookback=lookback_from(lake, tmp, calls))
+    q = "SELECT stopped_s, no_data_s FROM T WHERE asset_id = 'CHILLER-01' AND hour_utc = '2026-11-01 00:00:00+00'"
+    assert sql(found, "fact_asset_hour", q) == [(3600, 0)]
+    assert sql(found, "fact_asset_hour", STATES) == sql(sunday, "fact_asset_hour", STATES)
+    assert calls[0] == datetime(2026, 10, 31, 22, tzinfo=timezone.utc)     # começa logo antes da janela (D−1 23h)
+    assert len(calls) <= LOOKBACK_HOURS
+
+
+def test_with_the_previous_day_nothing_more_is_read(days):
+    """No dia a dia o estado inicial vem do gold de D−1: nenhum pedido a mais ao Object Storage."""
+    lake, tmp, saturday, sunday = days
+    calls = []
+    out = build_day(silver_files(lake, SUNDAY, tmp), SUNDAY, tmp / "out-prev-lookback", lookback=lookback_from(lake, tmp, calls),
+                    previous_tag_hour=saturday.files[gold_path("fact_tag_hour", SATURDAY)],
+                    previous_asset_hour=saturday.files[gold_path("fact_asset_hour", SATURDAY)])
+    assert calls == [] and sql(out, "fact_asset_hour", STATES) == sql(sunday, "fact_asset_hour", STATES)
+
+
+def _previous_with(saturday, tmp: Path, name: str, select: str) -> Path:
+    src = f"read_parquet('{saturday.files[gold_path('fact_tag_hour', SATURDAY)]}', hive_partitioning = false)"
+    out = tmp / f"prev-{name}.parquet"
+    duckdb.sql(f"COPY ({select.replace('FROM T', 'FROM ' + src)}) TO '{out}' (FORMAT PARQUET)")
+    return out
+
+
+def test_a_state_lost_at_the_end_of_the_previous_day_is_looked_up_but_a_silent_one_is_not(days):
+    """Com o gold de D−1, mas o `value_end` do estado nulo (a comunicação caiu no último segundo): procura-se a última
+    leitura e o estado continua. Um sinal que esteve calado o dia D−1 inteiro não se procura outra vez (o build de D−1
+    já o fez): sem isto, um sinal que nunca escreve custava 168 pedidos por dia."""
+    lake, tmp, saturday, _ = days
+    chiller = "asset_id = 'CHILLER-01' AND tag_name = 'state'"
+    q = "SELECT stopped_s, no_data_s FROM T WHERE asset_id = 'CHILLER-01' AND hour_utc = '2026-11-01 00:00:00+00'"
+    lost = _previous_with(saturday, tmp, "lost", f"SELECT * REPLACE (CASE WHEN {chiller} THEN NULL ELSE value_end END AS value_end) FROM T")
+    silent = _previous_with(saturday, tmp, "silent", f"""SELECT * REPLACE (CASE WHEN {chiller} THEN NULL ELSE value_end END AS value_end,
+        CASE WHEN {chiller} THEN 0 ELSE samples END AS samples,
+        CASE WHEN {chiller} THEN 0 ELSE seconds_with_data END AS seconds_with_data) FROM T""")
+    results = {}
+    for name, previous in (("lost", lost), ("silent", silent)):
+        calls = []
+        out = build_day(silver_files(lake, SUNDAY, tmp), SUNDAY, tmp / f"out-{name}", previous_tag_hour=previous,
+                        lookback=lookback_from(lake, tmp, calls))
+        results[name] = (sql(out, "fact_asset_hour", q)[0], len(calls))
+    assert results["lost"] == ((3600, 0), 1)                 # encontrado na primeira hora lida (sábado 22h)
+    assert results["silent"] == ((0, 3600), 0)
+
+
+def test_a_bad_stamped_by_the_gateway_does_not_beat_the_good_reading_that_came_after_it(days):
+    """ADR-018: dentro do mesmo segundo ordena-se pelo `server_ts`. Ao religar (Oracle, 22-11 22:29:08) o gateway manda
+    um BAD carimbado com milissegundos (.628) e logo a seguir o valor do PLC, com o `ts_utc` do segundo (.000) e um
+    `server_ts` posterior (.843). O estado em vigor é o segundo, não o BAD."""
+    lake, tmp, saturday, sunday = days
+    files = silver_files(lake, SUNDAY, tmp)
+    hour3 = next(f for f in files if "dt=2026-11-01_hour=03" in f.name)
+    src = f"read_parquet('{hour3}', hive_partitioning = false)"
+    running = f"(SELECT * FROM read_parquet([{', '.join(repr(str(f)) for f in files)}], union_by_name = true, " \
+              "hive_partitioning = false) WHERE asset_id = 'MOTOR-01' AND tag_name = 'state' AND value_str = 'RUNNING' LIMIT 1)"
+    at = lambda ms: f"TIMESTAMPTZ '2026-11-01 03:30:00.{ms:03d}+00'"         # noqa: E731
+    patched = tmp / "silver-hour3-reconnect.parquet"
+    duckdb.sql(f"""COPY (
+        SELECT * FROM {src}
+        UNION ALL BY NAME SELECT * REPLACE ({at(628)} AS ts_utc, {at(628)} AS server_ts, 'BAD' AS quality,
+                                            NULL::DOUBLE AS value_double, NULL::VARCHAR AS value_str,
+                                            'reconnect-bad' AS bronze_event_id, dq_flags[1:0] AS dq_flags) FROM {running}
+        UNION ALL BY NAME SELECT * REPLACE ({at(0)} AS ts_utc, {at(843)} AS server_ts, 'reconnect-good' AS bronze_event_id,
+                                            dq_flags[1:0] AS dq_flags) FROM {running}
+        ) TO '{patched}' (FORMAT PARQUET)""")
+    out = build_day([patched if f == hour3 else f for f in files], SUNDAY, tmp / "out-reconnect",
+                    previous_tag_hour=saturday.files[gold_path("fact_tag_hour", SATURDAY)],
+                    previous_asset_hour=saturday.files[gold_path("fact_asset_hour", SATURDAY)])
+    q = "SELECT run_s, no_data_s FROM T WHERE asset_id = 'MOTOR-01' AND hour_utc = '2026-11-01 03:00:00+00'"
+    assert sql(sunday, "fact_asset_hour", q) == [(3600, 0)]
+    assert sql(out, "fact_asset_hour", q) == [(3600, 0)]           # com a ordem antiga: (1800, 1800)

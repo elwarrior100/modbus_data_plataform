@@ -24,6 +24,7 @@ hora do evento em D. As leituras anteriores a D servem só de "estado inicial" (
 """
 import logging
 import time as _time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -38,8 +39,9 @@ from .plan import Plan, load_plan
 
 log = logging.getLogger(__name__)
 UTC = timezone.utc
+LOOKBACK_HOURS = 7 * 24             # até onde se procura, na silver, o estado inicial de um sinal (ver _look_back)
 HOLD_S = 60                         # teto do "sample and hold" dos analógicos e do device_clock (ADR-019, contexto)
-GOLD_VERSION = "1"                  # versão do código do gold (entra nos metadados do commit e no manifest)
+GOLD_VERSION = "2"                  # versão do código do gold (metadados do commit e manifest); "2": ADR-024
 
 # Cada estado numa categoria comum aos três ativos (o chiller tem outros nomes). "run" é o que conta como a funcionar.
 STATE_CATEGORY = {"RUNNING": "run", "COOLING": "run", "STARTING": "starting", "STANDBY": "starting",
@@ -185,15 +187,72 @@ def _per_asset(expr: dict[str, str | None]) -> str:
     return f"CASE asset_id {whens} END" if whens else "NULL"
 
 
+def _readings_sql(files: list) -> str:
+    """As leituras dos ficheiros silver, na forma da tabela `raw`: o instante do evento (`t_us`; `server_ts` nas linhas
+    com `clock_skew`), o segundo inteiro, a qualidade, o valor (número; nos estados, também o nome) e o desempate."""
+    src = "[" + ", ".join(_lit(f) for f in files) + "]"
+    return f"""
+      WITH s AS (SELECT *, epoch_us(CASE WHEN list_contains(dq_flags, 'clock_skew') THEN server_ts ELSE ts_utc END) AS t_us
+                 FROM read_parquet({src}, union_by_name = true, hive_partitioning = false))
+      SELECT g.tag_id, s.t_us, s.t_us // 1000000 AS sec, s.quality = 'GOOD' AS good, s.quality <> 'BAD' AS ok,
+             CASE g.kind WHEN 'boolean' THEN CAST(s.value_bool AS DOUBLE) WHEN 'clock' THEN NULL ELSE s.value_double END AS v,
+             CASE g.kind WHEN 'state' THEN s.value_str END AS label, epoch_us(s.server_ts) AS srv_us,
+             hash(s.bronze_event_id) AS eid
+      FROM s JOIN tags g ON g.asset_id = s.asset_id AND g.tag_name = s.tag_name"""
+
+
+def _look_back(q, lookback, t0: int, previous_tag_hour) -> int:
+    """O estado inicial que falta, procurado na silver anterior à janela. Devolve quantas horas leu.
+
+    Só para os sinais "até à leitura seguinte" (`hold_s` nulo: estado, alarme, contadores, `Connected`, sinais de
+    processo) que ficaram sem nenhuma leitura antes de D, nem da janela nem do gold de D−1. Lê-se uma hora de receção
+    de cada vez, de D−1 22h para trás (a janela começa em D−1 23h), e para assim que todos tiverem uma leitura, ou ao
+    fim de `LOOKBACK_HOURS`. De cada sinal fica a última leitura da hora mais recente em que aparece, no segundo em que
+    aconteceu; se for BAD, o sinal continua "sem dados" (como dentro do dia).
+
+    Custo (pedidos ao Object Storage): no dia a dia, zero. Com o gold de D−1, cada sinal tem o `value_end` da hora 23;
+    só falta quando a comunicação caiu no fim do dia, e então a leitura está perto. Um sinal que já esteve calado o dia
+    D−1 inteiro (sem amostras e sem segundos com dados) não se procura outra vez: o build de D−1 já o procurou."""
+    silent = ""
+    if previous_tag_hour is not None:
+        silent = f"""AND NOT EXISTS (
+            SELECT 1 FROM read_parquet({_lit(previous_tag_hour)}, hive_partitioning = false) p
+            WHERE p.asset_id = g.asset_id AND p.tag_name = g.tag_name
+            GROUP BY ALL HAVING sum(p.samples) = 0 AND sum(p.seconds_with_data) = 0)"""
+    missing = {r[0] for r in q(f"""SELECT g.tag_id FROM tags g WHERE g.hold_s IS NULL {silent}
+                                   AND NOT EXISTS (SELECT 1 FROM ps x WHERE x.tag_id = g.tag_id AND x.sec < {t0})""").fetchall()}
+    hour, read = datetime.fromtimestamp(t0, UTC) - timedelta(hours=2), 0
+    for _ in range(LOOKBACK_HOURS):
+        if not missing:
+            break
+        path, hour = lookback(hour), hour - timedelta(hours=1)
+        if path is None:
+            continue
+        read += 1
+        found = q(f"""INSERT INTO ps
+                      SELECT tag_id, sec, ok, v, label FROM ({_readings_sql([path])})
+                      WHERE tag_id IN ({", ".join(map(str, sorted(missing)))}) AND sec < {t0}
+                      QUALIFY row_number() OVER (PARTITION BY tag_id
+                                                 ORDER BY sec DESC, srv_us DESC NULLS LAST, t_us DESC, eid DESC) = 1
+                      RETURNING tag_id""").fetchall()
+        missing -= {r[0] for r in found}
+    if missing:
+        log.info("sem estado inicial ao fim de %d h para trás: tags %s", LOOKBACK_HOURS, sorted(missing))
+    return read
+
+
 def build_day(silver_files: list[str | Path], day: date, out_dir: str | Path, *, catalog: list[Tag] | None = None,
               plan: Plan | None = None, previous_tag_hour: str | Path | None = None,
               previous_asset_hour: str | Path | None = None,
+              lookback: Callable[[datetime], str | Path | None] | None = None,
               memory_limit: str = "256MB", threads: int = 1) -> BuildResult:
     """Calcula as tabelas gold do dia UTC `day` a partir dos ficheiros silver da janela (`silver_window`).
     `previous_tag_hour` e `previous_asset_hour` são o `fact_tag_hour` e o `fact_asset_hour` do gold de D−1, se existirem:
     o primeiro dá o estado inicial dos sinais que só se escrevem ao mudar (o estado de uma máquina pode não mudar durante
-    dias), o segundo as horas de D−1 dos turnos e dias que acabam em D. Sem eles, esses sinais começam "sem dados" até à
-    primeira leitura e esses KPIs ficam `complete = false`. Por isso os dias calculam-se por ordem (o DAG faz isso)."""
+    dias), o segundo as horas de D−1 dos turnos e dias que acabam em D. Sem eles, esses KPIs ficam `complete = false`.
+    Por isso os dias calculam-se por ordem (o DAG faz isso).
+    `lookback(hora)` dá o ficheiro silver de uma hora de receção anterior à janela (ou None se não houver): só se chama
+    para os sinais que ficaram sem estado inicial (ver `_look_back`). Sem ele, esses sinais começam "sem dados"."""
     catalog = catalog or load_catalog()
     plan = plan or load_plan()
     out_dir = Path(out_dir)
@@ -222,21 +281,17 @@ def build_day(silver_files: list[str | Path], day: date, out_dir: str | Path, *,
     q("""CREATE TABLE raw (tag_id BIGINT, t_us BIGINT, sec BIGINT, good BOOLEAN, ok BOOLEAN, v DOUBLE, label VARCHAR,
                            srv_us BIGINT, eid UBIGINT)""")
     if silver_files:
-        files = "[" + ", ".join(_lit(f) for f in silver_files) + "]"
-        q(f"""INSERT INTO raw
-              WITH s AS (SELECT *, epoch_us(CASE WHEN list_contains(dq_flags, 'clock_skew') THEN server_ts ELSE ts_utc END) AS t_us
-                         FROM read_parquet({files}, union_by_name = true, hive_partitioning = false))
-              SELECT g.tag_id, s.t_us, s.t_us // 1000000, s.quality = 'GOOD', s.quality <> 'BAD',
-                     CASE g.kind WHEN 'boolean' THEN CAST(s.value_bool AS DOUBLE) WHEN 'clock' THEN NULL ELSE s.value_double END,
-                     CASE g.kind WHEN 'state' THEN s.value_str END, epoch_us(s.server_ts), hash(s.bronze_event_id)
-              FROM s JOIN tags g ON g.asset_id = s.asset_id AND g.tag_name = s.tag_name
-              WHERE s.t_us // 1000000 < {t1}""")
-    # a ordem total das leituras (o "primeiro" e o "último" nunca empatam): instante, server_ts (ADR-018), id
-    order = "{'t': t_us, 's': srv_us, 'e': eid}"
+        q(f"INSERT INTO raw SELECT * FROM ({_readings_sql(silver_files)}) WHERE sec < {t1}")
+    # A ordem total das leituras (o "primeiro" e o "último" nunca empatam): o SEGUNDO, depois o server_ts, o instante
+    # e o id. Dentro do mesmo segundo manda o server_ts (ADR-018, decisão 4), não o instante: o `ts_utc` de um PLC tem
+    # a precisão de 1 s (vem com .000), mas uma leitura BAD é carimbada pelo gateway com milissegundos. Visto na Oracle
+    # (22-11 22:29:08, ao religar): MOTOR-01.state BAD às .628 e a seguir RUNNING com `ts_utc` .000 e `server_ts` .843.
+    # Ordenado pelo instante, o BAD ficava como "a última leitura" e o estado acabava em "sem dados".
+    order = "{'t': sec, 's': srv_us, 'u': t_us, 'e': eid}"
 
     # 2. Uma leitura por (tag, segundo): a última desse segundo -------------------------------------------------------
     q("""CREATE TABLE ps AS SELECT tag_id, sec, ok, v, label FROM raw
-         QUALIFY row_number() OVER (PARTITION BY tag_id, sec ORDER BY t_us DESC, srv_us DESC NULLS LAST, eid DESC) = 1""")
+         QUALIFY row_number() OVER (PARTITION BY tag_id, sec ORDER BY srv_us DESC NULLS LAST, t_us DESC, eid DESC) = 1""")
     # Estado inicial: os sinais que valem "até à leitura seguinte" (estado, alarme, contadores, Connected) podem não ter
     # nenhuma leitura há dias (o gateway só escreve ao mudar). Se a janela não tiver nenhuma leitura deles antes de D,
     # entra o valor em vigor no fim de D−1 (`value_end` da hora 23 do fact_tag_hour de D−1), como uma leitura no último
@@ -249,6 +304,13 @@ def build_day(silver_files: list[str | Path], day: date, out_dir: str | Path, *,
               JOIN tags g ON g.asset_id = p.asset_id AND g.tag_name = p.tag_name
               WHERE epoch_us(p.hour_utc) // 1000000 = {t0 - 3600} AND g.hold_s IS NULL AND p.value_end IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM ps x WHERE x.tag_id = g.tag_id AND x.sec < {t0})""")
+    # Quando nem a janela nem o gold de D−1 dão o estado inicial, procura-se a última leitura na silver mais antiga
+    # (`lookback`), de hora a hora para trás. Foi o que faltou na Oracle: o 1.º dia do gold (23-11) não tinha D−1, e o
+    # MOTOR-01 estava RUNNING desde 22-11 22:29 sem mudar; o dia ficou todo "sem dados" e, como o `value_end` desse dia
+    # era nulo, o dia seguinte também, até o motor mudar de estado (24-11 10:50).
+    if lookback is not None:
+        _look_back(q, lookback, t0, previous_tag_hour)
+
 
     # 3. A grelha: para cada tag e segundo de D, a última leitura até esse segundo, e se ainda vale -------------------
     # "a última leitura até ao segundo s" = last_value(... IGNORE NULLS) numa janela ordenada pelo segundo. A leitura vai

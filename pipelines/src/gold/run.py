@@ -99,8 +99,19 @@ def run_day(lake, day: date, *, target: str = "main", hook=None, keep_branch: bo
         silver = [fetch(_silver_path(h)) for h in window]
         previous = {t: fetch(gold_path(t, yesterday)) for t in ("fact_tag_hour", "fact_asset_hour")
                     if gold_path(t, yesterday) in gold_tables}
+        listed = {}                              # dia → partições de silver que existem (uma listagem por dia)
+
+        def lookback(hour: datetime) -> Path | None:
+            """A silver de uma hora anterior à janela, do mesmo commit, para o estado inicial que falta (build._look_back).
+            Só se chama quando falta: no dia a dia nenhum pedido a mais ao Object Storage."""
+            d = hour.date()
+            if d not in listed:
+                listed[d] = set(lake.list(commit, f"silver/dt={d.isoformat()}/"))
+            path = _silver_path(hour)
+            return fetch(path) if path in listed[d] else None
+
         result = build_day(silver, day, tmp / "out", previous_tag_hour=previous.get("fact_tag_hour"),
-                           previous_asset_hour=previous.get("fact_asset_hour"))
+                           previous_asset_hour=previous.get("fact_asset_hour"), lookback=lookback)
         hook("build")
         for path, local in sorted(result.files.items()):
             lake.upload(branch, path, local.read_bytes())

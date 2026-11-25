@@ -888,6 +888,12 @@ código e explica-o; ver CLAUDE.md.)*
      Medir a latência na Oracle numa altura em que 20 spikes não contem: eles entram na silver e no gold do dia.
    - ⬜ **Ressalva 3:** o commit da correção das tags `gold-v*` fora do formato (está no disco, com testes). Só afeta
      o cluster local, que tem a `gold-v0.1.0` do spike.
+   - 🟡 (25-11) **MOTOR-01 "sem dados" no gold (dias 22 e 23-11), apesar de as leituras estarem GOOD.** Havia duas causas.
+     A primeira: o 1.º dia do gold não tinha D−1, e o estado do motor (RUNNING desde 22-11 22:29) estava fora da janela.
+     A segunda: no mesmo segundo, um BAD do gateway ganhava à leitura do PLC (o que contraria o ADR-018). A correção está
+     no disco, por rever: o estado inicial procura-se na silver anterior, a ordem dentro do segundo é pelo `server_ts`,
+     e há uma regra nova, o G3-07 (`warn`). Ver o ADR-024. Testes: 114 passam e 24 saltam. Falta o commit, a imagem, a
+     promoção e reprocessar 23-11 e depois 24-11.
    - ✅ (24-11) **1.ª release real na Oracle, com o S1:** `gold-v1.0.0_202611240240` do dia 23-11 (G3 `pass`,
      1 264 537 amostras), o `LATEST_STABLE` movido e o OpenMetadata atualizado. A tarefa `serve` copiou 42 598 linhas
      para a base `serving` (15 MB), e as vistas `gold.*` mostram essa release. O dump das 02:30 saiu completo com as

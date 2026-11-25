@@ -151,6 +151,17 @@ def evaluate(day: date, gold_files: dict[str, Path], silver_files: list[Path], *
                 ORDER BY 1, 3""").fetchall():
             f.append(Finding("G3-03", "blocker", round(value, 4), 0, f"{table}: {detail}", asset))
 
+    # G3-07 estado desconhecido: o ativo fica "sem dados" o dia inteiro (nenhum segundo com estado), mas os seus sinais
+    # têm leituras GOOD. Quase sempre é o estado inicial que falta (o gateway só escreve o `state` ao mudar), não uma
+    # falha de comunicação. Foi o caso do MOTOR-01 na Oracle a 23-11: 100 % das leituras GOOD, a 30 kW e 1480 rpm, e
+    # cobertura 0 nos KPIs. Aviso e não bloqueio: o gold está coerente com o que leu; quem o vê tem de saber porquê.
+    for asset, good in con.execute("""
+            WITH a AS (SELECT asset_id FROM fact_asset_hour GROUP BY 1 HAVING sum(no_data_s) = count(*) * 3600),
+                 t AS (SELECT asset_id, sum(good_samples) AS good FROM fact_tag_hour GROUP BY 1)
+            SELECT asset_id, t.good FROM a JOIN t USING (asset_id) WHERE t.good > 0 ORDER BY 1""").fetchall():
+        f.append(Finding("G3-07", "warn", int(good), 0, f"o dia inteiro sem estado, mas com {good} leituras GOOD: "
+                                                        "falta o estado inicial do sinal state?", asset))
+
     # G3-04 cobertura: horas do dia sem silver no main (recusadas pelo G2, ou que não correram)
     missing = sorted(set(range(24)) - set(silver_hours))
     if missing:

@@ -1,7 +1,11 @@
 """Uma execução do gold (um dia) contra um lakeFS em memória: o ciclo, a idempotência, as falhas a meio e o G3."""
 import copy
 import json
+import tempfile
 from datetime import date
+from pathlib import Path
+
+import duckdb
 
 import pytest
 
@@ -110,3 +114,20 @@ def test_a_day_without_silver_is_skipped_and_creates_nothing(lake):
     result = run_day(lake, date(2026, 11, 5))
     assert result.skipped and gold_branches(lake) == set()
     assert not [p for p in lake.branches["main"]["committed"] if p.startswith(("gold/", "_gates/g3/"))]
+
+
+def test_the_first_gold_day_takes_the_initial_state_from_the_older_silver(lake, lake_sat):
+    """O 1.º dia do gold (na Oracle, 23-11) não tem D−1: o run_day dá ao build a silver anterior à janela, do mesmo
+    commit, e o dia sai igual ao calculado por ordem (o estado das máquinas é o mesmo nas duas formas)."""
+    first, in_order = run_day(lake, SUNDAY), run_day(lake_sat, SUNDAY)
+    assert first.g3_status == in_order.g3_status == "pass"
+    path = gold_path("fact_asset_hour", SUNDAY)
+    with tempfile.TemporaryDirectory() as tmp:
+        rows = []
+        for name, lk in (("first", lake), ("in_order", lake_sat)):
+            local = Path(tmp) / f"{name}.parquet"
+            local.write_bytes(lk.read("main", path))
+            rows.append(duckdb.sql(f"""SELECT asset_id, hour_utc, run_s, stopped_s, fault_s, maintenance_s, no_data_s
+                                       FROM '{local}' ORDER BY 1, 2""").fetchall())
+    assert rows[0] == rows[1]
+    assert sum(r[-1] for r in rows[0]) == 600                     # só os 10 min sem comunicação do motor (dom. 20:00)

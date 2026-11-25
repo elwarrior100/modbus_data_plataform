@@ -121,3 +121,18 @@ def test_the_attestation_carries_the_checksums_and_the_inputs(sunday):
     assert doc["gate"] == "G3" and doc["status"] == "pass" and doc["partition"] == "2026-11-01"
     assert doc["files"] == {"gold/x/dt=2026-11-01/data.parquet": "abc"} and doc["inputs"]["silver_commit"] == "c0ffee"
     assert {r["id"] for r in doc["rules"]} == {"G3-05", "G3-06"}                    # os `info` ficam registados
+
+
+def test_g3_07_an_asset_without_state_all_day_but_with_good_readings_is_a_warning(sunday):
+    """O caso do MOTOR-01 na Oracle (23-11): leituras todas GOOD, mas o estado nunca conhecido, cobertura 0."""
+    result, silver, tmp = sunday
+    assert "G3-07" not in ids(g3.evaluate(SUNDAY, result.files, silver, silver_hours=ALL_HOURS))
+    motor = "asset_id = 'MOTOR-01'"
+    zero = ", ".join(f"CASE WHEN {motor} THEN 0 ELSE {c} END AS {c}" for c in
+                     ("run_s", "starting_s", "stopped_s", "fault_s", "maintenance_s", "planned_with_data_s", "run_planned_s"))
+    files = tampered(result, tmp, "fact_asset_hour",
+                     f"SELECT * REPLACE ({zero}, CASE WHEN {motor} THEN 3600 ELSE no_data_s END AS no_data_s) FROM T")
+    report = g3.evaluate(SUNDAY, files, silver, silver_hours=ALL_HOURS)
+    found = [x for x in report.findings if x.id == "G3-07"]
+    assert report.status == "warn" and [(x.severity, x.asset) for x in found] == [("warn", "MOTOR-01")]
+    assert found[0].value > 10_000                                   # as leituras GOOD do motor nesse dia

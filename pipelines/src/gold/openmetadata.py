@@ -5,7 +5,7 @@ não falham (quem impõe são os hooks do lakeFS; o catálogo só mostra e guard
 - **Catálogo:** a base `industrial_lake` ganha o esquema `gold` com as 9 tabelas; as colunas vêm do próprio ficheiro
   parquet do dia (assim nunca divergem do que o `gold/build.py` escreve).
 - **Linhagem:** silver.readings → (pipeline gold_daily) → cada tabela do gold.
-- **G3:** um caso de teste por regra (G3-01 … G3-06), na tabela `gold.fact_tag_hour` (a do G3-01, a reconciliação com a
+- **G3:** um caso de teste por regra (G3-01 … G3-07), na tabela `gold.fact_tag_hour` (a do G3-01, a reconciliação com a
   silver), com um resultado por dia. Repetir um dia atualiza o resultado (409 → PATCH, como no G2).
 - **Release (M1):** duas propriedades próprias em cada tabela do gold, `release` e `lakefs_commit`: a release para onde o
   `LATEST_STABLE` aponta (o que os consumidores veem). Mudam a cada release e a cada rollback. O histórico das releases
@@ -39,6 +39,7 @@ G3_RULES = {
     "G3-04": "cobertura: horas do dia sem silver no main",
     "G3-05": "volume: amostras do dia contra a média dos 7 dias anteriores",
     "G3-06": "deriva: PSI das médias horárias contra os dias anteriores",
+    "G3-07": "estado desconhecido: o dia inteiro sem estado, mas com leituras GOOD (ADR-024)",
 }
 DESCRIPTIONS = {
     "dim_asset": "ativos e o que se sabe deles (tipo, potência, estados de funcionamento)",

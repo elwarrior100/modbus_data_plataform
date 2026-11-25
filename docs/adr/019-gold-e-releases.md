@@ -330,7 +330,7 @@ porque o `main` avançou). O ficheiro da silver não muda (`silver_version` "2")
   comunicação (o `device_clock` do ativo com dados). Uma leitura `BAD` acaba o valor. Médias, energia e volume são
   somas sobre os segundos com dados, e cada hora soma 3600 s;
 - **estado inicial**: os sinais "até à leitura seguinte" podem estar dias sem linhas; o dia D começa com o valor em
-  vigor no fim de D−1 (`value_end` do `fact_tag_hour` de D−1). Por isso os dias correm por ordem;
+  vigor no fim de D−1 (`value_end` do `fact_tag_hour` de D−1). Por isso os dias correm por ordem; *(Revisto no ADR-024: sem D−1, ou com o `value_end` nulo, procura-se a última leitura na silver anterior.)*
 - **KPIs de turno e de dia de produção** ficam na partição do dia UTC em que o período **acaba** (o turno C e o dia de
   produção acabam às 06:00 de Lisboa do dia seguinte); leem as horas de D−1 do `fact_asset_hour` de D−1;
   `complete = false` se faltarem horas;

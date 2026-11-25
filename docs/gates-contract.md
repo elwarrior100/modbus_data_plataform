@@ -142,6 +142,7 @@ O mesmo desenho do G2: o **G3** (Python, `pipelines/src/gold/g3.py`) decide e es
 | G3-04 cobertura | horas de D sem silver no `main` (recusadas pelo G2, ou que não correram) | qualquer | > 6 h **(a calibrar)** |
 | G3-05 volume | amostras do dia contra a média dos dias anteriores que estão no gold (até 7) | ±20 % | — (`info` sem histórico) |
 | G3-06 deriva | PSI das médias horárias de cada tag analógica contra os dias anteriores (decis da referência) | PSI > 0,25 | — (`info` com menos de 3 dias de histórico) |
+| G3-07 estado desconhecido | um ativo com o dia inteiro "sem dados" no `fact_asset_hour` (nenhum segundo com estado), mas com leituras GOOD no `fact_tag_hour` — quase sempre falta o estado inicial (ADR-024) | qualquer | — |
 
 O rendimento > 1 e o COP > 12 não estavam no ADR: são impossíveis fisicamente (um rendimento acima de 1 cria energia),
 por isso entraram no G3-03 como bloqueio. O PSI fica em aviso de propósito: com o simulador, uma deriva é muitas vezes
